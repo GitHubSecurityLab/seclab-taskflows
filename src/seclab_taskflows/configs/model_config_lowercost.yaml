@@ -5,5 +5,5 @@ seclab-taskflow-agent:
   version: 1
   filetype: model_config
 models:
-   code_analysis: gpt-4.1-mini
-   general_tasks: gpt-4.1-mini
+   code_analysis: gpt-5-mini
+   general_tasks: gpt-5-mini
