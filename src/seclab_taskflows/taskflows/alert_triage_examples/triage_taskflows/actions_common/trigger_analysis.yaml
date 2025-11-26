@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      async: true
+      user_prompt: |
+        You must first make sure that the workflow containing the alert is active. You can do this by using the `check_workflow_active` tool with
+        the actual repository and workflow_id derived from the file path {{ RESULT_location }}.
+        If it is not `active`, then the set the `valid` field of the alert result to `false` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}
+        and update the alert result with the reason that the action is not active and set the `valid` field of the alert to false. 
+        If the workflow is not active, then your task is done. Do not continue with the task.
+
+        Check if the action is reusable or not using the dedicated tool rather than looking through the file.
+
+        Do the following to assess the alert:
+
+        1. Use the dedicated tool `get_high_privileged_workflow_triggers` to get the high privileged triggers of the workflow. 
+        If there is ANY high privileged triggers, then the alert is a potential vulnerability. 
+        Add the high privileged triggers to your notes and clearly state that these are high privileged triggers.
+        2. If the action is reusable, then it is a potential vulnerability.
+        then the alert is also a potential vulnerability.
+
+        If neither of the above is true, that is, if the workflow containing the alert is not high privileged and is not reusable, then 
+        the alert is NOT a potential vulnerability. Set the `valid` field of the alert to false. List the workflow triggers using 
+        the `get_workflow_trigger` tool and explain that
+        the workflow is neither reusable nor high privileged in your notes, and update the alert results with your notes.
+
+        If the workflow is either high privileged or reusable, 
+        then the alert is a potential vulnerability. Set the `valid` field of the alert to true.
+        Then get the following additional information and add them to your notes:
+
+        1. Inspect the workflow file to see if any permission is granted to the action. List all the permissions in your notes
+        2. Then check and see if the action is using any secrets.
+           IMPORTANT: Do not consider GITHUB_TOKEN as a secret. Include the name of the all the secrets and their line numbers in the notes.
+
+
+        Take notes while assessing the alert, including the trigger, permissions, and secrets used by the action.
+        IMPORTANT:
+        You must include all the triggers of the action in the notes, even if they are not high privileged triggers or `workflow_call`.
+        Store your notes in the `results` field of the alert result by updating the alert results.
+        For secrets, include the name of the secret and the line number where it is used in the notes.
+
+        When you are done, set the `valid` field of the alert result to `true` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}
+        if the alert is a potential vulnerability, otherwise set it to `false`. 
+
+        IMPORTANT:
+        Only include the information that is relevant to the alert in the notes, 
+        do not comment on any other factors, such as how the injected code is used in the rest of the workflow.
+        and base your decision only on the criteria above. You're only doing trigger analysis in this step.
+
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflows.toolboxes.gh_actions

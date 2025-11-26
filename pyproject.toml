@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "seclab-taskflows"
+dynamic = ["version"]
+description = 'Example taskflows to use with the the GitHub Security Lab Taskflow Agent Framework (https://github.com/GitHubSecurityLab/seclab-taskflow-agent)'
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "GitHub Security Lab", email = "securitylab@github.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "seclab-taskflow-agent",
+]
+
+[project.urls]
+Source = "https://github.com/GitHubSecurityLab/seclab-taskflows"
+Issues = "https://github.com/GitHubSecurityLab/seclab-taskflows/issues"
+
+[tool.hatch.version]
+path = "src/seclab_taskflows/__about__.py"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/seclab_taskflows tests}"
+
+[tool.coverage.run]
+source_pkgs = ["seclab_taskflows", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/seclab_taskflows/__about__.py",
+]
+
+[tool.coverage.paths]
+seclab_taskflows = ["src/seclab_taskflows", "*/seclab-taskflows/src/seclab_taskflows"]
+tests = ["tests", "*/seclab-taskflows/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]

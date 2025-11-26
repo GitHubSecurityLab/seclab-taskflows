@@ -1,0 +1,314 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals: 
+  rule: actions/code-injection/critical
+taskflow:
+  - task:
+      headless: true
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.cleanup_results
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      name: create repo list
+      description: create repo list to fetch alerts from.
+      run: |
+        echo '[ {"repo": ""}]'
+  - task:
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_common.fetch_code_scanning_alerts
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      name: fetch alert results
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the alert results that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      name: trigger analysis
+      description: |
+        Collect information about the events that trigger the workflow.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.trigger_analysis
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the valid alert results that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      name: audit injection point
+      description: Check if code injection point is valid.
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      model: triage
+      user_prompt: |
+        The alert_id is {{ RESULT_alert_id }} and the repo is {{ RESULT_repo }}.
+
+        Take a look at the code at near the alert location {{ RESULT_location }}. This usually contains some user inputs being evaluated or executed, 
+        which may lead to code injection. For example:
+        ```
+        run: |
+        # Search for e2e issues with matching title using major.minor version
+        E2E_TITLE=$(cat <<'EOF'
+        [e2e] ${{ github.event.issue.title }}
+        ```
+        In the above, the `github.event.issue.title` is a user input that is being evaluated in with the `${{}}` syntax.
+
+        In the above, the `github.event.issue.title` is a user input that is being evaluated in with the `${{}}` syntax, 
+        because it is then used in the script in the `run` field, it may lead to code injection.
+
+        IMPORTANT:
+        1. Only look at the expression that is evaluated at the alert location {{ RESULT_location }}, and don't consider other 
+        expressions that may be evaluated in the same script or workflow. However, there may be multiple
+        expressions that are evaluated at the same alert location, so you should look for all of them.
+        2. Double quotations around the expression does not prevent code injection, so you should still consider it as a code injection vulnerability.
+        For example, in the following code:
+        ```
+        run: |
+        ISSUE_TITLE="${{ github.event.issue.title }}"
+        ```
+        IS vulnerable, even if it just stores the user input in a variable and it is double quoted.
+        if `${{ github.event.issue.title }}` is a user input, then it can bypass the quotation if it contains a double quotation, such as:
+        ```
+        "echo test"
+        ```
+        then the double quotation will be removed and the code will be executed as:
+        ```
+        run: |
+        ISSUE_TITLE=echo test
+        ```
+        3. Github branch names, such as `github.event.pull_request.head.ref`, `github.ref`, `github.head_ref`, `github.ref_name` are also user inputs, 
+        and they may contain code injection payloads, so you should also consider them as user inputs, because there are very few
+        restrictions on branch names, and they can be set by the user.
+
+        ## Invalid user input
+
+        Some user inputs, however, should not be considered as valid code injection point:
+        1. The `github.event.pull_request.number` and `github.event.issue.number` are the numbers of the pull request and issue and cannot be
+        controlled by the user and cannot be used for code injection. In general, an input that ends in `.number` is not considered to be valid 
+        user input.
+        IMPORTANT:
+        Only consider `.number` input as invalid if it comes directly from a `github` event. An input may have the name `number` but comes from
+        inputs such as artifacts or outputs of steps, which may not actually be a number. For example, in the following:
+        ```
+          pr_number="$(head -n 2 /tmp/artifacts/metadata.txt | tail -n 1)"
+          pr_commit="$(tail -n 1 /tmp/artifacts/metadata.txt)"
+          echo PR_COMMIT="$pr_commit" >> "$GITHUB_ENV"
+          echo PR_NUMBER="$pr_number" >> "$GITHUB_ENV"        
+        ```
+        `pr_number` may still be user controlled and not actually a number.
+
+        2. The `github.event.pull_request.draft` is also not a valid code injection input.
+
+        ## Sanitizers
+
+        In some cases, however, the user input may be sanitized or checked before being used. 
+        IMPORTANT:
+        ONLY consider the following sanitizers as safe. DO NOT dismiss the alert based on any 
+        other methods of sanitizing or checking the user input, even if you think they are safe.
+        1. If the user input is sanitized with the `toJSON` function:       
+        ```
+        run: |
+        echo "The issue title is: ${{ toJSON(github.event.issue.title)}}"
+        ```
+        2. The user input is evaluated in the `env` section, such as:        
+        ```
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          echo "The issue title is: ${{ env.ISSUE_TITLE }}"
+        ```
+        IMPORTANT:
+        However, if envoirnment variables are not set in the `env` section, but are set in the `run` section, then it is vulnerable to code injection:
+        ```
+        run: |
+          echo "TITLE=${{ github.event.issue.title }}" >> $GITHUB_ENV
+        ```
+        even if it uses `$GITHUB_ENV`, because the user input is still being evaluated in the `run` section, and it is not sanitized or checked before being used.
+        3. If the user input is sanitized with the `parseInt` function:
+        ```
+        run: |
+        echo "The pull request number is: ${{ parseInt(github.event.pull_request.number)}}"
+        ```
+        IMPORTANT:
+        A sanitizer is only effective if it is done before the user input is evaluated or executed, that is, before 
+        any `${{}}` syntax is used on the user input, and it must be a strong check that prevents code injection.
+        For example:
+        ```
+        run: |
+          COMMENT = ${{ github.event.issue.comment.body }}
+          if [[ "$COMMENT" == "valid comment" ]]; then
+            echo "The comment is valid"
+          fi
+        ```
+        is insufficient, because `${{ github.event.issue.comment.body }}` by itself is already evaluated and executed, so it does not matter how
+        the bash variable `COMMENT` is used, and whether there is any checks performed on that variable, it is still vulnerable to code injection.
+        2. The following is NOT safe, because the user input is being evaluated in the `run` section:
+        ```
+        run: |
+          if [[ "${{ github.event.issue.title }}" == "title" ]]; then
+            echo "The title is valid"
+          else
+            echo "The title is invalid"
+          fi
+        ```
+        even though it looks like a check. In any case, do not consider pattern matching checks as a valid security check.
+
+        3. The alert may also identify outputs of previous steps that are being evaluated or executed, such as:
+        ```
+        run: |
+        echo "The output is: ${{ steps.step_id.outputs.output_name }}"
+        ```
+        In this case, you should treat the output as a user input and check if it is sanitized or checked before being used.
+
+        IMPORTANT:
+        All of the above applies to expressions that are evaluated in the `script` section using `actions/github-script` as well, such as:
+        ```
+        - name: Run script
+          uses: actions/github-script@v6
+          with:
+            script: |
+              console.log(`The issue title is: ${github.event.issue.title}`);
+        ```
+        Is also vulnerable to code injection, because the user input is being evaluated in the script, and it is not sanitized or checked before being used.
+
+        Note any valid sanitizer or checks in the notes, including the lines of the checks or sanitizer and mention that the code is not vulnerable to code injection.
+        ONLY consider the exact sanitizers stated above, and do not try to reason about other sanitizers or checks that may be present in the code.
+        Check to make sure that the sanitizers or checks happens before the code injection vulnerability at {{ RESULT_location }}.
+
+        ## Validity decision
+
+        When deciding whether the code is vulnerable to code injection, DO NOT consider how the code is used in the rest of the workflow, 
+        only consider whether the code at the alert location {{ RESULT_location }} is affected by a sanitizer or a check that takes 
+        place before the code injection vulnerability at {{ RESULT_location }}.
+
+        If the sanitizer is still valid include update the alert results with these information using the alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }} in the 
+        `update_alert_result` tool with your notes as the `result`. Remember to include the line numbers of the checks or sanitizers in the notes.
+        and then set the `valid` field of the alert result to `false` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}.
+
+        IMPORTANT:
+        You must only based your decision on the present of sanitizer and check and not any other factors. And do not include 
+        comment on any other factors that may affect the code injection vulnerability.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflows.toolboxes.gh_actions
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the valid alert results from that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.track_workflow_users
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      name: fetch workflow users
+      description: |
+        Prepare data to do workflow reachability analysis.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the previous workflow users results by calling `fetch_last_workflow_users_results`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_actions
+  - task:
+      name: workflow reachability analysis
+      description: |
+        Perform workflow reachability analysis and collect trigger events and permissions of the users of the
+        vulnerable workflow.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.audit_workflow_users
+  - task:
+      must_complete: true
+      model: general_tasks
+      exclude_from_context: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the all the alert results from that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.review_report
+      name: review report
+      description: |
+        Review the information gathered from the audit notes to determine whether this alert is a FP.
+      inputs:
+        vuln_specifics: |
+          DO NOT look for sanitizers of user input beyond those mentioned in the notes. If the notes does not 
+          mention any sanitizers used on the user input, then assume that the user input is not sanitized, even if
+          you think the code is safe from code injection.
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the valid the alert results from that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.create_report
+      name: create report
+      description: |
+        Use the information in the notes and the decision made in the previous step to create a bug report.
+      inputs:
+        title: Code injection in Github Actions <action_name>
+        vul_specifics: |
+          First, the report should state that the GitHub action at {{ RESULT_location }} executing user input. 
+          Add a code snippet from the file at {{ RESULT_location }} that contains the code injection vulnerability and 
+          explain which user input is being evaluated or executed, which may lead to code injection.
+  - task:
+      must_complete: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Clear the memcache entry with key `dismissed_alerts_summary` and `repos`.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch all the entries in your memory cache.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      name: check report
+      description: |
+        Check that the bug report created in the previous step has all the information that is needed.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.check_report
+      inputs:
+        vuln_specifics: |
+          You decision must be based only on the criteria above, and not any other factors. 
+          DO NOT mark the alert as invalid if you think the code is safe from code injection.

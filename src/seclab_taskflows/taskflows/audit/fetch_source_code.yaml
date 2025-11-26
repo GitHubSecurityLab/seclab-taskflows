@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+# Taskflow to analyze the general contextual information of a project and classify the different applications within it
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      model: general_tasks
+      user_prompt: |
+        Fetch the source code of the repo {{ GLOBALS_repo }}.
+      toolboxes:
+        - seclab_taskflows.toolboxes.local_gh_resources

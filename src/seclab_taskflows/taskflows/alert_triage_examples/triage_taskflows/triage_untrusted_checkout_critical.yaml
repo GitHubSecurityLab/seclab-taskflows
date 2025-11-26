@@ -1,0 +1,210 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals: 
+  rule: actions/untrusted-checkout/critical
+taskflow:
+  - task:
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.cleanup_results
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      name: create repo list
+      description: create repo list to fetch alerts from.
+      run: |
+        echo '[{"repo": ""}]'
+  - task:
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_common.fetch_code_scanning_alerts
+  - task:
+      must_complete: true
+      model: general_tasks
+      exclude_from_context: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the alert results that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      name: trigger analysis
+      description: |
+        Collect information about the events that trigger the workflow.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.trigger_analysis
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the valid alert results that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      model: triage
+      name: audit checkout and code execution
+      description: Check for code execution point after the untrusted checkout.
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      async: true
+      user_prompt: |
+        Take note of potential invocation of untrusted code after the location of the alert, where untrusted code is checked out.
+        In particular, look for any package managers like `npm`, `yarn`, or `pnpm` that are used to install dependencies after this point,
+        Also look for build tools such as `make`, `cmake`, `gradle`, `mvn` that are used to build code within the repository after this point.
+        Also look out for invocation of another action or script within the repository. Only 
+        include actions that are within the same repository, which has their name starting with `.github/workflows/` or 
+        starts with a relative path. Any other actions that are invoked from an external repository are not considered untrusted code.
+        Note also that scripts can also be invoked using the interpretor, like `python ./scripts/deploy.py` or `bash ./scripts/deploy.sh`.
+        Also consider invocations of linters, formatters or checkers, such as `pylint`, `stylelint`, `prettier`, `tflint` as untrusted invocations.
+        Bundling tools such as `webpack`, `rollup`, `parcel` are also considered untrusted invocations.
+
+        Add any such findings to your notes and update the `results` field of the alert result accordingly.
+        You should include the line number where the untrusted code is invoked, as well as the untrusted code or package manager that is invoked in 
+        the notes.
+        If you cannot find any such invocation, then mention that in your notes as well.
+        Update the results field of the alert result with your notes using `update_alert_result` with 
+        {{ RESULT_alert_id }} as alert_id and {{ RESULT_repo }} as repo.
+
+        When you are done, set the `valid` field of the alert result to `true` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}
+        if the alert is a potential vulnerability, otherwise set it to `false`. 
+        IMPORTANT: You must also do the following checks.
+        1.If the ONLY alert trigger is `workflow_dispatche`, then you should set the `valid` field to `false` and update the alert result with the reason that the trigger is `workflow_dispatch`.
+        2. Look through your notes and check for untrusted code invocation. These are either:
+            - A package manager like `npm`, `yarn`, or `pnpm` that is used to install dependencies after the alert location.
+            - An action that is invoked from the same repository, which has its name starting with a relative path or `.github/workflows/` or `.github/actions/`
+            - Any script that is invoked from the same repository, which has its name starting with a relative path.
+            - Any build tool that is invoked to build code from the same repository.
+            - Any linters, formatters or checkers, such as `pylint`, `stylelint`, `prettier`, `tflint` that is invoked.
+            - Any bundling tools such as `webpack`, `rollup`, `parcel` that are invoked.
+
+        If no invocation of untrusted code is found, then also set the `valid` field to `false` and update the alert result with the reason that no untrusted code is found.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflows.toolboxes.gh_actions
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the valid alert results from that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      name: fetch workflow users
+      description: |
+        Prepare data to do workflow reachability analysis.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.track_workflow_users
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the previous workflow users results by calling `fetch_last_workflow_users_results`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_actions
+  - task:
+      name: workflow reachability analysis
+      description: |
+        Perform workflow reachability analysis and collect trigger events and permissions of the users of the
+        vulnerable workflow.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.audit_workflow_users
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the all the alert results from that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      name: review report
+      description: |
+        Review the information gathered from the audit notes to determine whether this alert is a FP.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.review_report
+      inputs:
+        vuln_specifics: |
+          Next check for invocation of untrusted code in the notes. The notes may mention different invocations of code, 
+          you should check each of them to see if they are really untrusted or not. Again, do not trust the conclusion of the notes, but inspect the notes and check.
+          Invocation of code is considered untrusted if it is one of the following:
+              - A package manager like `npm`, `yarn`, or `pnpm` that is used to install dependencies after the alert location.
+              - An action that is invoked from the same repository, which has its name starting with a relative path or `.github/workflows/` or `.github/actions/`
+              - Any script that is invoked from the same repository, which has its name starting with a relative path.
+              - Any build tool that is invoked to build code from the same repository.
+              - Any linters, formatters or checkers, such as `pylint`, `stylelint`, `prettier`, `tflint` that are invoked.
+              - Any bundling tools such as `webpack`, `rollup`, `parcel` that are invoked.
+          If you cannot find any such invocation, then the alert is invalid.
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the valid the alert results from that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      name: create report
+      description: |
+        Use the information in the notes and the decision made in the previous step to create a bug report.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.create_report
+      inputs:
+        title: Checking out of untrusted code in Github Actions <action_name> may lead to code execution in privileged context/secret leak
+        vul_specifics: |
+          First, the report should state that the GitHub action at {{ RESULT_location }} is checking out untrusted code. You should then include 
+          a code snippet from the file at the alert location {{ RESULT_location }}, that contains the few lines around the location where 
+          the `checkout` action is used.
+
+          Next, from the analysis of the alert, identify any invocation of untrusted code after the location of the alert, where untrusted code is checked out.
+          The notes may contain invocations that are not considered untrusted, so you should only include an invocation of untrusted code if it is one of the following:
+          - A package manager like `npm`, `yarn`, or `pnpm` that is used to install dependencies after the alert location.
+          - Build tools such as `make`, `cmake` that is used to build code within the repository after the alert location.
+          - Any linters, formatters or checkers, such as `pylint`, `stylelint`, `prettier`, `tflint` that are invoked.
+          - Any bundling tools such as `webpack`, `rollup`, `parcel` that are invoked.
+          - An action that is invoked from the same repository, which has its name starting with a relative path or `.github/workflows/` or `.github/actions/`
+          - Any script that is invoked from the same repository, which has its name starting with a relative path. It could be 
+            a shell script, python script, or any other script that is invoked from the same repository.
+            IMPORTANT:
+            Note that scripts can also be invoked using the interpretor, like `python ./scripts/deploy.py` or `bash ./scripts/deploy.sh`.
+            these cases are also considered untrusted code.
+          Only include the line number and code snippet from the action file that contains the invocation of untrusted code
+          in the report. Ignore the invocations that are not considered untrusted code. 
+          In the report, include code snippet where the that untrusted code is invoked from the file at {{ RESULT_location }}, 
+          mention the line number where the untrusted code is invoked. Explain that because the action has checked out to 
+          an attacker-controlled branch, the code that is invoked now lives on that branch and is under the control of the attacker,
+          this invocation is therefore now executing attacker-controlled code in the context of the GitHub action.
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch all the entries in your memory cache.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      name: check report
+      description: |
+        Check that the bug report created in the previous step has all the information that is needed.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.check_report
+      inputs:
+        vuln_specifics: ""

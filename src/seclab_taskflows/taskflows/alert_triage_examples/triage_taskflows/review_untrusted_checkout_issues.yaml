@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Clear the memcache entry with key `dismissed_alerts_summary`.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.collect_dismiss_reasons
+      name: collect dismiss reasons
+      description: |
+        Go through alerts in the repo to collect the reasons why they are dismissed.
+      inputs:
+        repos: |
+          ""
+        rule: actions/untrusted-checkout/critical
+        label: MANUAL
+      inputs: 
+        vuln_specifics: |
+          5. A check to ensure that the repository is not a fork, or check that the pull request is not from a fork repository. 
+          This applies to any trigger.
+  - task:
+      must_complete: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      exclude_from_context: true
+      user_prompt: |
+        Fetch all the memcache entries.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      repeat_prompt: true
+      model: triage
+      async: true
+      name: check dismiss reason
+      description: |
+        Check if reasons for dismissing other alerts in this repo applies to this alert. If it does, 
+        then dismiss this alert and add a comment to the issue to explain the reason.
+      user_prompt: |
+        {{ PROMPTS_seclab_taskflows.prompts.triage_taskflows.actions_common.check_dismiss_reason }}
+        
+        {{ PROMPTS_seclab_taskflows.prompts.triage_taskflows.actions_common.dismiss_decision }}
+
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.github_official
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.gh_actions

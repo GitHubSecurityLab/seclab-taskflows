@@ -1,0 +1,88 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      user_prompt: |
+        This alert has has alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}. The notes of this alert is: 
+        ```
+        {{ RESULT_result }}
+        ```
+        Your task is to check that the notes is consistent. Do not trust the conclusion of the notes, but inspect the notes and check
+        for the validity criteria. Once you have determined the validity of the alert, set the validity of the alert with a tool call and 
+        the task is done. If you decided that the alert is invalid, then 
+        update the alert result with a section called "Reviewer analysis" and state the reason why the alert is invalid.
+        Once a criteria in the following determines the validity of an alert, the task is done. Set the validity, update the notes and finish the task.
+        DO NOT carry on any further.
+
+        IMPORTANT:
+        You must ignore any previous conclusion of the alert, including those under "Reviewer analysis" section, and your decision
+        must be based only on the criteria that I set out. If any criteria states that the alert is valid or invalid,
+        then that decision is final. You must stop at once and conclude the validity of the alert based on that criteria and 
+        set the validity of the alert accordingly.
+
+        {{ INPUTS_vuln_specifics }}
+
+        First check for trigger of the alert in the notes.
+        1. If the alert location {{ RESULT_location }} is a high privileged workflow according to `get_high_privileged_workflow_triggers`, then 
+        the alert is valid.
+        2. If the ONLY alert trigger is `workflow_dispatch`, then it is invalid.
+        3. If the alert location {{ RESULT_location }} is not a reusable action, and the `get_high_privileged_workflow_triggers` says it is
+        not high privileged, then it is invalid.
+        4. If the alert location {{ RESULT_location }} is not a reusable action, then check that the workflow is active.
+           If it is not active, then the alert is invalid.
+        5. Check that the workflow is active using the 
+        `fetch_workflow` tool with the actual repository and workflow_id derived from the file path {{ RESULT_location }}.
+        If it is not `active`, then the alert is invalid.
+
+        If the alert location {{ RESULT_location }} is not a reusable action, but the `get_high_privileged_workflow_triggers`
+        indicates the alert is high privileged, then the alert is valid.
+
+        Only Do the following if the alert is in a reusable action. If the alert is not reusable, then the task is done.
+
+        If the alert location {{ RESULT_location }} is a reusable action, then you should check if the action is used in any other workflow.
+        IMPORTANT:
+        If the alert is a reusable action, then even if it contains a high privileged trigger, you should still
+        consider it as a reusable action and check for its users.
+        Look in the notes for any mention of the action name being used in any other workflow. 
+        This is usually in the end of the notes which says The action <...> is used in the file <...>. If there is
+        a sentence like this, then the action of the alert is used.
+
+        If the notes concluded that 
+        there is no user of the action, you should not trust that conclusion and inspect the notes yourself.
+        If you cannot find any use of the action, and the `get_high_privileged_workflow_triggers` tool, 
+        indicate the workflow is not high privileged, then the alert is invalid. Mark the alert as invalid.
+        However, if the `get_high_privileged_workflow_triggers` indicates the workflow is high privileged, then the
+        alert is valid.
+        Update the "Reviewer analysis" section of the alert result with the reason why validity of the alert and
+        the task is done.
+        DO NOT carry on with the analysis.
+
+        For a reusable action, check the notes to see if any user of the action is a high privileged workflow using the 
+        `get_high_privileged_workflow_triggers` tool.
+        If that's the case, then the alert is valid. Mark the alert as valid, update the "Reviewer analysis" section of the alert result
+        with the reason why the alert is valid
+        and the task is done. DO NOT carry on the task.
+
+        Check the notes again to see if any user of the action is a high privileged workflow using the 
+        `get_high_privileged_workflow_triggers` tool. If none of them
+        is high privileged  AND the workflow itself is not high privileged, then the alert is invalid. Mark the alert as invalid and update the "Reviewer analysis" section of the alert result
+        with the reason why the alert is invalid.
+
+        When you are done, set the `valid` field of the alert result according to your analysis using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflows.toolboxes.gh_actions
+  

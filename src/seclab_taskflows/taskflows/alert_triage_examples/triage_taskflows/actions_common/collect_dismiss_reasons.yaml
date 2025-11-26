@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      user_prompt: |
+        Fetch the dismissed alerts from the {{ INPUTS_repos }} and use {{ INPUTS_rule }}.
+
+        Look through the dismissal comments and only consider comments that starts with {{ INPUTS_label }}.
+
+        Additionally, include the following dismissal reasons:
+        1. There is a check to ensure that vulnerable code only runs when a label is present on the PR.
+        2. There is a check to ensure that the workflow is run by a trusted user, such as a member of the org or repo.
+        3. There is a check to ensure that the vulnerable code is run in an environment that requires extra approval, such as a production environment.
+        4. There is a check to ensure that vulnerable code only runs when the workflow is triggered by an event that is not controlled by the user, 
+           such as a push event or a merge event.
+        {{ INPUTS_vuln_specifics }}
+
+        Summarize the reasons for dismissal in a single markdown formatted text block, without mentioning the alert id, rule or the repo name.
+        Store the summary in the memcache with the key `dismissed_alerts_summary`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_code_scanning
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.gh_actions

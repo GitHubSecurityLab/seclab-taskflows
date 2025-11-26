@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+# Taskflow to analyze the existing information
+taskflow:
+  - task:
+      must_complete: true
+      headless: true
+      model: general_tasks
+      exclude_from_context: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the components of the repo {{ GLOBALS_repo }}.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+  - task:
+      model: code_analysis
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      max_steps: 100
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      user_prompt: |
+        The component has component_id {{ RESULT_app_id }} and location {{ RESULT_location }} in the repo {{ RESULT_repo }}.
+        Fetch the entry points of the component and for each entry point, check if this entry point is a server endpoint.
+        If it is reachble as a server endpoint, then you need to find the following by looking through the relevant files:
+        - The routing path that reaches this entry point 
+        - HTTP method
+        - Note any middlewares used. 
+        - Also note which roles are allowed to call it. Note which kind of authentication is required for that endpoint. It is possible 
+        that the entry point does not have require any authentication. In which case, you can leave both roles and auth fields empty.
+
+        For each entry point identified as a web endpoint create a new web entry point using
+        the information gathered.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.local_file_viewer

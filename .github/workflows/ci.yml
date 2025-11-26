@@ -1,0 +1,42 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run Tests ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.11', '3.13'] # the one we have in the Codespace + the latest supported one by PyO3.
+      fail-fast: false  # Continue testing other version(s) if one fails
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+
+    - name: Install Hatch
+      run: pip install --upgrade hatch
+
+    - name: Run static analysis
+      run: |
+        # hatch fmt --check
+        echo linter errors will be fixed in a separate PR
+
+    - name: Run tests
+      run: hatch test --python ${{ matrix.python-version }} --cover --randomize --parallel --retries 2 --retry-delay 1

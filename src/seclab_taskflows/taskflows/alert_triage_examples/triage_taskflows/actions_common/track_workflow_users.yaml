@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      model: triage
+      user_prompt: |
+        The alert_id is {{ RESULT_alert_id }} and the repo is {{ RESULT_repo }}.
+        
+        Check that if the workflow in the alert location {{ RESULT_location }} is an reusuable action. Remember to 
+        check if the location is an external action, and use the appropriate repository and file path to check if it is a reusable action.
+        
+        If the alert location is not an reusable action, then you are done.
+        Otherwise, use the `get_workflow_user` tool to find the users of the reusable action and save the results to database. Use 
+        {{ RESULT_repo }} as the repository regardless of whether the action is an external action or not, because 
+        we are looking for the use of the action in {{ RESULT_repo }} rather than the actual repository. 
+        Use the file path of the location {{ RESULT_location }} as the workflow file path. You do not need to 
+        decode the file path when using `get_workflow_user`, it will handle that for you.
+
+        Finally, add an alert flow entry for the alert with the alert_canonical_id {{ RESULT_canonical_id }},
+        the repo {{ RESULT_repo }},
+        the alert location file path WITHOUT the line numbers as the `next`, a wildcard "*" as `prev`, and a wildcard "*" as `flow_data`.
+
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflows.toolboxes.gh_actions

@@ -1,0 +1,151 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  rule: js/xss
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      name: create repo list
+      description: create repo list to fetch alerts from.
+      run: |
+        echo '[ {"repo": ""}]'
+  - task:
+      headless: true
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_common.fetch_code_scanning_alerts
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the alert results that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      must_complete: false
+      repeat_prompt: true
+      max_steps: 40
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      async: true
+      name: audit alert location
+      description: |
+        Perform local analysis to look for sanitizer that may result in a FP.
+      user_prompt: |
+        Inspect the alert location at {{ RESULT_location }} in the repo {{ RESULT_repo }} to determine if it is in an exploitable client-side cross-site scripting (XSS) vulnerability.
+        Client-side means that the code is executed in the user's browser, not on the server.
+
+        In this task, restrict your analysis to the function that contains the alert location only. Do not trace the calls of the function. Just
+        perform a local analysis.
+
+        Exploitable means that a remote attacker would be able to inject a malicious script into the web application that would be executed in the context of a user visiting the page.
+        This could include a `javascript:` URL, a `<script>` tag, or any other way to inject JavaScript code into the page.
+        It also means that the XSS vulnerability is not mitigated by any other code in the repository, such as sanitization or validation of the input.
+        Check if the code tries to sanitize or validate the input. F.ex. if the output is encoded before being sent back. Or if a Regex is used to validate the input.
+        Also check if the Regex only let's true a subset of the provided input.
+        Take note of relevant regex patterns.
+        Analyze all Regex patterns used in the code to see if they are effective against cross-site scripting (XSS) attacks. Let's think step by step and explain how the Regex works.
+        If you encounter methods used for validation or sanitization, look them up and check if they are effective against cross-site scripting (XSS) attacks.
+        It is important to check for the context where a potentially malicious script would be executed, such as in the HTML body, in an attribute, or in a JavaScript context.
+        If the script would have to be given as part of another format (e.g. JSON, XML, etc.),
+        Note the context in which the potentially malicious script would be executed. e.g. HTML, JavaScript, CSS, etc.
+        Note how that format would have to be constructed and passed to the server to allow the script to be executed.
+        Note the location (file path and line number) of the validation or sanitization methods in the notes.
+
+        ## Sanitizer found
+
+        Once you've found a sanitizer that sufficiently mitigates the XSS issue, you must mark the alert as invalid,
+        update the alert results with your notes including the reason why the alert is invalid and finish the task.
+
+        ## No sanitizer found
+
+        If you cannot find any sanitizer, then carry on with the following:
+
+        If the vulnerable code sink is part of code that retrieves messages from WebSockets e.g. inside `onMessage`,
+        the XSS-vulnerability is likely not exploitable as the attacker would need to be able to send a message to the WebSocket
+        (this might be possible if the WebSocket would be used as some sort of chat notifcation system between users).
+        Take notes while assessing the alert.
+        If prompt token count exceeds the given limit note this in the result and mark the task as complete.
+        Update the results field of the alert result with your notes using `update_alert_result` with 
+        {{ RESULT_alert_id }} as alert_id and {{ RESULT_repo }} as repo.
+        When you are done, set the `valid` field of the alert result to `true` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}
+        if the alert is a potential vulnerability, otherwise set it to `false`. 
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the valid alert results that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      name: reachability analysis
+      description: |
+        Perform reachability analysis to see if the vulnerable sink can be reached remotely.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_common.reachability_analysis
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      inputs:
+        type: cross site scripting
+        sanitizer: |
+          Encoded of the data is a sanitizer. Or if a Regex is used to validate the input.
+          In addition, there maybe middleware that sanitizes the data.
+          Also check if there are Regex that only allow a subset of the provided input.
+          Take note of relevant regex patterns.
+          Analyze all Regex patterns used in the code to see if they are effective against cross-site scripting (XSS) attacks. Let's think step by step and explain how the Regex works.
+          If you encounter methods used for validation or sanitization, look them up and check if they are effective against cross-site scripting (XSS) attacks.
+        user_input: |
+          For XSS vulnerability, in addition to coming from a web request, a user controlled input must be controllable from a GET request. In particular,
+          form parameters, DOM element or data attributes, etc. are not considered user controlled input in the context of XSS. DO NOT include as
+          user controlled input.
+  - task:
+      must_complete: true
+      model: general_tasks
+      exclude_from_context: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the valid alert results that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      name: check report
+      description: |
+        Check that the audit notes contain a precise reference to remote user input that can reach the vulnerability. Dismiss the
+        report otherwise.
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_common.validate_user_input
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the valid alert results that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      name: check notes
+      description: |
+        Check that the audit notes contain everything that is needed.
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_common.check_notes

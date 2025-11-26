@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      model: triage
+      user_prompt: |
+        The alert_id is {{ RESULT_alert_id }} and the repo is {{ RESULT_repo }}.
+        The notes from the alert analysis is:        
+        ```
+        {{ RESULT_result }}
+        ```
+        Check that the notes contains a section call "User-Controlled input" or similar.
+        If the section is missing, then mark the alert as invalid and update the alert results
+        with the reason saying that no user input is found.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state

@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: 1
+
+prompt: |
+  If you decided that the ANY dismissal reason applies then alert is invalid. In this case, add the `FP` label to the issue.
+  But if the None of the dismissal reason applies, then don't add the `FP` label.

@@ -1,0 +1,39 @@
+## SecLab taskflows
+
+This repository contains example taskflows to use with the [SecLab Taskflow Agent](https://github.com/GitHubSecurityLab/seclab-taskflow-agent), as well as the custom MCP servers that are needed to run the taskflows. To run these taskflows, first create a directory named `data` in `src`. Various environment variables need to be set for the custom MCP servers to store data.
+
+```
+MEMCACHE_STATE_DIR=/app/data
+CODEQL_DBS_BASE_PATH=/app/data
+DATA_DIR=/app/data
+```
+
+The `MEMCACHE_STATE_DIR` is needed to persist some intermediate data in the memcache, `DATA_DIR` is needed for various mcp server to store intermediate results. These can be set in a `.env` file in the `src` directory.
+
+The repo provides a script [`run_seclab_agent.sh`](https://github.com/GitHubSecurityLab/seclab-taskflows/blob/main/src/run_seclab_agent.sh) to run a docker container of the `seclab-taskflow-agent` as outlined [here](https://github.com/GitHubSecurityLab/seclab-taskflow-agent/tree/main?tab=readme-ov-file#deploying-from-docker). Note that this script needs to be run from the `src` directory.
+
+Individual taskflows may need additional setup, please refer to the `README.md` in the relevant subdirectories for further requirements.
+
+## Background
+
+[SecLab Taskflows](https://github.com/GitHubSecurityLab/seclab-taskflows) is a companion repository to the [SecLab Taskflow Agent](https://github.com/GitHubSecurityLab/seclab-taskflow-agent) repository.
+SecLab Taskflow Agent is an experimental agentic framework maintained by [GitHub Security Lab](https://securitylab.github.com/). This repository provides example taskflows and supporting resources for use with the SecLab Taskflow Agent. We are using the agent and these taskflows to experiment with using AI Agents for security purposes, such as auditing code for vulnerabilities or triaging issues.
+
+We'd love to hear your feedback. Please [create an issue](https://github.com/GitHubSecurityLab/seclab-taskflows/issues/new/choose) to send us a feature request or bug report. We also welcome pull requests (see our [contribution guidelines](./CONTRIBUTING.md) for more information if you wish to contribute).
+
+## Requirements
+
+Python >= 3.9 or Docker
+
+## License
+
+This project is licensed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license. Please refer to the [LICENSE](./LICENSE) file for the full terms.
+
+## Maintainers
+
+[CODEOWNERS](./CODEOWNERS)
+
+## Support
+
+[SUPPORT](./SUPPORT.md)
+

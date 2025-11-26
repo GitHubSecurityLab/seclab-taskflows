@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo: outline/outline
+  id: 1
+# Taskflow to audit some potential issues.
+taskflow:
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      model: code_analysis
+      user_prompt: |
+        Fetch the issues in component with id {{ GLOBALS_id }} in the repo {{ GLOBALS_repo }}. Audit the second issue that was suggested.
+
+        The issues suggested are have not been probably verified and are only suggested because they are common issues in these types of 
+        application. You task is to audit the source code to check if this type of issues is present.
+
+        You need to take into account of the intention and threat model of the component in component notes to determine if an issue 
+        is a valid security issue or if it is an intended functionality. You can fetch entry points, web entry points and user actions 
+        to help you determine the intended usage of the component.
+
+        For example, the application may be a dashboard frontend that allow user to query various databases, in this case, being able 
+        to query these databases is not considered a security issue or info leak.
+
+        Or an application may be an Admin UI intended for an admin user to perform high privilege actions. In this case, the absense of
+        authentication or bypasses would be a security issue. However, issues that are reachable only after authentication are not 
+        generally considered security issue, unless it has unintended consequences or are XSS, CSRF type issues.
+
+        Do not consider scenarios where authentication is bypassed via stolen credential etc. We only consider situations that are 
+        achievable from within the source code itself.
+
+        Keep a record of the audit notes, be sure to include all relevant file path and line number. Just stating an end point, e.g.
+        `IDOR in user update/delete endpoints (PUT /user/:id)` is not sufficient. I need to have the file and line number.
+
+        If you believe there is a vulnerability, then you must include a realistic attack scenario, with details of all the file and line included, and also what an 
+        attacker can gain by exploiting the vulnerability. Only consider the issue a vulnerability if an attacker can gain privilege by 
+        performing an action that is not intended by the component.
+
+        Remember, the issues suggested are only speculation and there may not be a vulnerability at all and it is ok to conclude that
+        there is no security issue.
+
+        Before reporting to the user, reflect on the notes and check the attack scenario:
+        1. Have you included all the file and line number?
+        2. Have you included a scenario of how the vulnerability can be exploited, including the end point and untrusted input that 
+        may be used?
+        3. Is this a realistic scenario that does not require stolen credential, misconfiguration etc. that is outside of what can be achieved via source code?
+        4. In the attack scenario, what privilege can an attacker gain that is not intended by the application?
+
+        Remember, if these criteria are not satisfied, it is ok to report that there is no vulnerabilities.
+
+        In the end of the audit, collect your notes and store a new AuditResult entry. If the issue satisfies 
+        the criteria for being a vulnerability, then set the `has_vulnerability` field to True when creating the 
+        entry. If there are bugs that are due to incorrect implementation or inconsistencies, and it is not clear 
+        whether it is exploitable or not, but nevertheless the bug should be addressed to harden security, then 
+        set `has_non_security_error` to True but `has_vulnerability` to False. Set both to False if no security
+        related issues are identified. 
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.gh_file_viewer

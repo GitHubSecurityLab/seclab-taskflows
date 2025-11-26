@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      user_prompt: |
+        The bug report is as follows:
+        ```
+        {{ RESULT_value }}
+        ```
+        The alert_id and repo are encoded in the key {{ RESULT_key }} as
+        `<repo_name>_<alert_id>`. Use this to extract the alert_id and repo_name from the key. 
+
+        If the alert has a high privileged trigger, then the alert is valid and your task is done. Do nothing and DO NOT continue with the task and
+        DO NOT mark the alert as invalid or remove it from memcache.
+
+        IMPORTANT:
+        Only remove a memcache entry if the alert is invalid. If you remove a memcache entry, 
+        you must explain which of the following criteria leads you to this decision, and also set the 
+        corresponding alert as invalid. DO NOT remove a memcache entry if the alert is valid. 
+
+        Check that the report contains all the necessary information:
+        - This criteria only applies if the workflow containing the alert is a reusable action AND has no high privileged trigger. 
+          You should check it with the relevant tools in the gh_actions toolbox.
+          If that's not the case, ignore this criteria.
+          In this case, check that the report contains a section that lists the vulnerable action users. 
+          If there isn't any vulnerable action users and there is no high privileged trigger, 
+          then mark the alert as invalid and 
+          using the alert_id and repo, then remove the memcache entry with the key {{ RESULT_key }}.
+        - If it is a reusable action and contains a section that lists the vulnerable action users, then check 
+          if any of the action user is a high privileged workflow. If none of the the action users is a high privileged workflow, 
+          then mark the alert as invalid and remove the memcache entry with the key {{ RESULT_key }}.
+        - Is there any mentioning of `write` permissions or secrets used by the action? If neither are mentioned, and none of the triggers is 
+          a high privileged trigger, then mark the alert as invalid and remove the memcache entry with the key {{ RESULT_key }}.
+        - Is the only trigger of the alert `workflow_call` or `pull_request`? If so, and there is no mentioning of any 
+          `write` permission granted, then mark the alert as invalid and remove the memcache entry with the key {{ RESULT_key }}.
+
+        {{ INPUTS_vuln_specifics }}
+
+        IMPORTANT:
+        If any of the above indicates that the alert is invalid,
+        then you MUST mark the alert as invalid and remove the memcache entry with the key {{ RESULT_key }}, even if you believe 
+        the vulnerability still poses a risk. You MUST follow the instructions. You can then finish the task.
+        You should then also update the alert result with the reason why the alert is invalid, using the alert_id and repo_name extracted 
+        from the key {{ RESULT_key }}.
+        
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflows.toolboxes.gh_actions

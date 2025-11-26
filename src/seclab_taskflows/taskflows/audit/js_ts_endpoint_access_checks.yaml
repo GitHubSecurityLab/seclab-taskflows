@@ -1,0 +1,82 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+# Taskflow to analyze the access control checks of endpoints in a JavaScript or TypeScript web project.
+# It uses a CodeQL database for the analysis. (specified by the repo_nwo input)
+taskflow:
+  - task:
+      must_complete: true
+      headless: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Clear the memory cache.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      model: claude-sonnet-4
+      must_complete: false
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      inputs:
+        repo_nwo: 
+      user_prompt: |
+        Fetch CodeQL database for the {{ INPUTS_repo_nwo }} repository for the
+        JavaScript language.
+
+        You are auditing code using the previously fetched
+        CodeQL database.
+
+        This database is built for a JavaScript web project.
+
+        ## IMPORTANT: Vulnerability Pattern Details
+        
+        Review the files specifying routes and endpoints for the security vulnerabilities
+        described as follows:
+
+        Check all defined routes and endpoints for improper access control
+        that could allow unauthorized users to access or manipulate resources.
+        That can mean either an endpoint is missing access control checks entirely,
+        or that the access control checks are insufficient or incorrectly implemented.
+        It can also mean that an endpoint is accessible to users and roles who should
+        not have access, or that an endpoint allows actions that should be restricted.
+        For each endpoint add how it's protected, or if it's unprotected. Make a note
+        of decorators or middleware that are used to protect the endpoint.
+
+        ## IMPORTANT: General Guidance that ALWAYS applies
+
+        1. Do NOT ask the user for permission to perform next steps, continue your
+        analysis autonomously until it is complete.
+        
+        2. Reflect on your analysis for accuracy before returning it to the user.
+        We are only interested in results that you can clearly explain and
+        motivate as potentially vulnerable based on code examples.
+
+        3. Do NOT speculate. All answers should be motivated by code examples and
+        match the conditions of our described vulnerability pattern. Call out
+        any situation where you are unsure about your results.
+
+        4. Keep a log of your auditing notes in the `notes` key of the memory
+        cache. Update it with additional information as needed. Always list the endpoint
+        path if known.
+
+        5. Make small and concise single line notes while you work. Update the
+        existing value for `notes` in memory as you work.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.codeql
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.gh_code_scanning
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      user_prompt: |
+        Fetch your audit notes from memory using the `notes`
+        key. Do not perform any additional security review, only show me your
+        notes.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache

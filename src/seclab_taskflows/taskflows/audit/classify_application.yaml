@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+  id: 
+# Taskflow to analyze the general contextual information of a project and classify the different applications within it
+taskflow:
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      model: code_analysis
+      user_prompt: |
+        Fetch the entry points of the repo {{ GLOBALS_repo }},
+        the user actions of the repo {{ GLOBALS_repo }} and the 
+        the components of the repo {{ GLOBALS_repo }}.
+        Based on the entry points, components, user actions and README.md and if available, SECURITY.md in the {{ GLOBALS_repo }},
+        can you tell me what type of application this repo is and what kind of security boundary it has.
+        Based on this, identify the components that are most likely to have security problems. For each component, 
+        state the precise component id, and the location. (You can group multiple components that serves a single functionalities together)
+        State the most likely security problems in these components. For example, an Admin UI/dashboard may be susceptible to client side 
+        Javascript vulnerabilities such as XSS, CSRF. 
+        An authentication/authorization component may be susceptible to IDOL, bypasses etc.
+        Components that grants user accesses to data may require access control or authentication.
+
+        We're looking for more concrete and serious security issues that affects system integrity or 
+        lead to information leak, so please do not include issues like brute force, Dos, log injection etc.
+
+        Also do not include issues that requires system to be already compromised, such as issues that relies on maliciious 
+        configurations etc.
+
+        For each scenario, consider what privilege and access does the attacker needs to gain and do not include issues that 
+        requires high privilege or access to the system.
+
+        Store a component issue entry for each type of issue identified.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.gh_file_viewer
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      model: code_analysis
+      user_prompt: |
+        Fetch the issues in component with id {{ GLOBALS_id }} in the repo {{ GLOBALS_repo }}. Give a summary of each type of issue in this
+        component.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context

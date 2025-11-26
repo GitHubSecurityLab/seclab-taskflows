@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      name: set up taskflow
+      description: Clearing previous results.
+      user_prompt: |
+        Clear the alert results from with the rule `{{ GLOBALS_rule }}` and all the alert flows.
+        Then clear the memcache.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflow_agent.toolboxes.memcache

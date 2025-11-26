@@ -1,0 +1,238 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo: 
+# Taskflow to analyze the general contextual information of a project and classify the different applications within it
+taskflow:
+  - task:
+      must_complete: true
+      headless: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Clear the memory cache and clear the repo context results for repo {{ GLOBALS_repo }}
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.repo_context
+  - task:
+      model: code_analysis
+      must_complete: true
+      name: identify components
+      description: Identify different components and purpose of the repo
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      user_prompt: |
+        Inspect {{ GLOBALS_repo }} and determine its function. Determine whether the repo is a framework library,
+        or a web application etc. For repo that may contain multiple applications, determine the purpose of each 
+        application and the directories of each application. Repo can also be a library but contains actual applications, for 
+        example, a web server and admin UI etc. that are not for testing or examples.
+        
+        Apart from source code, it is also useful to look at the README.md and documentations in 
+        the repo.
+
+        For each application identified, store a new component entry in the database. Provide some brief notes about the 
+        functionality of the component with the entry.
+
+        If the repo is a library, store the root directory as a library component in the database and provide some notes about 
+        the purpose and the usage of the library.
+        
+        Identify example, demo or test code in the repo. Skip analyzing these code and do not create a component entry for these.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.repo_context
+  
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+          Fetch the components from the repo {{ GLOBALS_repo }}.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+  - task:
+      model: code_analysis
+      must_complete: false
+      repeat_prompt: true
+      async: true
+      max_steps: 100
+      name: entry point analysis
+      description: Identify entry points that allows untrusted users to interact with the component.
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      user_prompt: |
+        The component is in {{ RESULT_repo }} in the directory {{ RESULT_location }}. These are the 
+        notes for this component:
+
+        {{ RESULT_notes }}
+
+        Analyze the entry points of this application. First check whether this component is a library or 
+        an application. From previous analysis stated that:
+
+        is_application ? {{ RESULT_is_app }}
+        is_library ? {{ RESULT_is_library }}
+        
+        ## Application
+
+        For application components, you should consider the following:
+
+        Does this application consumes untrusted input, for example, web request? Or does it interact with 
+        other applications and can take input from them? User supplied arguments, 
+        configuration files, web request from hardcoded url or environment variables are not considered untrusted 
+        input. 
+        
+        However, if user arguments are pointing to some untrusted resources, then they can be considered as 
+        untrusted input. For example, a parser may take a user argument that points to a file, and in this case,
+        the file is still considered untrusted even though it is supplied via user argument.
+
+        ## Library
+
+        For library code, identify the functions that are exposed to a library user. Consider the library user 
+        as trusted and instead focus on functionalities that consumes untrusted input when they are used for 
+        building applications. 
+        
+        Ignore applications within the library such as default UI, etc. as these are going 
+        to be analyzed separately. Focus on the library code.
+
+        For example, a web application framework may expose functionalities such as http request handlers and middleware, which 
+        are typically used for handling http requests when used for building web applications. In this case, the 
+        http requests handled by these handlers and middleware are considered untrusted.
+
+        Only identify the untrusted inputs and entry points, do not analyze the security risks of the component or the 
+        entry point.
+
+        Once you're finished with this, store an "entry_point" for each entry point identified, providing the precise
+        file and line number of this entry point, as well as the user inputs that it exposes. Use the "notes" field to 
+        explain how the entry point is exposed to the end user and why the identified user inputs are untrusted. 
+        Note that line number has to be integer. If an entry point spans multiple lines, then use the first line as the line 
+        number.
+
+        ## IMPORTANT: General Guidance that ALWAYS applies
+
+        1. Do NOT ask the user for permission to perform next steps, continue your
+        analysis autonomously until it is complete.
+        
+        2. Reflect on your analysis for accuracy before returning it to the user.
+        We are only interested in results that you can clearly explain and
+        motivate as potentially vulnerable based on code examples.
+
+        3. Do NOT speculate. All answers should be motivated by code examples and
+        match the conditions of our described vulnerability pattern. Call out
+        any situation where you are unsure about your results.
+
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.repo_context
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+          Fetch the components from the repo {{ GLOBALS_repo }}.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+  - task:
+      model: code_analysis
+      must_complete: false
+      repeat_prompt: true
+      async: true
+      max_steps: 100
+      name: user actions analysis
+      description: Identify actions that untrusted users are allowed performed the component.
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      user_prompt: |
+        The component is in {{ RESULT_repo }} in the directory {{ RESULT_location }}. These are the 
+        notes for this component:
+
+        {{ RESULT_notes }}
+
+        Analyze the actions that an untrusted user is allowed to perform. The purpose of this task is not 
+        about the security of the source code, but rather get an understanding of the purpose of the component and 
+        what an untrusted user should be allowed to do under the intention of the component.
+        For example, the component may have an api that allows an untrusted user to run aribitrary command. In this 
+        case, the intention and purpose of the component is for user to run arbitrary command, and so the user action in 
+        this case is arbitrary code execution. 
+
+        Similarly, an api may allow a user to read and write files to a specific directory. In this case the intention and 
+        the user action is to read and write to restricted directory. This is different to allowing a user read and write 
+        to any directories. Be precise in these details when looking at user action.
+
+        Do not consider security risk or potential bypasses or any potential privilege escalations that is outside of the 
+        intended use. Focus only on the intended use here.
+        
+        First check whether this component is a library or 
+        an application. From previous analysis stated that:
+
+        is_application ? {{ RESULT_is_app }}
+        is_library ? {{ RESULT_is_library }}
+
+        ## Application
+        
+        For application components, you should consider the following:
+
+        What actions can a user perform using the application? Can they exectue arbitrary code? Can they 
+        make arbitrary web request? Can they read any local file? Consider restrictions that are placed on the actions 
+        that a user can perform using the application, and what actions the user should not be allowed to do
+        when using the application.
+
+        You should also state clearly the actions and privileges that a user can have when using the application.
+
+        ## Library
+
+        For library component, do the following instead:
+        When considering user privileges, consider the library user as trusted and focus on the 
+        functionalities that are exposed to untrusted users when the library is used. For example, a web 
+        application library may provide functionalities for the library user to run arbitrary script to configure 
+        the application. These are not considered "allowed actions" from an untrusted user point of view.
+
+        However, if a library exposes a REST api that allows arbitrary files to be read by unauthenticated users, 
+        then it reading arbitrary files is consider an "allowed" activity. Note any "allow" activity and how 
+        they are exposed to untrusted users, referencing the file and function in detail.
+
+        Ignore applications within the library such as default UI, etc. as these are going 
+        to be analyzed separately. Focus on the library code.
+
+        Store an user_action entry stating precising the file and line number where the allowed action is performed, and
+        provide notes about the action.
+
+        Note that line number has to be integer. If an user action spans multiple lines, then use the first line as the line 
+        number.
+
+        ## IMPORTANT: General Guidance that ALWAYS applies
+
+        1. Do NOT ask the user for permission to perform next steps, continue your
+        analysis autonomously until it is complete.
+        
+        2. Reflect on your analysis for accuracy before returning it to the user.
+        We are only interested in results that you can clearly explain and
+        motivate as potentially vulnerable based on code examples.
+
+        3. Do NOT speculate. All answers should be motivated by code examples and
+        match the conditions of our described vulnerability pattern. Call out
+        any situation where you are unsure about your results.
+
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.repo_context
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      model: code_analysis
+      user_prompt: |
+        Fetch the entry points of the repo {{ GLOBALS_repo }} and give a summary of the notes. 
+        Fetch the user actions of the repo {{ GLOBALS_repo }} and give a summary of the notes.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context

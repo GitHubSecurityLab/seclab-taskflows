@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+# Taskflow to audit some potential issues.
+taskflow:
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      model: code_analysis
+      user_prompt: |
+        Fetch the audit results in {{ GLOBALS_repo }}. Give a summary of the notes, include what has been looked at,
+        reason of the decision,
+        list each area and issue and include the precise file and line
+        in the report. If it is a vulnerability, also state the attack scenarios
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context

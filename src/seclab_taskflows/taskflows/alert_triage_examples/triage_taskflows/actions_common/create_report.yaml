@@ -1,0 +1,104 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      user_prompt: |
+        The alert_id is {{ RESULT_alert_id }} and the repo is {{ RESULT_repo }}.
+        The notes from the alert analysis is:        
+        ```
+        {{ RESULT_result }}
+        ```
+
+        You now need to create a report based on the analysis of the alert.
+        IMPORTANT:
+        Your report should based only on the analysis of the alert. You have access to the files, but 
+        do not analyze the files, only use it to retrieve code snippets to be included in the report.
+        You should also replace the word alert with vulnerability in the report. 
+
+        First determine the file path and repository of the alert from the alert location {{ RESULT_location }}.
+        The location may indicate an external file path in a different repo.
+        Inspect the alert location at {{ RESULT_location }} in the repo {{ RESULT_repo }} to determine if it is in an external action or not.
+        If the file path starts with `.github/workflows/external/`, then it is an external action. In this case, 
+        extract the actual repository from the file path, which is encoded as follows:
+        The file path is in the format `.github/workflows/external/<repo_owner>/<repo_name>/<actual_file_path>`.
+        In this case, the actual repository `<repo_owner>/<repo_name>` and the file path is `<actual_file_path>`, 
+        Otherwise, it is an internal action that is in {{ RESULT_repo }} with the expected file path.
+
+        {{ INPUTS_vul_specifics }}
+
+        Next, take a look at the use of secrets from the notes. Again, include code snippets from the action file that contains the use of secrets in the notes.
+        If any secrets is used, then state in your report that the code execution identified in the previous step may then lead to the secrets being leaked.
+  
+        Next look for any `write` permission granted to the action, and include the line and permission type in the report, then 
+        state that the code execution from the vulnerability may lead to the action gaining various `write` permission. If 
+        no `write` permission is granted, you don't need to include this step in the report.
+
+        If the alert has a high privileged trigger, then state that the alert can be triggered by the attacker, and runs in a privileged context.
+
+        If the alert can be triggered by `workflow_run`, then add the following explanation to the report:
+
+        A malicious attacker can create a workflow on their PR branch and 
+        with the `pull_request` trigger and name to the trigger of the `workflow_run`. If the attacker then trigger that workflow, the 
+        `workflow_run` workflow will then be triggered and run in a high privileged context. This is because `pull_request` triggered
+        workflow runs actions that lives on the PR branch instead of the target branch.
+        
+        If the alert location is a reusable action, then from the notes, look for each use of the reusable action.
+        IMPORTANT:
+        If the alert location is a reusable action, then you must still check its use unless it is triggered by a 
+        high privileged trigger.
+
+        Include a section that clear states the trigger of the alert action, and whether it is 
+        a reusable action or not.
+
+        Start a new section called "Vulnerable action user" and include the following information:
+
+        For each use, if the use is high privileged,
+        then state that the alert can be triggered by the attacker and include it in the report. 
+        IMPORTANT:
+        If the use does not have a high privileged trigger, then you must ignore this use and
+        move on to the next use and do not include it in the report.
+
+        If the use has a high privileged trigger, then do the following:
+        The notes will contain the line number where the reusable action is used.
+        In the report, state that the user action uses the {{ RESULT_location }} action and include the line number where it is used.
+        Then include any permission or secret used by the user action in the report, if any.
+
+        If that is the case, and there is no extra permissions granted either to the action or its users, 
+        then state that the action runs in a low privileged context and mark the alert as invalid.
+
+        The title of the report should be something like:
+        ```
+        ## {{ INPUTS_title }}
+        ```
+
+        The first sentence of the report must contain the alert id and the repo, like:
+
+        ```
+        This report is for the alert with id {{ RESULT_alert_id }} in the repository {{ RESULT_repo }}.
+        ```
+
+        Include either privileged context or secret leak in the title based on the analysis of the alert.
+        The report should be in markdown format.
+        When you are done, create a memcache entry with the {{ RESULT_repo }}_{{ RESULT_alert_id }} as the key and the report as the value, and store it.
+
+        IMPORTANT:
+        For each statement related to code, you must include the line number where the code is located in the file.
+
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.gh_actions
+        - seclab_taskflow_agent.toolboxes.memcache

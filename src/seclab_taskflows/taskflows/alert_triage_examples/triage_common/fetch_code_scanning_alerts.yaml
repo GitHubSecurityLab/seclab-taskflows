@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the open alerts from the {{ RESULT_repo }} repo to the sql database.
+        Use {{ RESULT_repo }} as the repo name for storing.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_code_scanning

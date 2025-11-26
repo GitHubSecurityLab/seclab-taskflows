@@ -1,0 +1,86 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      model: general_tasks
+      name: clean up memcache
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Clear the memcache entry with key `dismissed_alerts_summary`.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.collect_dismiss_reasons
+      name: collect dismiss reasons
+      description: |
+        Go through alerts in the repo to collect the reasons why they are dismissed.
+      inputs:
+        repos: |
+          ""
+        rule: actions/code-injection/critical
+        label: MANUAL
+        vuln_specifics: |
+          5. For workflows triggered via `pull_request` or `pull_request_target`, a check to ensure that the pull request or the repository is not 
+          from a fork repository.
+  - task:
+      must_complete: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      exclude_from_context: true
+      user_prompt: |
+        Fetch all the memcache entries.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      repeat_prompt: true
+      model: triage
+      async: true
+      name: check dismiss reason
+      description: |
+        Check if reasons for dismissing other alerts in this repo applies to this alert. If it does, 
+        then dismiss this alert and add a comment to the issue to explain the reason.
+      user_prompt: |
+        {{ PROMPTS_seclab_taskflows.prompts.triage_taskflows.actions_common.check_dismiss_reason }}
+
+        IMPORTANT:
+        1. If the dismissal reason does not apply the issue, then you must not dismiss the alert. In particular,
+        DO NOT try to reason about code injection sanitizer beyond the dismissal reason. 
+        
+        2. A security check has to restrict the permission or privilege of the user, simple checks that 
+        only checks for comments matching a specific pattern or a workflow running after another task 
+        that does not clearly restrict the user privilege does not count as a security check. Do not 
+        include discussion about such checks and do not dismiss the alert based on such checks.
+
+        3. You must NOT reason about the code injection sanitizers beyond the dismissal reason.
+        You must not try to make your decision based on other factors, such as how the injected code is used in the rest of the workflow,
+        or whether there are other standard practices in the repo that would prevent the code injection vulnerability.
+        If a dismissal reason mentions a code injection sanitizer, then you should only consider that specific sanitizer and 
+        not any other ways that may sanitize the user input.
+
+        If you decided that the dismissal reason applies to the issue, then dismiss the alert using the alert id extract from the 
+        issue title, which is of the form. If you failed to dismiss the alert, then try to dismiss it again without providing any
+        reason, but only a quote of the issue id.
+        
+        {{ PROMPTS_seclab_taskflows.prompts.triage_taskflows.actions_common.dismiss_decision }}
+
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.github_official
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.gh_actions
+        - seclab_taskflows.toolboxes.gh_code_scanning
+      env:
+        GITHUB_MCP_TOOLSETS: repos,issues

@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+# Taskflow to audit some potential issues.
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      model: general_tasks
+      user_prompt: |
+        Fetch the component issues in {{ GLOBALS_repo }}.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+  - task:
+      must_complete: false
+      max_steps: 100
+      repeat_prompt: true
+      async: false
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      model: code_analysis
+      user_prompt: |
+        The issue is in repo {{ RESULT_repo }} with id {{ RESULT_issue_id }}. The component is under the directory 
+        {{ RESULT_location }} with component_id {{ RESULT_component_id }}. The notes of the component is:
+
+        {{ RESULT_component_notes }}
+        
+        You should use this to understand the intended purpose of the component and take it into account when 
+        you audit the issue.
+
+        The type of the issue is {{ RESULT_issue_type }} and here is the notes of the issue:
+
+        {{ RESULT_issue_notes }}
+
+        {{ PROMPTS_seclab_taskflows.prompts.audit.audit_issue }}
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.local_file_viewer
+        

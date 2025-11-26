@@ -1,0 +1,186 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+globals:
+  rule: actions/untrusted-checkout/critical
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      model: general_tasks
+      name: fetch invalid alerts
+      description: Fetch invalid alerts for the next task to review and dismiss.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      exclude_from_context: true
+      user_prompt: |
+        Fetch all the invalid alert results that have the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      model: triage
+      name: dismiss invalid alerts
+      description: |
+        Dismiss invalid alert if a valid reason is provided in the "Review analysis" section, otherwise, leave it as
+        incomplete.
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      user_prompt: |
+        The alert results is the following:
+        ```
+        {{ RESULT_result }}
+        ```
+
+        Look for a section called "Reviewer analysis" in the alert results. If the section is not present, then your task is done.
+
+        Otherwise, dismiss the alert using the alert id {{ RESULT_alert_id }}. 
+
+        The repository is {{ RESULT_repo }}.
+
+        Dismiss the alert using the "Reviewer analysis" section as the dismissal reason. Summarize the section and remove any duplicate
+        information. You need to summarize the reason so that it contains less than 280 characters, otherwise, the dismissal will fail.
+        If that happens, then you need to summarize the section again until it is less than 280 characters and try dismissing the alert again.
+
+        Finally, set the completed field of the alert result to true, using the alert_id {{ RESULT_alert_id }}.
+
+        Do not make any other changes to the alert result.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_code_scanning
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflows.toolboxes.gh_actions
+  - task:
+      must_complete: true
+      model: general_tasks
+      name: fetch completed alerts
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      exclude_from_context: true
+      user_prompt: |
+        Fetch the all the completed alert results from that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      must_complete: true
+      model: triage
+      name: Mark alerts as FP
+      description: |
+        Create an issue for invalid and completed alerts and mark them as FP with a label.
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      repeat_prompt: true
+      async: true
+      user_prompt: |
+        The alert_id is {{ RESULT_alert_id }}. The repository is {{ RESULT_repo }}.
+
+        The validity of the alert is {{ RESULT_valid }}. If the alert is valid, then your task is done.
+        If the alert is not valid, then do the following:
+
+        First check if an issue with the alert id already exists in {{ RESULT_repo }}.
+        If it does, then do not create a new issue and your task is done.
+
+        Otherwise, create an issue in {{ RESULT_repo }} using these notes:
+        ```
+        {{ RESULT_result }}
+        ```
+        Remove any duplicate information of the notes and use it as the issue body.
+        The title of the issue should be:
+        ```
+        Alert <alert id> triage report
+        ```
+        Use `mecha,FP` and as the label for the issue.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.github_official
+        - seclab_taskflows.toolboxes.gh_code_scanning
+      env:
+        GITHUB_MCP_TOOLSETS: repos,issues
+  - task:
+      must_complete: true
+      model: general_tasks
+      name: clean up invalid alerts
+      description: |
+        Remove all the alerts that have been dismissed and labelled as FP from the database.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Clear all the completed alert results.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      must_complete: true
+      model: general_tasks
+      name: clean up memcache
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Clear the memcache entry with key `dismissed_alerts_summary` and `repos`.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      must_complete: true
+      model: general_tasks
+      exclude_from_context: true
+      name: fetch alert notes from memcache
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Get all memcache entries.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      model: triage
+      name: create issue
+      description: |
+        Use the alert notes to create the bug report and open a GitHub issue.
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      user_prompt: |
+        The repo and alert id can are encoded in the key {{ RESULT_key }} as follows:
+        ```
+        <encoded_repo_name>_<alert id>
+        ```
+        For example, if the key is `my_org/my_repo_123`, the repo name to use is `my_org/my_repo`.
+        The alert id is the number after the last `_` in the key, which is `123` in this case.
+
+        Create an issue in the repo using the following as the issue body:
+        ```
+        {{ RESULT_value }}
+        ```
+        The issue body should be formatted in markdown.
+
+        Before you create the issue, check if an issue with the alert id already exists in the repo.
+        If it does, then do not create a new issue and your task is done.
+
+        The title of the issue should be:
+        ```
+        Alert <alert id> triage report
+        ```
+        Use `mecha` as the label for the issue.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.github_official
+        - seclab_taskflows.toolboxes.gh_code_scanning
+        - seclab_taskflows.toolboxes.gh_actions
+      env:
+        GITHUB_MCP_TOOLSETS: repos,issues
+  - task:
+      must_complete: true
+      model: general_tasks
+      name: fetch invalid alerts
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      exclude_from_context: true
+      user_prompt: |
+        Fetch the all the invalid alert results from that has the rule `{{ GLOBALS_rule }}`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state

@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: toolbox
+  version: 1
+
+server_params:
+  kind: stdio
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.report_alert_state"]
+  env:
+    ALERT_RESULTS_DIR: "{{ env DATA_DIR }}"
+# the list of tools that you want the framework to confirm with the user before executing
+# use this to guard rail any potentially dangerous functions from MCP servers
+confirm:
+  - clear_repo_results
+  - clear_alert_results
+  - clear_rule_results

@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: false
+      repeat_prompt: true
+      async: true
+      model: triage
+      max_steps: 40
+      user_prompt: |
+        Inspect the alert location at {{ RESULT_location }} in the repo {{ RESULT_repo }}.
+        This is an alert for a {{ INPUTS_type }} vulnerability.
+
+        ## Sanitizers
+        For type of vulnerability, you should consider the following as sanitizer:
+
+        {{ INPUTS_sanitizer }}
+
+        ## User controlled inputs
+
+        In this task. You need to determine whether data relevant to the alert can be controlled by an untrusted user.
+        {{ INPUTS_user_input }}
+
+        Create a call graph to understand how the code flows from the entry point to the vulnerable code. Let's think step by step and go through the call graph.
+        Always try to find out whether the code is in use and reachable from the outside (e.g. via HTTP request).
+
+        You should trace the calls where the data is passed through and in each call, check whether relevant sanitization is 
+        applied to the data.
+
+        You need to record each step of your analysis in the note, stating which function is passing on the alert data and 
+        note any sanitizer that is used. Update the results field of the alert result with your notes using `update_alert_result` with 
+        {{ RESULT_alert_id }} as alert_id and {{ RESULT_repo }} as repo.
+
+        ## Sanitizer found
+        If at any point, you find that the data is sufficiently sanitized, you should mark the alert as invalid, and update its
+        `valid` field. You should then update your notes with the sanitizer that you find and the reason why you think the alert is invalid.
+        Then update the alert results with your notes and finish the task.
+
+        ## User controlled input found
+        If you do not find any sufficient sanitizer and managed to trace the data to a user controlled input, then you should include 
+        the input in your notes clearly with a section called 
+        ```
+        ## User controlled input
+        ```
+        and include the input in this section. Only include inputs that you are certain of that are user controlled.
+        You must also include a subsection called 
+        ```
+        ### Flow path
+        ```
+        under "User controlled input" that includes the call path from the user controlled input to the 
+        alert location. The call path must also the file name and line of each step.
+        
+        You must then update the alert results with your notes. 
+        You should finish the task without changing the alert validity.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.report_alert_state
+      
+        
+
+
+
+
+

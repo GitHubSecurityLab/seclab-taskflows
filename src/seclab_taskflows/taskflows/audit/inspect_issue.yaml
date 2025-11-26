@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+  location:
+taskflow: 
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      model: code_analysis
+      user_prompt: |
+        Fetch the components in {{ GLOBALS_repo }} and then identify the one where {{ GLOBALS_location }}
+        belong. Give me the id of this component, then. Fetch the issues in this component in the repo {{ GLOBALS_repo }}. Give a summary of each type of issue in this
+        component.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context

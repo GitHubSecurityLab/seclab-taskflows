@@ -1,0 +1,52 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: 1
+
+prompt: |
+  The key is {{ RESULT_key }}. If it is `repos` or `dismissed_alerts_summary,` then your task is done.
+
+  The repo and alert id can are encoded in the key {{ RESULT_key }} as follows:
+  ```
+  <encoded_repo_name>_<alert id>
+  ```
+  For example, if the key is `my_org/my_repo_123`, the repo name to use is `my_org/my_repo`.
+  The alert id is the number after the last `_` in the key, which is `123` in this case.
+
+  Before you start, check if an issue with the alert id already exists in {{ RESULT_repo }}.
+  If it doesn't, then your task is done. 
+  Otherwise, fetch the issue from {{ RESULT_repo }} using the issue id that you found and inspect its body.
+  Remember the issue id, which you'll need to add label and comment on the issue later. 
+  This is usually not the same as the alert id.
+
+  Fetch the dismissal reason from the memcache with the key `dismissed_alerts_summary`.
+
+  Look through the issue body and audit the files that are relevant to the alert, including the all files that 
+  uses the vulnerable actions, and see if the any dismissal reason applies to this issue. 
+
+  If it does, then you must explain the dismissal reason is relevant, including the relevant lines in the files.
+
+  The dismissal reason tend to be terse, and may not contain enough information to accurately explain the reason. 
+  For example, if the dismissal reason states mentions a check, but does not provide the details of the check, 
+  then you should look for that check in the files and list the lines that contain the check, and whether the check 
+  prevents the vulnerable code in the alert location from being executed, and whether the code could still be executed
+  with sufficient priviledge 
+  For example: Can it still be executed with a high priviledge trigger after the check? Can a user 
+  with low priviledge still trigger the code?
+
+  Sometimes the check may be an external function, and it is not clear what it does. In that case, you should assume the
+  check would prevent the vulnerable code from being executed, unless you can find evidence that it does not.
+
+  Not all dismissal reasons will apply to every issue, 
+  so if any reason applies, then you must explain how it applies to the issue.
+
+  If none of the dismissal reason apply, then explain why you think the dismissal reason does not apply to the issue.
+
+  When you are done, comment on the issue with your explanation.
+
+  If you decided that the dismissal reason applies to the issue, then dismiss the alert using the alert id extract from the 
+  issue title, which is of the form. If you failed to dismiss the alert, then try to dismiss it again without providing any
+  reason, but only a quote of the issue id.
+

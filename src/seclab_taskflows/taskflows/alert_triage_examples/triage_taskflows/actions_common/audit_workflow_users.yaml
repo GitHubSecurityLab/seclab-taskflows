@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.action_expert
+      user_prompt: |
+        Fetch the file {{ RESULT_user }} from the repo {{ RESULT_repo }}.
+        
+        Get the high privileged triggers for the of the workflow in the file {{ RESULT_user }} and check if it is reusable. 
+        If it does not contain any high privileged trigger AND it is not a reusable action, then the task is done.
+
+        Otherwise, check that the action specified by {{ RESULT_user }} in repo {{ RESULT_repo }} is active.
+        To do so, fetch the workflow from GitHub using the `workflow_id` derived from {{ RESULT_user }}.
+        Then check the workflow state, if it is not `active`, then the task is done.
+
+        Otherwise, from the file {{ RESULT_user }}, take note of the following:
+        1. All the triggers of the action {{ RESULT_user }}.
+        2. All the high privileged triggers of {{ RESULT_user }}, if any. You must clearly state that these are high privileged triggers.
+        2. Any permissions granted to the {{ RESULT_user }} action.
+        3. Any secrets used in the {{ RESULT_user }} action.
+
+        Update the notes and alert results as follows:
+        You must mention the fact that {{ RESULT_user }} uses {{ RESULT_action }} in lines {{ RESULT_lines }}
+        in the notes.
+        You must also include all the permissions granted to the {{ RESULT_user }} action in the notes, and all the triggers of the action.
+        Finally, update the all the alert result that has {{ RESULT_action }} with the results in your notes using `update_all_alert_results_for_flow_graph` with 
+        your notes as the `results`, {{ RESULT_action }} as the `next` and {{ RESULT_repo }} as the `repo`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflows.toolboxes.gh_actions

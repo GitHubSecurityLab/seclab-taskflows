@@ -1,0 +1,79 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      name: create repo list
+      description: create repo list to fetch alerts from.
+      run: |
+        echo '[ {"repo": ""}]'
+  - task:
+      headless: true
+      uses: seclab_taskflows.taskflows.alert_triage_examples.triage_common.fetch_code_scanning_alerts
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the alert results that has the rule `js/path-injection`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.report_alert_state
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      model: triage
+      name: audit alert
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      async: true
+      user_prompt: |
+        Inspect the alert location at {{ RESULT_location }} in the repo {{ RESULT_repo }} to determine if it is in an exploitable path traversal vulnerability.
+        Exploitable means that a remote attacker would be able to control a path e.g. by sending a crafted request to the application containing a path traversal payload like `../`.
+        It also means that the path traversal vulnerability is not mitigated by any other code in the repository, such as sanitization or validation of the path.
+        And that the sink is a method that is used to read, write or delete files, such as `fs.readFile`, `fs.writeFile`, `fs.createWriteStream`, etc.
+        Check if the code tries to sanitize or validate the path. F.ex. does it check that no `..` are present in the path?
+        If you encounter methods used for validation or sanitization, look them up and check if they are effective against path traversal attacks.
+        Note the location (file path and line number) of the validation or sanitization methods in the notes.
+        Also check if the given path fragment is checked against a whitelist of allowed paths.
+        Path validation can also take place at the location where the URL is registered in the web framework, e.g. as a validator middleware in Express.js.
+        Always note where the URL path is registered in the web framework and the HTTP method required to call it. Write the lines that register the URL path in the notes.
+        Take notes while assessing the alert.
+        Update the results field of the alert result with your notes using `update_alert_result` with 
+        {{ RESULT_alert_id }} as alert_id and {{ RESULT_repo }} as repo.
+        When you are done, set the `valid` field of the alert result to `true` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}
+        if the alert is a potential vulnerability, otherwise set it to `false`. 
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflow_agent.toolboxes.codeql
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      model: triage
+      name: check notes
+      description: |
+        Check the notes and carry out further actions in the notes.
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      async: true
+      user_prompt: |
+        Check all results whether they contain next steps that need to be taken. If they do, then take those steps.
+        In case code parts (such as methods) were not found previosuly, look them up and change the notes accordingly.
+        Update the results field of the alert result with your notes using `update_alert_result` using the updated notes. 
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.report_alert_state
+        - seclab_taskflow_agent.toolboxes.codeql
+

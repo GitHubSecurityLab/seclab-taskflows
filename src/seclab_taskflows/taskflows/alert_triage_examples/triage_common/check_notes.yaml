@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+taskflow:
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      max_steps: 25
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      async: true
+      user_prompt: |
+        The alert_id is {{ RESULT_alert_id }} and the repo is {{ RESULT_repo }}.
+        The notes from the alert analysis is:        
+        ```
+        {{ RESULT_result }}
+        ```
+        Check all results whether they contain next steps that need to be taken. If they do, then take those steps.
+        In case code parts (such as methods) were not found previously, look them up and change the notes accordingly.
+        Always make sure the mentioned methods and function are actually present in the codebase and related to the alert.
+        IMPORTANT: If it is written that a sanitization or validation method is used, then look it up and tell where it's used in relation to the alert.
+        Let's think step by step and go through the result and check if they are consistent.
+        Update the results field of the alert result with your notes using `update_alert_result` using the updated notes, but only if they are not empty.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.report_alert_state

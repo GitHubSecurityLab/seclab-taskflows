@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo: 
+  id: 
+# Taskflow to audit some potential issues.
+taskflow:
+  - task:
+      must_complete: true
+      max_steps: 100
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      model: code_analysis
+      user_prompt: |
+        Fetch the issues in component with id {{ GLOBALS_id }} in the repo {{ GLOBALS_repo }}. Audit the first issue.
+
+        {{ PROMPTS_seclab_taskflows.prompts.audit.audit_issue }}
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.local_file_viewer

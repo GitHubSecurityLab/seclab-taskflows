@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  version: 1
+  filetype: model_config
+models:
+   code_analysis: gpt-5
+   general_tasks: gpt-4o
+   triage: claude-sonnet-4

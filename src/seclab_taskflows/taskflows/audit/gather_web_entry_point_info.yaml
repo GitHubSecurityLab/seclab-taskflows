@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo: 
+# Taskflow to analyze the existing information
+taskflow:
+  - task:
+      model: code_analysis
+      must_complete: true
+      headless: true
+      max_steps: 100
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      user_prompt: |
+        For the repo {{ GLOBALS_repo }} iterate over all entry points and and check if they are
+        reachable as a server endpoint.
+        For this check the noted `file` and it's line using the file viewer.
+        Then note it's path, HTTP method and note any middlewares used. Also note which roles are
+        allowed to call it. Note which kind of authentication is required for that endpoint.
+        For each entry point identified as a web endpoint create a new web entry point using
+        the information gathered.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.gh_file_viewer
+  
