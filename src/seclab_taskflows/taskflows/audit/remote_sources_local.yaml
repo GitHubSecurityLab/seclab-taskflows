@@ -1,0 +1,95 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: 1
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+    apache/allura
+# Taskflow to analyze the existing information
+taskflow:
+  - task:
+      must_complete: true
+      headless: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Clear the memory cache and clear the codeql_sqlite database for repo {{ GLOBALS_repo }}.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.codeql_python
+  - task:
+      model: general_tasks
+      must_complete: true
+      headless: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        For the repo {{ GLOBALS_repo }} fetch the Python CodeQL database and find all remote flow sources using CodeQL.
+        Store the value for CodeQL's 'relative_database_path' in 'codeql_relative_database_path' memory key.
+      toolboxes:
+        - seclab_taskflows.toolboxes.gh_code_scanning
+        - seclab_taskflows.toolboxes.codeql_python
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+          Fetch the sources from the repo {{ GLOBALS_repo }}.
+      toolboxes:
+        - seclab_taskflows.toolboxes.codeql_python
+  - task:
+      model: code_analysis
+      must_complete: false
+      repeat_prompt: true
+      async: true
+      async_limit: 5
+      max_steps: 100
+      name: source analysis
+      description: Identify actions that untrusted users are allowed performed the source.
+      agents:
+        - seclab_taskflows.personalities.auditer
+      user_prompt: |
+        Retrieve the contents of the `codeql_relative_database_path` memory key, which represents the relative path to the CodeQL database for the repository {{ GLOBALS_repo }}.
+        Using the CodeQL database located at that path, analyze the following source:
+        The source is a {{ RESULT_type }} in {{ RESULT_repo }} in the location {{ RESULT_source_location }}.
+        Analyze what the source endpoint is for and how it is used.
+        Search for relevant code associated with each source.
+        If it is a web endpoint, identify the routing path that reaches this source, HTTP method,
+        any middlewares used, which roles are allowed to call it.
+        Note which kind of authentication is required for that endpoint.
+        It is possible that the source does not have require any authentication.
+        If authorization is required, note the details.
+        Analyze the code and identify if this source could lead to a security vulnerability.
+
+        Update the source entry in the codeql_sqlite database with your findings.
+        ## IMPORTANT: General Guidance that ALWAYS applies
+
+        1. Do NOT ask the user for permission to perform next steps, continue your
+        analysis autonomously until it is complete.
+
+        2. Do NOT use 'fetch_sources' or 'remote_sources' tools.
+
+        3. Do NOT speculate. If you do not have access to the information you need, respond with
+        the error you encountered.
+      toolboxes:
+        - seclab_taskflows.toolboxes.codeql_python
+        - seclab_taskflow_agent.toolboxes.memcache
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      model: code_analysis
+      user_prompt: |
+        Fetch the sources of the repo {{ GLOBALS_repo }} and give a summary of the notes.
+      toolboxes:
+        - seclab_taskflows.toolboxes.codeql_python
+        - seclab_taskflow_agent.toolboxes.memcache
