@@ -17,7 +17,7 @@ It will most likely look similar to this:
 - create a folder named 'data'
 - create or update your `.env` file in the root of this project with values for:
 ```
-COPILOT_TOKEN= # a fine-grained GitHub personal access token with permssion for "copilot chat"
+COPILOT_TOKEN= # a fine-grained GitHub personal access token with permission for "copilot chat"
 CODEQL_DBS_BASE_PATH="/workspaces/seclab-taskflows/data/codeql_databases" #path to folder with your CodeQL databases
 
 # Example values for a local setup, run with `python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.remote_sources_local`

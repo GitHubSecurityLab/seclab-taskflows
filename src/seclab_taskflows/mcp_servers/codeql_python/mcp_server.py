@@ -20,7 +20,7 @@ import csv
 import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from pathlib import Path
+
 import zipfile
 import httpx
 import aiofiles
@@ -88,7 +88,7 @@ class CodeqlSqliteBackend:
         with Session(self.engine) as session:
             existing = session.query(Source).filter_by(repo = repo, source_location = source_location).first()
             if existing:
-                existing.notes += notes
+                existing.notes = (existing.notes or "") + notes
                 session.commit()
                 return f"Updated notes for source at {source_location} in {repo}."
             else:
@@ -120,7 +120,7 @@ def _csv_parse(raw):
             for j, k in enumerate(keys):
                 this_obj[k.strip()] = row[j + 2]
             results.append(this_obj)
-    except csv.Error as e:
+    except (csv.Error, IndexError, ValueError) as e:
         return ["Error: CSV parsing error: " + str(e)]
     return results
 
@@ -218,7 +218,7 @@ def clear_codeql_repo(owner: str, repo: str):
 
 @mcp.tool()
 def get_file_contents(
-        file_uri: str = Field(description="The file URI to get contents for. The URI scheme is defined as `file://path` and `file://path:region`. Examples of file URI: `file:///path/to/file:1:2:3:4`, `file:///path/to/file`. File URIs optionally contain a region definition that looks like `start_line:start_column:end_line:end_column` which will limit the contents returned to the specified region, for example `file:///path/to/file:1:2:3:4` indicates a file region of `1:2:3:4` which would return the content of the file starting at line 1, column 1 and ending at line 3 column 4. Line and column indices are 1-based, meaning line and column values start at 1. If the region is ommitted the full contents of the file will be returned, for example `file:///path/to/file` returns the full contents of `/path/to/file`."),
+        file_uri: str = Field(description="The file URI to get contents for. The URI scheme is defined as `file://path` and `file://path:region`. Examples of file URI: `file:///path/to/file:1:2:3:4`, `file:///path/to/file`. File URIs optionally contain a region definition that looks like `start_line:start_column:end_line:end_column` which will limit the contents returned to the specified region, for example `file:///path/to/file:1:2:3:4` indicates a file region of `1:2:3:4` which would return the content of the file starting at line 1, column 1 and ending at line 3 column 4. Line and column indices are 1-based, meaning line and column values start at 1. If the region is omitted the full contents of the file will be returned, for example `file:///path/to/file` returns the full contents of `/path/to/file`."),
         database_path: str = Field(description="The path to the CodeQL database.")):
     """Get the contents of a file URI from a CodeQL database path."""
 
