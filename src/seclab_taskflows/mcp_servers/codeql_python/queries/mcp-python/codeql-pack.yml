@@ -1,0 +1,7 @@
+---
+library: false
+warnOnImplicitThis: false
+name: sylwia-budzynska/mcp-python
+version: 0.0.1
+dependencies:
+  codeql/python-all: ^4.1.0
