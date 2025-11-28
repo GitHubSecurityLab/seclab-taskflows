@@ -122,7 +122,7 @@ taskflow:
         ```
         Code scanning alert #{{ RESULT_alert_id }} triage report for {{ RESULT_rule }}. Remove any occurences of `'` from the rule.
         ```
-        Use `barry-agent,FP` as the label for the issue.
+        Use [barry-agent,FP] as labels for the issue.
       toolboxes:
         - seclab_taskflow_agent.toolboxes.github_official
         - seclab_taskflows.toolboxes.gh_code_scanning
