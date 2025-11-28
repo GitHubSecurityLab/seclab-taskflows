@@ -65,7 +65,7 @@ server_prompt: |
   file starting at line 1, column 2 and ending at line 3, column 4. These line
   and column indices are 1-based, meaning line and column values start at 1.
 
-  If the region is ommitted the full contents of the file will be returned,
+  If the region is omitted the full contents of the file will be returned,
   for example `file:///path/to/file` returns the full contents of
   `/path/to/file`.
 

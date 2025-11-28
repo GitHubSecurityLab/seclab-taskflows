@@ -13,7 +13,7 @@ from seclab_taskflow_agent.mcp_servers.codeql.client import run_query, file_from
 
 from pydantic import Field
 #from mcp.server.fastmcp import FastMCP, Context
-from fastmcp import FastMCP, Context # use FastMCP 2.0
+from fastmcp import FastMCP # use FastMCP 2.0
 from pathlib import Path
 import os
 import csv
@@ -21,9 +21,9 @@ import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-import zipfile
-import httpx
-import aiofiles
+
+
+
 from .codeql_sqlite_models import Base, Source
 
 MEMORY = Path(os.getenv('CODEQL_SQLITE_DIR', default='/app/my_data'))
@@ -164,6 +164,8 @@ def remote_sources(owner: str, repo: str,
     results = _run_query('remote_sources', database_path, language, {})
 
     # Check if results is an error (list of strings) or valid data (list of dicts)
+    if isinstance(results, str):
+        return f"Error: {results}"
     if results and isinstance(results[0], str):
         return f"Error: {results[0]}"
 
