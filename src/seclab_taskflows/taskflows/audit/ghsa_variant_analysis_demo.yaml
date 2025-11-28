@@ -10,7 +10,7 @@ seclab-taskflow-agent:
   filetype: taskflow
   version: 1
 
-model_config: seclab_taskflows.configs.model_config_lowercost
+model_config: seclab_taskflows.configs.model_config
 
 globals:
   repo:
@@ -20,41 +20,50 @@ taskflow:
       must_complete: true
       agents:
         - seclab_taskflow_agent.personalities.assistant
-      user_prompt: |
-        Fetch the GHSAs of the repo {{ GLOBALS_repo }}.
       toolboxes:
-        - seclab_taskflows.toolboxes.ghsa
-  - task:
-      must_complete: true
-      repeat_prompt: true
-      agents:
-        - seclab_taskflow_agent.personalities.assistant
-      user_prompt: |
-        Get the details of the GHSA with ID {{ RESULT_ghsa_id }} in repo {{ GLOBALS_repo }}.
-        Analyze the description to understand what type of bug caused
-        the vulnerability.
-        Try to determine from the description the name of the source code file
-        that the bug was in.
-        Store an entry in the memcache with {{ GLOBALS_repo }}_{{ RESULT_ghsa_id }} as the key.
-        The entry should state the vulnerability type (for example "out-of-bounds array write")
-        and the name of the source file with the bug.
-      toolboxes:
-        - seclab_taskflows.toolboxes.ghsa
         - seclab_taskflow_agent.toolboxes.memcache
-        - seclab_taskflows.toolboxes.gh_file_viewer
+      user_prompt: |
+        Clear the memory cache.
 
   - task:
       must_complete: true
       agents:
         - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.ghsa
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflow_agent.toolboxes.memcache
       user_prompt: |
-        Get all the entries from the memory cache.
-        Use the list to identify the source file that has been
-        responsible for the most vulnerabilities in the repo {{ GLOBALS_repo }},
-        and also the type of bug that was most frequently the cause.
-        Fetch the source file from GitHub and look for bugs in the code, focusing
-        particularly on the type of bug that was identified as the most common
-        cause of vulnerabilities in this repo.
+        Fetch the details of the most recent GHSA of the repo {{ GLOBALS_repo }}.
+
+        Analyze the description to understand what type of bug caused
+        the vulnerability.
+
+        Try to determine from the description the
+        name of the source code file that the bug was in.
+
+        The GHSA may not specify the full path name of the source
+        file, or it may mention the name of a function or method
+        instead, so if you have difficulty finding the file, try
+        searching for the most likely match.
+
+        Store a summary of your findings in the memcache with the GHSA
+        ID as the key.
+
+  - task:
+      must_complete: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
       toolboxes:
         - seclab_taskflows.toolboxes.gh_file_viewer
         - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Fetch the GHSA ID and summary that were stored in the memcache
+        by the previous task.
+
+        Fetch the source file that was identified as the cause of the
+        GHSA in repo {{ GLOBALS_repo }}.
+
+        Do a security audit of the code in the source file, focusing
+        particularly on the type of bug that was identified as the
+        cause of the GHSA.
