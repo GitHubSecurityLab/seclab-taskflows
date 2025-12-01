@@ -49,7 +49,7 @@ taskflow:
       repeat_prompt: true
       max_steps: 100
       name: source analysis
-      description: Identify actions that untrusted users are allowed perform the source.
+      description: Identify actions that untrusted users are allowed to perform on the source.
       agents:
         - seclab_taskflows.personalities.auditor
       user_prompt: |
