@@ -101,7 +101,7 @@ class CodeqlSqliteBackend:
 
     def get_sources(self, repo):
         with Session(self.engine) as session:
-            results = session.query(Source).filter_by(repo=repo).all()
+            results = session.query(Source).filter_by(repo = repo).all()
             sources = [source_to_dict(source) for source in results]
         return sources
 
@@ -206,7 +206,7 @@ def clear_codeql_repo(owner: str, repo: str):
     """
     repo = process_repo(owner, repo)
     with Session(backend.engine) as session:
-        deleted_sources = session.query(Source).filter_by(repo=repo).delete()
+        deleted_sources = session.query(Source).filter_by(repo = repo).delete()
         session.commit()
     return f"Cleared {deleted_sources} sources from repo {repo}."
 
