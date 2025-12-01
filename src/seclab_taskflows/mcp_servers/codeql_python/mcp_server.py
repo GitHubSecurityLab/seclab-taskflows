@@ -21,10 +21,8 @@ import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-
-
-
 from .codeql_sqlite_models import Base, Source
+from .utils import process_repo
 
 MEMORY = Path(os.getenv('CODEQL_SQLITE_DIR', default='/app/my_data'))
 mcp = FastMCP("CodeQL-Python")
@@ -66,7 +64,9 @@ def _resolve_db_path(relative_db_path: str | Path):
     # not windows compatible and probably needs additional hardening
     relative_db_path = str(relative_db_path).strip().lstrip('/')
     relative_db_path = Path(relative_db_path)
-    absolute_path = CODEQL_DBS_BASE_PATH / relative_db_path
+    absolute_path = (CODEQL_DBS_BASE_PATH / relative_db_path).resolve()
+    if not str(absolute_path).startswith(str(CODEQL_DBS_BASE_PATH.resolve())):
+        raise RuntimeError(f"Error: Database path {absolute_path} is outside the base path {CODEQL_DBS_BASE_PATH}")
     if not absolute_path.is_dir():
         _debug_log(f"Database path not found: {absolute_path}")
         raise RuntimeError(f"Error: Database not found at {absolute_path}!")
@@ -148,11 +148,6 @@ def _run_query(query_name: str, database_path: str, language: str, template_valu
     except Exception as e:
         return f"The query {query_name} encountered an error: {e}"
 
-def _get_file_contents(db: str | Path, uri: str):
-    """Retrieve file contents from a CodeQL database"""
-    db = Path(db)
-    return file_from_uri(uri, db)
-
 backend = CodeqlSqliteBackend(MEMORY)
 
 @mcp.tool()
@@ -161,7 +156,7 @@ def remote_sources(owner: str, repo: str,
                    language: str = Field(description="The language used for the CodeQL database.")):
     """List all remote sources and their locations in a CodeQL database, then store the results in a database."""
 
-    repo = f"{owner}/{repo}"
+    repo = process_repo(owner, repo)
     results = _run_query('remote_sources', database_path, language, {})
 
     # Check if results is an error (list of strings) or valid data (list of dicts)
@@ -190,7 +185,7 @@ def fetch_sources(owner: str, repo: str):
     """
     Fetch all sources from the repo
     """
-    repo = f"{owner}/{repo}"
+    repo = process_repo(owner, repo)
     return json.dumps(backend.get_sources(repo))
 
 @mcp.tool()
@@ -202,7 +197,7 @@ def add_source_notes(owner: str, repo: str,
     """
     Add new notes to an existing source. The notes will be appended to any existing notes.
     """
-    repo = f"{owner}/{repo}"
+    repo = process_repo(owner, repo)
     return backend.store_new_source(repo = repo, source_location = source_location, line = line, type = "", notes = notes, update=True)
 
 @mcp.tool()
@@ -210,7 +205,7 @@ def clear_codeql_repo(owner: str, repo: str):
     """
     Clear all data for a given repo from the database
     """
-    repo = f"{owner}/{repo}"
+    repo = process_repo(owner, repo)
     with Session(backend.engine) as session:
         deleted_sources = session.query(Source).filter_by(repo=repo).delete()
         # deleted_apps = session.query(Application).filter_by(repo=repo).delete()
