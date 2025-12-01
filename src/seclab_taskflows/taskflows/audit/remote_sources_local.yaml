@@ -9,7 +9,6 @@ model_config: seclab_taskflows.configs.model_config
 
 globals:
   repo:
-    apache/allura
 # Taskflow to analyze the existing information
 taskflow:
   - task:
@@ -31,11 +30,9 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
         For the repo {{ GLOBALS_repo }} fetch the Python CodeQL database and find all remote flow sources using CodeQL.
-        Store the value for CodeQL's 'relative_database_path' in 'codeql_relative_database_path' memory key.
       toolboxes:
         - seclab_taskflows.toolboxes.gh_code_scanning
         - seclab_taskflows.toolboxes.codeql_python
-        - seclab_taskflow_agent.toolboxes.memcache
   - task:
       must_complete: true
       exclude_from_context: true
@@ -50,25 +47,21 @@ taskflow:
       model: code_analysis
       must_complete: false
       repeat_prompt: true
-      async: true
-      async_limit: 5
       max_steps: 100
       name: source analysis
       description: Identify actions that untrusted users are allowed perform the source.
       agents:
-        - seclab_taskflows.personalities.auditer
+        - seclab_taskflows.personalities.auditor
       user_prompt: |
-        Retrieve the contents of the `codeql_relative_database_path` memory key, which represents the relative path to the CodeQL database for the repository {{ GLOBALS_repo }}.
-        Using the CodeQL database located at that path, analyze the following source:
-        The source is a {{ RESULT_type }} in {{ RESULT_repo }} in the location {{ RESULT_source_location }}.
-        Analyze what the source endpoint is for and how it is used.
-        Search for relevant code associated with each source.
+        Fetch the zipball of the repository {{ GLOBALS_repo }} and use it to analyze the source.
+        The source is a {{ RESULT_type }} in {{ RESULT_repo }} in the location {{ RESULT_source_location }} on line {{ RESULT_line }}.
+        If the source is in a folder relating to tests or demo code, skip the analysis and update the source entry in the codeql_sqlite database indicating it is not relevant.
+        Analyze what the source endpoint is used for.
         If it is a web endpoint, identify the routing path that reaches this source, HTTP method,
         any middlewares used, which roles are allowed to call it.
         Note which kind of authentication is required for that endpoint.
         It is possible that the source does not have require any authentication.
         If authorization is required, note the details.
-        Analyze the code and identify if this source could lead to a security vulnerability.
 
         Update the source entry in the codeql_sqlite database with your findings.
         ## IMPORTANT: General Guidance that ALWAYS applies
@@ -82,7 +75,8 @@ taskflow:
         the error you encountered.
       toolboxes:
         - seclab_taskflows.toolboxes.codeql_python
-        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.local_gh_resources
+        - seclab_taskflows.toolboxes.local_file_viewer
   - task:
       must_complete: true
       agents:

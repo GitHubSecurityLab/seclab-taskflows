@@ -45,6 +45,7 @@ def source_to_dict(result):
         "source_id": result.id,
         "repo": result.repo,
         "source_location": result.source_location,
+        "line": result.line,
         "type": result.type,
         "notes": result.notes
     }
@@ -84,17 +85,17 @@ class CodeqlSqliteBackend:
         Base.metadata.create_all(self.engine, tables=[Source.__table__])
 
 
-    def store_new_source(self, repo, source_location, type, notes, update = False):
+    def store_new_source(self, repo, source_location, line, type, notes, update = False):
         with Session(self.engine) as session:
-            existing = session.query(Source).filter_by(repo = repo, source_location = source_location).first()
+            existing = session.query(Source).filter_by(repo = repo, source_location = source_location, line = line).first()
             if existing:
                 existing.notes = (existing.notes or "") + notes
                 session.commit()
-                return f"Updated notes for source at {source_location} in {repo}."
+                return f"Updated notes for source at {source_location}, line {line} in {repo}."
             else:
                 if update:
-                    return f"No source exists at repo {repo}, location {source_location}"
-                new_source = Source(repo = repo,  source_location = source_location, type = type, notes = notes)
+                    return f"No source exists at repo {repo}, location {source_location}, line {line} to update."
+                new_source = Source(repo = repo,  source_location = source_location, line = line, type = type, notes = notes)
                 session.add(new_source)
                 session.commit()
                 return f"Added new source for {source_location} in {repo}."
@@ -174,7 +175,8 @@ def remote_sources(owner: str, repo: str,
             repo=repo,
             source_location=result.get('location', ''),
             type=result.get('source', ''),
-            notes='', #result.get('description', ''),
+            line=int(result.get('line', '0')),
+            notes=None, #result.get('description', ''),
             update=False
         )
         stored_count += 1
@@ -191,18 +193,15 @@ def fetch_sources(owner: str, repo: str):
 
 @mcp.tool()
 def add_source_notes(owner: str, repo: str,
-                     database_path: str = Field(description="The CodeQL database path."),
-                     source_location: str = Field(description="The path to the file and column info that contains the source"),
+                    #  database_path: str = Field(description="The CodeQL database path."),
+                     source_location: str = Field(description="The path to the file"),
+                     line: int = Field(description="The line number of the source"),
                      notes: str = Field(description="The notes to append to this source", default="")):
     """
     Add new notes to an existing source. The notes will be appended to any existing notes.
     """
     repo = f"{owner}/{repo}"
-    try:
-        database_path = _resolve_db_path(database_path)
-    except RuntimeError:
-        return f"The database path for {database_path} could not be resolved"
-    return backend.store_new_source(repo, source_location, "", notes, update=True)
+    return backend.store_new_source(repo = repo, source_location = source_location, line = line, type = "", notes = notes, update=True)
 
 @mcp.tool()
 def clear_codeql_repo(owner: str, repo: str):
@@ -215,46 +214,6 @@ def clear_codeql_repo(owner: str, repo: str):
         # deleted_apps = session.query(Application).filter_by(repo=repo).delete()
         session.commit()
     return f"Cleared {deleted_sources} sources from repo {repo}."
-
-@mcp.tool()
-def get_file_contents(
-        file_uri: str = Field(description="The file URI to get contents for. The URI scheme is defined as `file://path` and `file://path:region`. Examples of file URI: `file:///path/to/file:1:2:3:4`, `file:///path/to/file`. File URIs optionally contain a region definition that looks like `start_line:start_column:end_line:end_column` which will limit the contents returned to the specified region, for example `file:///path/to/file:1:2:3:4` indicates a file region of `1:2:3:4` which would return the content of the file starting at line 1, column 1 and ending at line 3 column 4. Line and column indices are 1-based, meaning line and column values start at 1. If the region is omitted the full contents of the file will be returned, for example `file:///path/to/file` returns the full contents of `/path/to/file`."),
-        database_path: str = Field(description="The path to the CodeQL database.")):
-    """Get the contents of a file URI from a CodeQL database path."""
-
-    database_path = _resolve_db_path(database_path)
-    try:
-        # fix up any incorrectly formatted relative path uri
-        if not file_uri.startswith('file:///'):
-            if file_uri.startswith('file://'):
-                file_uri = file_uri[len('file://'):]
-            file_uri = 'file:///' + file_uri.lstrip('/')
-        results = _get_file_contents(database_path, file_uri)
-    except Exception as e:
-        results = f"Error: could not retrieve {file_uri}: {e}"
-    return results
-
-@mcp.tool()
-def list_source_files(database_path: str = Field(description="The path to the CodeQL database."),
-                      regex_filter: str = Field(description="Optional Regex filter.", default = r'[\s\S]+')):
-    """List the available source files in a CodeQL database using their file:// URI"""
-    database_path = _resolve_db_path(database_path)
-    results = list_src_files(database_path, as_uri=True)
-    return json.dumps([{'uri': item} for item in results if re.search(regex_filter, item)], indent=2)
-
-@mcp.tool()
-def search_in_source_code(database_path: str = Field(description="The path to the CodeQL database."),
-                          search_term: str = Field(description="The term to search in the source code")):
-    """
-    Search for a string in the source code. Returns the line number and file.
-    """
-    resolved_database_path = _resolve_db_path(database_path)
-    results = search_in_src_archive(resolved_database_path, search_term)
-    out = []
-    if isinstance(results, dict):
-        for k,v in results.items():
-            out.append({"database" : database_path, "path" : k, "lines" : v})
-    return json.dumps(out, indent = 2)
 
 if __name__ == "__main__":
     mcp.run(show_banner=False, transport="http", host="127.0.0.1", port=9998)

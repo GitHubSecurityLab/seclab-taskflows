@@ -46,34 +46,3 @@ server_prompt: |
   If you are unable to determine the appropriate programming language acronym,
   halt your task and ask the user to clarify which programming language the
   CodeQL database in question was created for.
-
-
-  ### CodeQL Database File URI
-
-  The CodeQL database file URI scheme is defined as `file://path` and
-  `file://path:region`.
-
-  Examples of CodeQL database file URIs:
-
-    - `file:///path/to/file:1:2:3:4`
-    - `file:///path/to/file`
-
-  File URIs optionally contain a region definition that looks like
-  `start_line:start_column:end_line:end_column` which will limit the contents
-  returned to the specified region. For example `file:///path/to/file:1:2:3:4`
-  indicates a file region of `1:2:3:4` which would return the content of the
-  file starting at line 1, column 2 and ending at line 3, column 4. These line
-  and column indices are 1-based, meaning line and column values start at 1.
-
-  If the region is ommitted the full contents of the file will be returned,
-  for example `file:///path/to/file` returns the full contents of
-  `/path/to/file`.
-
-  If you want to fetch a specific region by their line numbers only, you can set
-  the `start_column` and `end_column` values of a region to `0`. For example to
-  retrieve lines 1-4 from a file at `/path/to/file` you can use a file URI
-  with a region definition such as: `file:///path/to/file:1:0:4:0`.
-
-  When unsure how to fetch a specific region, fall back to fetching the full file
-  contents for a file by omitting the region definition, for example
-  `file:///path/to/file`

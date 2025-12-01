@@ -15,6 +15,7 @@ class Source(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     repo: Mapped[str]
     source_location: Mapped[str]
+    line: Mapped[int]
     type: Mapped[str]
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
