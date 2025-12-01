@@ -22,7 +22,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from .codeql_sqlite_models import Base, Source
-from .utils import process_repo
+from ..utils import process_repo
 
 MEMORY = Path(os.getenv('CODEQL_SQLITE_DIR', default='/app/my_data'))
 mcp = FastMCP("CodeQL-Python")
