@@ -60,7 +60,7 @@ taskflow:
         If it is a web endpoint, identify the routing path that reaches this source, HTTP method,
         any middlewares used, which roles are allowed to call it.
         Note which kind of authentication is required for that endpoint.
-        It is possible that the source does not have require any authentication.
+        It is possible that the source does not require any authentication.
         If authorization is required, note the details.
 
         Update the source entry in the codeql_sqlite database with your findings.
