@@ -16,7 +16,7 @@ class Source(Base):
     repo: Mapped[str]
     source_location: Mapped[str]
     line: Mapped[int]
-    type: Mapped[str]
+    source_type: Mapped[str]
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     def __repr__(self):

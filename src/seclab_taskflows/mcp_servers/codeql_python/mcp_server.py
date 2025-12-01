@@ -44,7 +44,7 @@ def source_to_dict(result):
         "repo": result.repo,
         "source_location": result.source_location,
         "line": result.line,
-        "type": result.type,
+        "source_type": result.source_type,
         "notes": result.notes
     }
 
@@ -76,7 +76,6 @@ def _resolve_db_path(relative_db_path: str | Path):
 class CodeqlSqliteBackend:
     def __init__(self, memcache_state_dir: str):
         self.memcache_state_dir = memcache_state_dir
-        self.location_pattern = r'^([a-zA-Z]+)(:\d+){4}$'
         if not Path(self.memcache_state_dir).exists():
             db_dir = 'sqlite://'
         else:
@@ -85,7 +84,7 @@ class CodeqlSqliteBackend:
         Base.metadata.create_all(self.engine, tables=[Source.__table__])
 
 
-    def store_new_source(self, repo, source_location, line, type, notes, update = False):
+    def store_new_source(self, repo, source_location, line, source_type, notes, update = False):
         with Session(self.engine) as session:
             existing = session.query(Source).filter_by(repo = repo, source_location = source_location, line = line).first()
             if existing:
@@ -95,7 +94,7 @@ class CodeqlSqliteBackend:
             else:
                 if update:
                     return f"No source exists at repo {repo}, location {source_location}, line {line} to update."
-                new_source = Source(repo = repo,  source_location = source_location, line = line, type = type, notes = notes)
+                new_source = Source(repo = repo,  source_location = source_location, line = line, source_type = source_type, notes = notes)
                 session.add(new_source)
                 session.commit()
                 return f"Added new source for {source_location} in {repo}."
@@ -171,7 +170,7 @@ def remote_sources(owner: str, repo: str,
         backend.store_new_source(
             repo=repo,
             source_location=result.get('location', ''),
-            type=result.get('source', ''),
+            source_type=result.get('source', ''),
             line=int(result.get('line', '0')),
             notes=None, #result.get('description', ''),
             update=False
@@ -198,7 +197,7 @@ def add_source_notes(owner: str, repo: str,
     Add new notes to an existing source. The notes will be appended to any existing notes.
     """
     repo = process_repo(owner, repo)
-    return backend.store_new_source(repo = repo, source_location = source_location, line = line, type = "", notes = notes, update=True)
+    return backend.store_new_source(repo = repo, source_location = source_location, line = line, source_type = "", notes = notes, update=True)
 
 @mcp.tool()
 def clear_codeql_repo(owner: str, repo: str):
@@ -208,7 +207,6 @@ def clear_codeql_repo(owner: str, repo: str):
     repo = process_repo(owner, repo)
     with Session(backend.engine) as session:
         deleted_sources = session.query(Source).filter_by(repo=repo).delete()
-        # deleted_apps = session.query(Application).filter_by(repo=repo).delete()
         session.commit()
     return f"Cleared {deleted_sources} sources from repo {repo}."
 
