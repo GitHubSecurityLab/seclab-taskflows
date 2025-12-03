@@ -153,7 +153,8 @@ def _run_query(query_name: str, database_path: str, language: str, template_valu
 backend = CodeqlSqliteBackend(MEMORY)
 
 @mcp.tool()
-def remote_sources(owner: str, repo: str,
+def remote_sources(owner: str = Field(description="The owner of the GitHub repository", default=""),
+                   repo: str = Field(description="The name of the GitHub repository", default=""),
                    database_path: str = Field(description="The CodeQL database path."),
                    language: str = Field(description="The language used for the CodeQL database.")):
     """List all remote sources and their locations in a CodeQL database, then store the results in a database."""
@@ -183,7 +184,7 @@ def remote_sources(owner: str, repo: str,
     return f"Stored {stored_count} remote sources in {repo}."
 
 @mcp.tool()
-def fetch_sources(owner: str, repo: str):
+def fetch_sources(owner: str = Field(description="The owner of the GitHub repository", default=""), repo: str = Field(description="The name of the GitHub repository", default="")):
     """
     Fetch all sources from the repo
     """
@@ -191,8 +192,8 @@ def fetch_sources(owner: str, repo: str):
     return json.dumps(backend.get_sources(repo))
 
 @mcp.tool()
-def add_source_notes(owner: str, repo: str,
-                    #  database_path: str = Field(description="The CodeQL database path."),
+def add_source_notes(owner: str = Field(description="The owner of the GitHub repository", default=""),
+                     repo: str = Field(description="The name of the GitHub repository", default=""),
                      source_location: str = Field(description="The path to the file"),
                      line: int = Field(description="The line number of the source"),
                      notes: str = Field(description="The notes to append to this source", default="")):
@@ -203,7 +204,7 @@ def add_source_notes(owner: str, repo: str,
     return backend.store_new_source(repo = repo, source_location = source_location, line = line, source_type = "", notes = notes, update=True)
 
 @mcp.tool()
-def clear_codeql_repo(owner: str, repo: str):
+def clear_codeql_repo(owner: str = Field(description="The owner of the GitHub repository", default=""), repo: str = Field(description="The name of the GitHub repository", default="")):
     """
     Clear all data for a given repo from the database
     """
