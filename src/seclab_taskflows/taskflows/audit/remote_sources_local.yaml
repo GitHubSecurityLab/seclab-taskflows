@@ -50,7 +50,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-          Fetch the sources from the repo {{ GLOBALS_repo }}.
+        Fetch the sources from the repo {{ GLOBALS_repo }}.
       toolboxes:
         - seclab_taskflows.toolboxes.codeql_python
   - task:
