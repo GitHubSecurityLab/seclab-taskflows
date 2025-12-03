@@ -9,7 +9,7 @@ logging.basicConfig(
     filename='logs/mcp_codeql_python.log',
     filemode='a'
 )
-from seclab_taskflow_agent.mcp_servers.codeql.client import run_query, file_from_uri, list_src_files, _debug_log, search_in_src_archive
+from seclab_taskflow_agent.mcp_servers.codeql.client import run_query, _debug_log
 
 from pydantic import Field
 #from mcp.server.fastmcp import FastMCP, Context
@@ -103,7 +103,7 @@ class CodeqlSqliteBackend:
 
     def get_sources(self, repo):
         with Session(self.engine) as session:
-            results = session.query(Source).filter_by(repo=repo).all()
+            results = session.query(Source).filter_by(repo = repo).all()
             sources = [source_to_dict(source) for source in results]
         return sources
 
@@ -208,7 +208,7 @@ def clear_codeql_repo(owner: str, repo: str):
     """
     repo = process_repo(owner, repo)
     with Session(backend.engine) as session:
-        deleted_sources = session.query(Source).filter_by(repo=repo).delete()
+        deleted_sources = session.query(Source).filter_by(repo = repo).delete()
         session.commit()
     return f"Cleared {deleted_sources} sources from repo {repo}."
 

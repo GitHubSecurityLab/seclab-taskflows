@@ -21,6 +21,5 @@ class Source(Base):
 
     def __repr__(self):
         return (f"<Source(id={self.id}, repo={self.repo}, "
-                f"location={self.source_location}, type={self.type}, "
-                # f"line={self.line},",
+                f"location={self.source_location}, line={self.line}, source_type={self.source_type}, "
                 f"notes={self.notes})>")
