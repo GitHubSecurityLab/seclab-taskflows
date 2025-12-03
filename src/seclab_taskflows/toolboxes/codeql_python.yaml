@@ -17,7 +17,7 @@ server_params:
     GH_NO_UPDATE_NOTIFIER: "Disable"
     GH_NO_EXTENSION_UPDATE_NOTIFIER: "Disable"
     CODEQL_CLI: "{{ env CODEQL_CLI }}"
-    CODEQL_SQLITE_DIR: "{{ env DATA_DIR }}"
+    DATA_DIR: "{{ env DATA_DIR }}"
 server_prompt: |
   ## CodeQL Supported Programming Languages
 
