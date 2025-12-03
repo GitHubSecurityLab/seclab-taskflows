@@ -10,7 +10,7 @@ logging.basicConfig(
     filemode='a'
 )
 from seclab_taskflow_agent.mcp_servers.codeql.client import run_query, _debug_log
-from seclab_taskflow_agent.path_utils import mcp_data_dir
+# from seclab_taskflow_agent.path_utils import mcp_data_dir
 
 from pydantic import Field
 #from mcp.server.fastmcp import FastMCP, Context
@@ -27,8 +27,10 @@ import importlib.resources
 from .codeql_sqlite_models import Base, Source
 from ..utils import process_repo
 
-MEMORY =  mcp_data_dir('seclab-taskflow-agent', 'codeql', 'DATA_DIR')
-CODEQL_DBS_BASE_PATH =  mcp_data_dir('seclab-taskflow-agent', 'codeql', 'CODEQL_DBS_BASE_PATH')
+MEMORY = Path(os.getenv('DATA_DIR', default='/app/data'))
+CODEQL_DBS_BASE_PATH = Path(os.getenv('CODEQL_DBS_BASE_PATH', default='/app/data'))
+# MEMORY =  mcp_data_dir('seclab-taskflows', 'codeql', 'DATA_DIR')
+# CODEQL_DBS_BASE_PATH =  mcp_data_dir('seclab-taskflows', 'codeql', 'CODEQL_DBS_BASE_PATH')
 
 mcp = FastMCP("CodeQL-Python")
 
@@ -153,8 +155,8 @@ def _run_query(query_name: str, database_path: str, language: str, template_valu
 backend = CodeqlSqliteBackend(MEMORY)
 
 @mcp.tool()
-def remote_sources(owner: str = Field(description="The owner of the GitHub repository", default=""),
-                   repo: str = Field(description="The name of the GitHub repository", default=""),
+def remote_sources(owner: str = Field(description="The owner of the GitHub repository"),
+                   repo: str = Field(description="The name of the GitHub repository"),
                    database_path: str = Field(description="The CodeQL database path."),
                    language: str = Field(description="The language used for the CodeQL database.")):
     """List all remote sources and their locations in a CodeQL database, then store the results in a database."""
@@ -184,7 +186,8 @@ def remote_sources(owner: str = Field(description="The owner of the GitHub repos
     return f"Stored {stored_count} remote sources in {repo}."
 
 @mcp.tool()
-def fetch_sources(owner: str = Field(description="The owner of the GitHub repository", default=""), repo: str = Field(description="The name of the GitHub repository", default="")):
+def fetch_sources(owner: str = Field(description="The owner of the GitHub repository"),
+                     repo: str = Field(description="The name of the GitHub repository")):
     """
     Fetch all sources from the repo
     """
@@ -192,11 +195,11 @@ def fetch_sources(owner: str = Field(description="The owner of the GitHub reposi
     return json.dumps(backend.get_sources(repo))
 
 @mcp.tool()
-def add_source_notes(owner: str = Field(description="The owner of the GitHub repository", default=""),
-                     repo: str = Field(description="The name of the GitHub repository", default=""),
+def add_source_notes(owner: str = Field(description="The owner of the GitHub repository"),
+                     repo: str = Field(description="The name of the GitHub repository"),
                      source_location: str = Field(description="The path to the file"),
                      line: int = Field(description="The line number of the source"),
-                     notes: str = Field(description="The notes to append to this source", default="")):
+                     notes: str = Field(description="The notes to append to this source")):
     """
     Add new notes to an existing source. The notes will be appended to any existing notes.
     """
@@ -204,7 +207,8 @@ def add_source_notes(owner: str = Field(description="The owner of the GitHub rep
     return backend.store_new_source(repo = repo, source_location = source_location, line = line, source_type = "", notes = notes, update=True)
 
 @mcp.tool()
-def clear_codeql_repo(owner: str = Field(description="The owner of the GitHub repository", default=""), repo: str = Field(description="The name of the GitHub repository", default="")):
+def clear_codeql_repo(owner: str = Field(description="The owner of the GitHub repository"),
+                     repo: str = Field(description="The name of the GitHub repository")):
     """
     Clear all data for a given repo from the database
     """

@@ -94,4 +94,3 @@ taskflow:
         Fetch the sources of the repo {{ GLOBALS_repo }} and give a summary of the notes.
       toolboxes:
         - seclab_taskflows.toolboxes.codeql_python
-        - seclab_taskflow_agent.toolboxes.memcache
