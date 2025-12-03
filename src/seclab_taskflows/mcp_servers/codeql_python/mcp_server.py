@@ -126,7 +126,7 @@ def _csv_parse(raw):
                 this_obj[k.strip()] = row[j + 2]
             results.append(this_obj)
     except (csv.Error, IndexError, ValueError) as e:
-        return ["Error: CSV parsing error: " + str(e)]
+        return f"Error: CSV parsing error: {e}"
     return results
 
 
@@ -167,8 +167,6 @@ def remote_sources(owner: str = Field(description="The owner of the GitHub repos
     # Check if results is an error (list of strings) or valid data (list of dicts)
     if isinstance(results, str):
         return f"Error: {results}"
-    if results and isinstance(results[0], str):
-        return f"Error: {results[0]}"
 
     # Store each result as a source
     stored_count = 0
