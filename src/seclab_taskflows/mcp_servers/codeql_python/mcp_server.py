@@ -70,7 +70,7 @@ def _resolve_db_path(relative_db_path: str | Path):
     relative_db_path = str(relative_db_path).strip().lstrip('/')
     relative_db_path = Path(relative_db_path)
     absolute_path = (CODEQL_DBS_BASE_PATH / relative_db_path).resolve()
-    if not str(absolute_path).startswith(str(CODEQL_DBS_BASE_PATH.resolve())):
+    if not absolute_path.is_relative_to(CODEQL_DBS_BASE_PATH.resolve()):
         raise RuntimeError(f"Error: Database path {absolute_path} is outside the base path {CODEQL_DBS_BASE_PATH}")
     if not absolute_path.is_dir():
         _debug_log(f"Database path not found: {absolute_path}")
