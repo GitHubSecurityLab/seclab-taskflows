@@ -10,6 +10,7 @@ logging.basicConfig(
     filemode='a'
 )
 from seclab_taskflow_agent.mcp_servers.codeql.client import run_query, _debug_log
+from seclab_taskflow_agent.path_utils import mcp_data_dir
 
 from pydantic import Field
 #from mcp.server.fastmcp import FastMCP, Context
@@ -26,10 +27,10 @@ import importlib.resources
 from .codeql_sqlite_models import Base, Source
 from ..utils import process_repo
 
-MEMORY = Path(os.getenv('CODEQL_SQLITE_DIR', default='/app/my_data'))
-mcp = FastMCP("CodeQL-Python")
+MEMORY =  mcp_data_dir('seclab-taskflow-agent', 'codeql', 'DATA_DIR')
+CODEQL_DBS_BASE_PATH =  mcp_data_dir('seclab-taskflow-agent', 'codeql', 'CODEQL_DBS_BASE_PATH')
 
-CODEQL_DBS_BASE_PATH = Path(os.getenv('CODEQL_DBS_BASE_PATH', default='/workspaces/seclab-taskflow-agent/my_data'))
+mcp = FastMCP("CodeQL-Python")
 
 # tool name -> templated query lookup for supported languages
 TEMPLATED_QUERY_PATHS = {
