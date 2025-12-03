@@ -20,6 +20,8 @@ import csv
 import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+import subprocess
+import importlib.resources
 
 from .codeql_sqlite_models import Base, Source
 from ..utils import process_repo
@@ -211,4 +213,9 @@ def clear_codeql_repo(owner: str, repo: str):
     return f"Cleared {deleted_sources} sources from repo {repo}."
 
 if __name__ == "__main__":
+    # Check if codeql/python-all pack is installed, if not install it
+    if not os.path.isdir('/.codeql/packages/codeql/python-all'):
+        pack_path = importlib.resources.files('seclab_taskflows.mcp_servers.codeql_python.queries').joinpath('mcp-python')
+        print(f"Installing CodeQL pack from {pack_path}")
+        subprocess.run(["codeql", "pack", "install", pack_path])
     mcp.run(show_banner=False, transport="http", host="127.0.0.1", port=9998)

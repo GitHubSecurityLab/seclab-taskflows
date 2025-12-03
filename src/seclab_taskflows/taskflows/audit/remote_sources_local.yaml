@@ -40,6 +40,16 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
+        Fetch the zipball of the repository {{ GLOBALS_repo }}.
+      toolboxes:
+        - seclab_taskflows.toolboxes.local_gh_resources
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
           Fetch the sources from the repo {{ GLOBALS_repo }}.
       toolboxes:
         - seclab_taskflows.toolboxes.codeql_python
@@ -53,7 +63,6 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.auditor
       user_prompt: |
-        Fetch the zipball of the repository {{ GLOBALS_repo }} and use it to analyze the source.
         The source is a {{ RESULT_type }} in {{ RESULT_repo }} in the location {{ RESULT_source_location }} on line {{ RESULT_line }}.
         If the source is in a folder relating to tests or demo code, skip the analysis and update the source entry in the codeql_sqlite database indicating it is not relevant.
         Analyze what the source endpoint is used for.
@@ -75,12 +84,11 @@ taskflow:
         the error you encountered.
       toolboxes:
         - seclab_taskflows.toolboxes.codeql_python
-        - seclab_taskflows.toolboxes.local_gh_resources
         - seclab_taskflows.toolboxes.local_file_viewer
   - task:
       must_complete: true
       agents:
-        - seclab_taskflows.personalities.web_application_security_expert
+        - seclab_taskflows.personalities.auditor
       model: code_analysis
       user_prompt: |
         Fetch the sources of the repo {{ GLOBALS_repo }} and give a summary of the notes.
