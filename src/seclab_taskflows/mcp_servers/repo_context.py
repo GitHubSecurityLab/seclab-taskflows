@@ -366,7 +366,7 @@ def add_component_notes(owner: str = Field(description="The owner of the GitHub 
 @mcp.tool()
 def store_new_entry_point(owner: str = Field(description="The owner of the GitHub repository"),
                           repo: str = Field(description="The name of the GitHub repository"),
-                          location: str = Field(description="The directory of the component where the entry point belonged to"),
+                          location: str = Field(description="The directory of the component where the entry point belongs to"),
                           file: str = Field(description="The file that contains the entry point"),
                           line: int = Field(description="The file line that contains the entry point"),
                           user_input: str = Field(description="The variables that are considered as user input"),
