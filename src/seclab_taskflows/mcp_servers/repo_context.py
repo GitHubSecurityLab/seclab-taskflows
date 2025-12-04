@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 
 from .repo_context_models import Application, EntryPoint, UserAction, WebEntryPoint, ApplicationIssue, AuditResult, Base
+from .utils import process_repo
 
 MEMORY = Path(os.getenv('REPO_CONTEXT_DIR', default='/app/my_data'))
 
@@ -90,9 +91,9 @@ class RepoContextBackend:
         else:
             db_dir = f'sqlite:///{self.memcache_state_dir}/repo_context.db'
         self.engine = create_engine(db_dir, echo=False)
-        Base.metadata.create_all(self.engine, tables=[Application.__table__, EntryPoint.__table__, UserAction.__table__, 
+        Base.metadata.create_all(self.engine, tables=[Application.__table__, EntryPoint.__table__, UserAction.__table__,
                                                       WebEntryPoint.__table__, ApplicationIssue.__table__, AuditResult.__table__])
-    
+
     def store_new_application(self, repo, location, is_app, is_library, notes):
         with Session(self.engine) as session:
             existing = session.query(Application).filter_by(repo = repo, location = location).first()
@@ -107,7 +108,7 @@ class RepoContextBackend:
                 session.add(new_application)
             session.commit()
         return f"Updated or added application for {location} in {repo}."
-    
+
     def store_new_component_issue(self, repo, component_id, issue_type, notes):
         with Session(self.engine) as session:
             existing = session.query(ApplicationIssue).filter_by(repo = repo, component_id = component_id, issue_type = issue_type).first()
@@ -155,7 +156,7 @@ class RepoContextBackend:
                 session.add(new_entry_point)
             session.commit()
         return f"Updated or added entry point for {file} and {line} in {repo}."
-    
+
     def store_new_web_entry_point(self, repo, entry_point_id, method, path, component, auth, middleware, roles_scopes, notes, update = False):
         with Session(self.engine) as session:
             existing = session.query(WebEntryPoint).filter_by(repo = repo, entry_point_id = entry_point_id).first()
@@ -177,7 +178,7 @@ class RepoContextBackend:
                 if update:
                     return f"No web entry point exists at repo {repo} with entry_point_id {entry_point_id}."
                 new_web_entry_point = WebEntryPoint(
-                    repo = repo, 
+                    repo = repo,
                     entry_point_id = entry_point_id,
                     method = method,
                     path = path,
@@ -190,7 +191,7 @@ class RepoContextBackend:
                 session.add(new_web_entry_point)
             session.commit()
         return f"Updated or added web entry point for entry_point_id {entry_point_id} in {repo}."
-    
+
     def store_new_user_action(self, repo, app_id, file, line, notes, update = False):
         with Session(self.engine) as session:
             existing = session.query(UserAction).filter_by(repo = repo, file = file, line = line).first()
@@ -203,7 +204,7 @@ class RepoContextBackend:
                 session.add(new_user_action)
             session.commit()
         return f"Updated or added user action for {file} and {line} in {repo}."
-    
+
     def get_app(self, repo, location):
         with Session(self.engine) as session:
             existing = session.query(Application).filter_by(repo = repo, location = location).first()
@@ -271,7 +272,7 @@ class RepoContextBackend:
         with Session(self.engine) as session:
             results = session.query(WebEntryPoint).filter_by(repo = repo).all()
         return [{
-                    'repo' : r.repo, 
+                    'repo' : r.repo,
                     'entry_point_id' : r.entry_point_id,
                     'method' : r.method,
                     'path' : r.path,
@@ -286,7 +287,7 @@ class RepoContextBackend:
         with Session(self.engine) as session:
             results = session.query(WebEntryPoint).filter_by(repo = repo, component = component_id).all()
         return [{
-                    'repo' : r.repo, 
+                    'repo' : r.repo,
                     'entry_point_id' : r.entry_point_id,
                     'method' : r.method,
                     'path' : r.path,
@@ -313,7 +314,7 @@ class RepoContextBackend:
             ).filter(UserAction.app_id == Application.id).all()
             uas = [user_action_to_dict(ua) for app, ua in results]
         return uas
-    
+
     def clear_repo(self, repo):
         with Session(self.engine) as session:
             session.query(Application).filter_by(repo = repo).delete()
@@ -324,7 +325,7 @@ class RepoContextBackend:
             session.query(AuditResult).filter_by(repo = repo).delete()
             session.commit()
         return f"Cleared results for repo {repo}"
-    
+
     def clear_repo_issues(self, repo):
         with Session(self.engine) as session:
             session.query(ApplicationIssue).filter_by(repo = repo).delete()
@@ -335,9 +336,6 @@ class RepoContextBackend:
 mcp = FastMCP("RepoContext")
 
 backend = RepoContextBackend(MEMORY)
-
-def process_repo(owner, repo):
-    return f"{owner}/{repo}".lower()
 
 @mcp.tool()
 def store_new_component(owner: str = Field(description="The owner of the GitHub repository"),

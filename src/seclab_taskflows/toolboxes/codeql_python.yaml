@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  version: 1
+  filetype: toolbox
+
+server_params:
+  kind: streamable
+  url: 'http://localhost:9998/mcp'
+  # if you set a command/args/env we will also start the server on demand
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.codeql_python.mcp_server"]
+  env:
+    CODEQL_DBS_BASE_PATH: "{{ env CODEQL_DBS_BASE_PATH }}"
+    # prevent git repo operations on gh codeql executions
+    GH_NO_UPDATE_NOTIFIER: "Disable"
+    GH_NO_EXTENSION_UPDATE_NOTIFIER: "Disable"
+    CODEQL_CLI: "{{ env CODEQL_CLI }}"
+    DATA_DIR: "{{ env DATA_DIR }}"
+server_prompt: |
+  ## CodeQL Supported Programming Languages
+
+  CodeQL supports the following languages, which you'll refer to by their
+  CodeQL acronyms and which are detailed below:
+
+    - actions: GitHub Actions workflows
+    - cpp: The C and C++ programming language
+    - csharp: The C# programming language
+    - go: The Go programming language
+    - java: The Java programming language (including Kotlin)
+    - javascript: The JavaScript programming language (including TypeScript)
+    - python: The Python programming language
+    - ruby: The Ruby programming language
+    - rust: The Rust programming language
+    - swift: The Swift programming language
+
+  When interacting with CodeQL databases, you will need to provide the
+  appropriate language acronym for the type of project contained within the
+  CodeQL database.
+
+  For example, when interacting with a CodeQL database for a C based project
+  you would reference its language as `cpp` for any CodeQL database
+  interactions.
+
+  If you are unable to determine the appropriate programming language acronym,
+  halt your task and ask the user to clarify which programming language the
+  CodeQL database in question was created for.
