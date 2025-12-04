@@ -27,7 +27,7 @@ mcp = FastMCP("GitHubCodeScanning")
 
 GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', default='')
 if not GITHUB_PERSONAL_ACCESS_TOKEN:
-    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('COPILOT_TOKEN')
+    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('AI_API_TOKEN')
 
 CODEQL_DBS_BASE_PATH = Path(os.getenv('CODEQL_DBS_BASE_PATH', default='/app/my_data'))
 

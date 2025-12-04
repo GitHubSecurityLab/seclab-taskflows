@@ -24,7 +24,7 @@ mcp = FastMCP("LocalGHResources")
 
 GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN')
 if not GITHUB_PERSONAL_ACCESS_TOKEN:
-    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('COPILOT_TOKEN')
+    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('AI_API_TOKEN')
 
 LOCAL_GH_DIR = Path(os.getenv('LOCAL_GH_DIR', default='/app/my_data'))
 

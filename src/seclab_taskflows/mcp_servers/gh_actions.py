@@ -47,7 +47,7 @@ unimportant_triggers = set(['pull_request', 'workflow_dispatch'])
 
 GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', default='')
 if not GITHUB_PERSONAL_ACCESS_TOKEN:
-    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('COPILOT_TOKEN')
+    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('AI_API_TOKEN')
 
 ACTIONS_DB_DIR = Path(os.getenv('ACTIONS_DB_DIR', default='/app/my_data'))
 

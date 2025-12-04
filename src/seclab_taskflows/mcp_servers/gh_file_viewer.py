@@ -44,7 +44,7 @@ mcp = FastMCP("GitHubFileViewer")
 
 GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', default='')
 if not GITHUB_PERSONAL_ACCESS_TOKEN:
-    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('COPILOT_TOKEN')
+    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('AI_API_TOKEN')
 
 SEARCH_RESULT_DIR = Path(os.getenv('SEARCH_RESULTS_DIR', default='/app/my_data'))
 
