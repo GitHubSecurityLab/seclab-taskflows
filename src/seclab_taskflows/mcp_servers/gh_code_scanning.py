@@ -2,12 +2,6 @@
 # SPDX-License-Identifier: MIT
 
 import logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='logs/mcp_gh_code_scanning.log',
-    filemode='a'
-)
 from fastmcp import FastMCP
 from pydantic import Field
 import httpx
@@ -20,8 +14,16 @@ from pathlib import Path
 import zipfile
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
 
 from .alert_results_models import AlertResults, AlertFlowGraph, Base
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename=log_file_name('mcp_gh_code_scanning.log'),
+    filemode='a'
+)
 
 mcp = FastMCP("GitHubCodeScanning")
 
@@ -29,9 +31,8 @@ GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', default
 if not GITHUB_PERSONAL_ACCESS_TOKEN:
     GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('COPILOT_TOKEN')
 
-CODEQL_DBS_BASE_PATH = Path(os.getenv('CODEQL_DBS_BASE_PATH', default='/app/my_data'))
-
-ALERT_RESULTS_DIR = Path(os.getenv('ALERT_RESULTS_DIR', default='/app/my_data'))
+CODEQL_DBS_BASE_PATH = mcp_data_dir('seclab-taskflows', 'codeql', 'CODEQL_DBS_BASE_PATH')
+ALERT_RESULTS_DIR = mcp_data_dir('seclab-taskflows', 'gh_code_scanning', 'ALERT_RESULTS_DIR')
 
 def parse_alert(alert: dict) -> dict:
     """Parse the alert dictionary to extract relevant information."""

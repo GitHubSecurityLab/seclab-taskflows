@@ -2,13 +2,6 @@
 # SPDX-License-Identifier: MIT
 
 import logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='logs/mcp_repo_context.log',
-    filemode='a'
-)
-
 from fastmcp import FastMCP
 from pydantic import Field
 import httpx
@@ -19,11 +12,19 @@ from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from pathlib import Path
+from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
 
 from .repo_context_models import Application, EntryPoint, UserAction, WebEntryPoint, ApplicationIssue, AuditResult, Base
 from .utils import process_repo
 
-MEMORY = Path(os.getenv('REPO_CONTEXT_DIR', default='/app/my_data'))
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename=log_file_name('mcp_repo_context.log'),
+    filemode='a'
+)
+
+MEMORY = mcp_data_dir('seclab-taskflows', 'repo_context', 'REPO_CONTEXT_DIR')
 
 def app_to_dict(result):
     return {

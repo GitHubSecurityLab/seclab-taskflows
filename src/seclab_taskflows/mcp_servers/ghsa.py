@@ -1,10 +1,4 @@
 import logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='logs/mcp_ghsa.log',
-    filemode='a'
-)
 
 from fastmcp import FastMCP
 from pydantic import Field
@@ -12,6 +6,14 @@ import re
 import json
 from urllib.parse import urlparse, parse_qs
 from .gh_code_scanning import call_api
+from seclab_taskflow_agent.path_utils import log_file_name
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename=log_file_name('mcp_ghsa.log'),
+    filemode='a'
+)
 
 mcp = FastMCP("GitHubRepoAdvisories")
 
