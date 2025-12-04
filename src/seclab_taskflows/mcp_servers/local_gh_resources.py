@@ -1,22 +1,22 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
-import logging
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filename="logs/mcp_local_gh_resources.log",
-    filemode="a",
-)
-
 import json
+import logging
 import os
 from pathlib import Path
 
 import aiofiles
 import httpx
 from fastmcp import FastMCP
+from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename=log_file_name("mcp_local_gh_resources.log"),
+    filemode="a",
+)
 
 mcp = FastMCP("LocalGHResources")
 
@@ -24,7 +24,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
 if not GITHUB_PERSONAL_ACCESS_TOKEN:
     GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv("COPILOT_TOKEN")
 
-LOCAL_GH_DIR = Path(os.getenv("LOCAL_GH_DIR", default="/app/my_data"))
+LOCAL_GH_DIR = mcp_data_dir("seclab-taskflows", "local_gh_resources", "LOCAL_GH_DIR")
 
 
 def is_subdirectory(directory, potential_subdirectory):

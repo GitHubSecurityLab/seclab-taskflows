@@ -1,25 +1,24 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
-import logging
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filename="logs/mcp_gh_actions.log",
-    filemode="a",
-)
-
 import json
+import logging
 import os
-from pathlib import Path
 
 import httpx
 import yaml
 from fastmcp import FastMCP
 from pydantic import Field
+from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename=log_file_name("mcp_gh_actions.log"),
+    filemode="a",
+)
 
 
 class Base(DeclarativeBase):
@@ -56,7 +55,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN", default
 if not GITHUB_PERSONAL_ACCESS_TOKEN:
     GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv("COPILOT_TOKEN")
 
-ACTIONS_DB_DIR = Path(os.getenv("ACTIONS_DB_DIR", default="/app/my_data"))
+ACTIONS_DB_DIR = mcp_data_dir("seclab-taskflows", "gh_actions", "ACTIONS_DB_DIR")
 
 engine = create_engine(f"sqlite:///{os.path.abspath(ACTIONS_DB_DIR)}/actions.db", echo=False)
 Base.metadata.create_all(engine, tables=[WorkflowUses.__table__])

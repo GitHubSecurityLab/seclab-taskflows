@@ -1,26 +1,26 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
-import logging
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filename="logs/mcp_local_file_viewer.log",
-    filemode="a",
-)
-
 import json
+import logging
 import os
 import zipfile
 from pathlib import Path
 
 from fastmcp import FastMCP
 from pydantic import Field
+from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename=log_file_name("mcp_local_file_viewer.log"),
+    filemode="a",
+)
 
 mcp = FastMCP("LocalFileViewer")
 
-LOCAL_GH_DIR = Path(os.getenv("LOCAL_GH_DIR", default="/app/my_data"))
+LOCAL_GH_DIR = mcp_data_dir("seclab-taskflows", "local_file_viewer", "LOCAL_GH_DIR")
 
 
 def is_subdirectory(directory, potential_subdirectory):

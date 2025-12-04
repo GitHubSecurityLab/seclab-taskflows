@@ -1,26 +1,25 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
-import logging
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filename="logs/mcp_report_alert_state.log",
-    filemode="a",
-)
-
 import json
-import os
+import logging
 from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
 from pydantic import Field
+from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from .alert_results_models import AlertFlowGraph, AlertResults, Base
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename=log_file_name("mcp_report_alert_state.log"),
+    filemode="a",
+)
 
 
 def result_to_dict(result):
@@ -62,7 +61,7 @@ def remove_line_numbers(location: str) -> str:
     return ":".join(parts[:-4])
 
 
-MEMORY = Path(os.getenv("ALERT_RESULTS_DIR", default="/app/my_data"))
+MEMORY = mcp_data_dir("seclab-taskflows", "report_alert_state", "ALERT_RESULTS_DIR")
 
 
 class ReportAlertStateBackend:

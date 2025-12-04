@@ -2,37 +2,34 @@
 # SPDX-License-Identifier: MIT
 
 
-import logging
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filename="logs/mcp_codeql_python.log",
-    filemode="a",
-)
 import csv
 import importlib.resources
 import json
+import logging
 import os
 import subprocess
 from pathlib import Path
 
 # from mcp.server.fastmcp import FastMCP, Context
 from fastmcp import FastMCP  # use FastMCP 2.0
-
-# from seclab_taskflow_agent.path_utils import mcp_data_dir
 from pydantic import Field
 from seclab_taskflow_agent.mcp_servers.codeql.client import _debug_log, run_query
+from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from ..utils import process_repo
 from .codeql_sqlite_models import Base, Source
 
-MEMORY = Path(os.getenv("DATA_DIR", default="/app/data"))
-CODEQL_DBS_BASE_PATH = Path(os.getenv("CODEQL_DBS_BASE_PATH", default="/app/data"))
-# MEMORY =  mcp_data_dir('seclab-taskflows', 'codeql', 'DATA_DIR')
-# CODEQL_DBS_BASE_PATH =  mcp_data_dir('seclab-taskflows', 'codeql', 'CODEQL_DBS_BASE_PATH')
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename=log_file_name("mcp_codeql_python.log"),
+    filemode="a",
+)
+
+MEMORY = mcp_data_dir("seclab-taskflows", "codeql", "DATA_DIR")
+CODEQL_DBS_BASE_PATH = mcp_data_dir("seclab-taskflows", "codeql", "CODEQL_DBS_BASE_PATH")
 
 mcp = FastMCP("CodeQL-Python")
 
