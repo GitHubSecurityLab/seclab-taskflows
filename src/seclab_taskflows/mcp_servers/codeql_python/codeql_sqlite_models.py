@@ -1,16 +1,18 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
-from sqlalchemy import Text
-from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 from typing import Optional
+
+from sqlalchemy import Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
 
 class Base(DeclarativeBase):
     pass
 
 
 class Source(Base):
-    __tablename__ = 'source'
+    __tablename__ = "source"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     repo: Mapped[str]
@@ -20,6 +22,8 @@ class Source(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     def __repr__(self):
-        return (f"<Source(id={self.id}, repo={self.repo}, "
-                f"location={self.source_location}, line={self.line}, source_type={self.source_type}, "
-                f"notes={self.notes})>")
+        return (
+            f"<Source(id={self.id}, repo={self.repo}, "
+            f"location={self.source_location}, line={self.line}, source_type={self.source_type}, "
+            f"notes={self.notes})>"
+        )
