@@ -16,7 +16,7 @@ from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    filename=log_file_dir('mcp_local_file_viewer.log'),
+    filename=log_file_name('mcp_local_file_viewer.log'),
     filemode='a'
 )
 
