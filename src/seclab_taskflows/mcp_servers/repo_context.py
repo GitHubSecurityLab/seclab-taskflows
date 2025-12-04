@@ -402,8 +402,8 @@ backend = RepoContextBackend(MEMORY)
 
 @mcp.tool()
 def store_new_component(
-    owner: str,
-    repo: str,
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
     location: str = Field(description="The directory of the component"),
     is_app: bool = Field(description="Is this an application", default=None),
     is_library: bool = Field(description="Is this a library", default=None),
@@ -417,8 +417,8 @@ def store_new_component(
 
 @mcp.tool()
 def add_component_notes(
-    owner: str,
-    repo: str,
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
     location: str = Field(description="The directory of the component", default=None),
     notes: str = Field(description="New notes taken for this component", default=""),
 ):
@@ -434,9 +434,9 @@ def add_component_notes(
 
 @mcp.tool()
 def store_new_entry_point(
-    owner: str,
-    repo: str,
-    location: str = Field(description="The directory of the component where the entry point belonged to"),
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    location: str = Field(description="The directory of the component where the entry point belongs to"),
     file: str = Field(description="The file that contains the entry point"),
     line: int = Field(description="The file line that contains the entry point"),
     user_input: str = Field(description="The variables that are considered as user input"),
@@ -453,7 +453,13 @@ def store_new_entry_point(
 
 
 @mcp.tool()
-def store_new_component_issue(owner: str, repo: str, component_id: int, issue_type: str, notes: str):
+def store_new_component_issue(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+    issue_type: str = Field(description="The type of issue"),
+    notes: str = Field(description="Notes about the issue"),
+):
     """
     Stores a type of common issue for a component.
     """
@@ -463,11 +469,11 @@ def store_new_component_issue(owner: str, repo: str, component_id: int, issue_ty
 
 @mcp.tool()
 def store_new_audit_result(
-    owner: str,
-    repo: str,
-    component_id: int,
-    issue_type: str,
-    issue_id: int,
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+    issue_type: str = Field(description="The type of issue"),
+    issue_id: int = Field(description="The ID of the issue"),
     has_non_security_error: bool = Field(
         description="Set to true if there are security issues or logic error but may not be exploitable"
     ),
@@ -485,8 +491,8 @@ def store_new_audit_result(
 
 @mcp.tool()
 def store_new_web_entry_point(
-    owner: str,
-    repo: str,
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
     entry_point_id: int = Field(description="The ID of the entry point this web entry point refers to"),
     location: str = Field(description="The directory of the component where the web entry point belongs to"),
     method: str = Field(description="HTTP method (GET, POST, etc)", default=""),
@@ -508,9 +514,9 @@ def store_new_web_entry_point(
 
 @mcp.tool()
 def add_entry_point_notes(
-    owner: str,
-    repo: str,
-    location: str = Field(description="The directory of the component where the entry point belonged to"),
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    location: str = Field(description="The directory of the component where the entry point belongs to"),
     file: str = Field(description="The file that contains the entry point"),
     line: int = Field(description="The file line that contains the entry point"),
     notes: str = Field(description="The notes for this entry point", default=""),
@@ -527,9 +533,9 @@ def add_entry_point_notes(
 
 @mcp.tool()
 def store_new_user_action(
-    owner: str,
-    repo: str,
-    location: str = Field(description="The directory of the component where the user action belonged to"),
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    location: str = Field(description="The directory of the component where the user action belongs to"),
     file: str = Field(description="The file that contains the user action"),
     line: int = Field(description="The file line that contains the user action"),
     notes: str = Field(description="New notes for this user action", default=""),
@@ -546,9 +552,9 @@ def store_new_user_action(
 
 @mcp.tool()
 def add_user_action_notes(
-    owner: str,
-    repo: str,
-    location: str = Field(description="The directory of the component where the user action belonged to"),
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    location: str = Field(description="The directory of the component where the user action belongs to"),
     file: str = Field(description="The file that contains the user action"),
     line: str = Field(description="The file line that contains the user action"),
     notes: str = Field(description="The notes for user action", default=""),
@@ -561,9 +567,13 @@ def add_user_action_notes(
 
 
 @mcp.tool()
-def get_component(owner: str, repo: str, location: str = Field(description="The directory of the component")):
+def get_component(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    location: str = Field(description="The directory of the component"),
+):
     """
-    The a component from the database
+    Get a component from the database
     """
     repo = process_repo(owner, repo)
     app = backend.get_app(repo, location)
@@ -573,7 +583,10 @@ def get_component(owner: str, repo: str, location: str = Field(description="The 
 
 
 @mcp.tool()
-def get_components(owner: str, repo: str):
+def get_components(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
     """
     Get components from the repo
     """
@@ -582,7 +595,11 @@ def get_components(owner: str, repo: str):
 
 
 @mcp.tool()
-def get_entry_points(owner: str, repo: str, location: str = Field(description="The directory of the component")):
+def get_entry_points(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    location: str = Field(description="The directory of the component"),
+):
     """
     Get all the entry points of a component.
     """
@@ -591,7 +608,10 @@ def get_entry_points(owner: str, repo: str, location: str = Field(description="T
 
 
 @mcp.tool()
-def get_entry_points_for_repo(owner: str, repo: str):
+def get_entry_points_for_repo(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
     """
     Get all entry points of an repo
     """
@@ -600,7 +620,11 @@ def get_entry_points_for_repo(owner: str, repo: str):
 
 
 @mcp.tool()
-def get_web_entry_points_component(owner: str, repo: str, component_id: int):
+def get_web_entry_points_component(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+):
     """
     Get all web entry points for a component
     """
@@ -609,7 +633,10 @@ def get_web_entry_points_component(owner: str, repo: str, component_id: int):
 
 
 @mcp.tool()
-def get_web_entry_points_for_repo(owner: str, repo: str):
+def get_web_entry_points_for_repo(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
     """
     Get all web entry points of an repo
     """
@@ -618,7 +645,11 @@ def get_web_entry_points_for_repo(owner: str, repo: str):
 
 
 @mcp.tool()
-def get_user_actions(owner: str, repo: str, location: str = Field(description="The directory of the component")):
+def get_user_actions(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    location: str = Field(description="The directory of the component"),
+):
     """
     Get all the user actions in a component.
     """
@@ -627,7 +658,10 @@ def get_user_actions(owner: str, repo: str, location: str = Field(description="T
 
 
 @mcp.tool()
-def get_user_actions_for_repo(owner: str, repo: str):
+def get_user_actions_for_repo(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
     """
     Get all the user actions in a repo.
     """
@@ -636,7 +670,11 @@ def get_user_actions_for_repo(owner: str, repo: str):
 
 
 @mcp.tool()
-def get_component_issues(owner: str, repo: str, component_id: int):
+def get_component_issues(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+):
     """
     Get issues for the component.
     """
@@ -645,7 +683,11 @@ def get_component_issues(owner: str, repo: str, component_id: int):
 
 
 @mcp.tool()
-def get_component_results(owner: str, repo: str, component_id: int):
+def get_component_results(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+):
     """
     Get audit results for the component.
     """
@@ -654,7 +696,11 @@ def get_component_results(owner: str, repo: str, component_id: int):
 
 
 @mcp.tool()
-def get_component_vulnerable_results(owner: str, repo: str, component_id: int):
+def get_component_vulnerable_results(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+):
     """
     Get audit results for the component that are audited as vulnerable.
     """
@@ -665,7 +711,11 @@ def get_component_vulnerable_results(owner: str, repo: str, component_id: int):
 
 
 @mcp.tool()
-def get_component_potential_results(owner: str, repo: str, component_id: int):
+def get_component_potential_results(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+):
     """
     Get audit results for the component that are audited as an issue but may not be exploitable.
     """
@@ -676,7 +726,10 @@ def get_component_potential_results(owner: str, repo: str, component_id: int):
 
 
 @mcp.tool()
-def get_audit_results_for_repo(owner: str, repo: str):
+def get_audit_results_for_repo(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
     """
     Get audit results for the repo.
     """
@@ -687,7 +740,10 @@ def get_audit_results_for_repo(owner: str, repo: str):
 
 
 @mcp.tool()
-def get_vulnerable_audit_results_for_repo(owner: str, repo: str):
+def get_vulnerable_audit_results_for_repo(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
     """
     Get audit results for the repo that are audited as vulnerable.
     """
@@ -698,7 +754,10 @@ def get_vulnerable_audit_results_for_repo(owner: str, repo: str):
 
 
 @mcp.tool()
-def get_potential_audit_results_for_repo(owner: str, repo: str):
+def get_potential_audit_results_for_repo(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
     """
     Get audit results for the repo that are potential issues but may not be exploitable.
     """
@@ -709,7 +768,10 @@ def get_potential_audit_results_for_repo(owner: str, repo: str):
 
 
 @mcp.tool()
-def clear_repo(owner: str, repo: str):
+def clear_repo(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
     """
     clear all results for repo.
     """
@@ -718,7 +780,10 @@ def clear_repo(owner: str, repo: str):
 
 
 @mcp.tool()
-def clear_component_issues_for_repo(owner: str, repo: str):
+def clear_component_issues_for_repo(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
     """
     clear all results for repo.
     """
