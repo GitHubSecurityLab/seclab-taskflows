@@ -2,13 +2,6 @@
 # SPDX-License-Identifier: MIT
 
 import logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='logs/mcp_gh_file_viewer.log',
-    filemode='a'
-)
-
 from fastmcp import FastMCP
 from pydantic import Field
 import httpx
@@ -22,6 +15,14 @@ from pathlib import Path
 import aiofiles
 import zipfile
 import tempfile
+from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filename=log_file_name('mcp_gh_file_viewer.log'),
+    filemode='a'
+)
 
 class Base(DeclarativeBase):
     pass
@@ -46,7 +47,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', default
 if not GITHUB_PERSONAL_ACCESS_TOKEN:
     GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('COPILOT_TOKEN')
 
-SEARCH_RESULT_DIR = Path(os.getenv('SEARCH_RESULTS_DIR', default='/app/my_data'))
+SEARCH_RESULT_DIR = mcp_data_dir('seclab-taskflows', 'gh_file_viewer', 'SEARCH_RESULTS_DIR')
 
 engine = create_engine(f'sqlite:///{os.path.abspath(SEARCH_RESULT_DIR)}/search_result.db', echo=False)
 Base.metadata.create_all(engine, tables = [SearchResults.__table__])
