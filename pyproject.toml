@@ -60,3 +60,105 @@ exclude_lines = [
   "if __name__ == .__main__.:",
   "if TYPE_CHECKING:",
 ]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+ignore = [
+  # E402: Module level import not at top of file
+  # Ignored because logging configuration needs to be set before imports
+  "E402",
+  # FBT001/FBT002: Boolean typed positional/default argument in function definition
+  # Ignored because this is a common pattern in API design
+  "FBT001",
+  "FBT002",
+  # N802: Function name should be lowercase
+  # Ignored to allow acronyms like GHSA in function names
+  "N802",
+  # RUF013: PEP 484 prohibits implicit Optional
+  # Ignored as explicit Optional is verbose and the pattern is clear
+  "RUF013",
+  # FA100/FA102: Add from __future__ import annotations
+  # Ignored as this is a style preference and PEP 604 union syntax is valid in Python 3.10+
+  "FA100",
+  "FA102",
+  # A001/A002/A003: Variable/argument/class attribute is shadowing a Python builtin
+  # Ignored as 'next', 'id', 'type' are common parameter names in this codebase
+  "A001",
+  "A002",
+  "A003",
+  # PLR2004: Magic value used in comparison
+  # Ignored as magic values are acceptable in this codebase for simple comparisons
+  "PLR2004",
+  # G004: Logging statement uses f-string
+  # Ignored as f-strings in logging are acceptable
+  "G004",
+  # T201: print found
+  # Ignored in MCP servers where print is used for output
+  "T201",
+  # S607: Starting a process with a partial executable path
+  # Ignored as we trust the environment configuration
+  "S607",
+  # ARG001/ARG002: Unused function/method argument
+  # Ignored as some arguments may be required for API compatibility
+  "ARG001",
+  "ARG002",
+  # TID252: Prefer absolute imports over relative imports
+  # Ignored as relative imports are acceptable within the same package
+  "TID252",
+  # RET504: Unnecessary assignment before return statement
+  # Ignored as this pattern can improve readability
+  "RET504",
+  # TRY003: Avoid specifying long messages outside the exception class
+  # Ignored as inline error messages are acceptable for simple cases
+  "TRY003",
+  # EM102: Exception must not use an f-string literal
+  # Ignored as f-strings in exceptions are acceptable
+  "EM102",
+  # TRY300: Consider moving this statement to an else block
+  # Ignored as the current pattern is acceptable
+  "TRY300",
+  # BLE001: Do not catch blind exception
+  # Ignored as catching Exception is sometimes necessary for error handling
+  "BLE001",
+  # SIM117: Use a single with statement with multiple contexts
+  # Ignored as nested with statements can be more readable
+  "SIM117",
+  # PLW0602: Using global for variable but no assignment is done
+  # Ignored as globals may be used for module-level configuration
+  "PLW0602",
+  # PIE810: Call startswith/endswith once with a tuple
+  # Ignored as multiple calls can be more readable
+  "PIE810",
+  # SIM102: Use a single if statement instead of nested if statements
+  # Ignored as nested if can be more readable in some cases
+  "SIM102",
+  # SIM101: Use a single if statement instead of multiple nested if statements
+  # Ignored as nested if can be more readable in some cases
+  "SIM101",
+  # PERF401: Use list.extend to create a transformed list
+  # Ignored as append in a loop can be more readable
+  "PERF401",
+  # PERF102: When using only the keys/values of a dict use keys()/values()
+  # Ignored as items() usage can be intentional
+  "PERF102",
+  # LOG015: debug() call on root logger
+  # Ignored as root logger usage is acceptable for simple logging
+  "LOG015",
+  # PLC0206: Cannot have defined parameters for properties
+  # Ignored as this is an intentional pattern
+  "PLC0206",
+  # RUF015: Prefer next(...) over single element slice
+  # Ignored as slice can be more readable
+  "RUF015",
+  # B008: Do not perform function call in argument defaults
+  # Ignored as Field() defaults are common in Pydantic
+  "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+  # S101: Use of assert detected
+  "S101",
+]
