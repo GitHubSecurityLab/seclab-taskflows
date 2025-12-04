@@ -428,7 +428,7 @@ def store_new_web_entry_point(owner: str = Field(description="The owner of the G
 @mcp.tool()
 def add_entry_point_notes(owner: str = Field(description="The owner of the GitHub repository"),
                           repo: str = Field(description="The name of the GitHub repository"),
-                          location: str = Field(description="The directory of the component where the entry point belonged to"),
+                          location: str = Field(description="The directory of the component where the entry point belongs to"),
                           file: str = Field(description="The file that contains the entry point"),
                           line: int = Field(description="The file line that contains the entry point"),
                           notes: str = Field(description="The notes for this entry point", default = "")):
