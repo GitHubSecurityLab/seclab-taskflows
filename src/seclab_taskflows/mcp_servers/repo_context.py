@@ -476,7 +476,7 @@ def get_component(owner: str = Field(description="The owner of the GitHub reposi
                   repo: str = Field(description="The name of the GitHub repository"),
                   location: str = Field(description="The directory of the component")):
     """
-    The a component from the database
+    Get a component from the database
     """
     repo = process_repo(owner, repo)
     app = backend.get_app(repo, location)
