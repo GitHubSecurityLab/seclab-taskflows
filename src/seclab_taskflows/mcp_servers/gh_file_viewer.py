@@ -44,8 +44,6 @@ class SearchResults(Base):
 mcp = FastMCP("GitHubFileViewer")
 
 GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', default='')
-if not GITHUB_PERSONAL_ACCESS_TOKEN:
-    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('COPILOT_TOKEN')
 
 SEARCH_RESULT_DIR = mcp_data_dir('seclab-taskflows', 'gh_file_viewer', 'SEARCH_RESULTS_DIR')
 

@@ -28,8 +28,6 @@ logging.basicConfig(
 mcp = FastMCP("GitHubCodeScanning")
 
 GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', default='')
-if not GITHUB_PERSONAL_ACCESS_TOKEN:
-    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('COPILOT_TOKEN')
 
 CODEQL_DBS_BASE_PATH = mcp_data_dir('seclab-taskflows', 'codeql', 'CODEQL_DBS_BASE_PATH')
 ALERT_RESULTS_DIR = mcp_data_dir('seclab-taskflows', 'gh_code_scanning', 'ALERT_RESULTS_DIR')

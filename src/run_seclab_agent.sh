@@ -10,4 +10,4 @@ mkdir -p data
 
 docker run -i \
        --mount type=bind,src="$PWD",dst=/app \
-       -e GITHUB_PERSONAL_ACCESS_TOKEN="$GITHUB_PERSONAL_ACCESS_TOKEN" -e COPILOT_TOKEN="$COPILOT_TOKEN" "ghcr.io/githubsecuritylab/seclab-taskflow-agent" "$@"
+       -e GITHUB_PERSONAL_ACCESS_TOKEN="$GITHUB_PERSONAL_ACCESS_TOKEN" -e AI_API_TOKEN="$AI_API_TOKEN" "ghcr.io/githubsecuritylab/seclab-taskflow-agent" "$@"

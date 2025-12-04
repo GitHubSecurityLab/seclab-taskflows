@@ -46,8 +46,6 @@ high_privileged_triggers = set(["issues", "issue_comment", "pull_request_comment
 unimportant_triggers = set(['pull_request', 'workflow_dispatch'])
 
 GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', default='')
-if not GITHUB_PERSONAL_ACCESS_TOKEN:
-    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('COPILOT_TOKEN')
 
 ACTIONS_DB_DIR = mcp_data_dir('seclab-taskflows', 'gh_actions', 'ACTIONS_DB_DIR')
 

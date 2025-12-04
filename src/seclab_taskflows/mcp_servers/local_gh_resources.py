@@ -23,8 +23,6 @@ logging.basicConfig(
 mcp = FastMCP("LocalGHResources")
 
 GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN')
-if not GITHUB_PERSONAL_ACCESS_TOKEN:
-    GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('COPILOT_TOKEN')
 
 LOCAL_GH_DIR = mcp_data_dir('seclab-taskflows', 'local_gh_resources', 'LOCAL_GH_DIR')
 
