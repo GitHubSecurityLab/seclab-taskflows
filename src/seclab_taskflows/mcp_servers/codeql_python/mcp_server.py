@@ -4,7 +4,6 @@
 
 import logging
 from seclab_taskflow_agent.mcp_servers.codeql.client import run_query, _debug_log
-# from seclab_taskflow_agent.path_utils import mcp_data_dir
 
 from pydantic import Field
 #from mcp.server.fastmcp import FastMCP, Context
