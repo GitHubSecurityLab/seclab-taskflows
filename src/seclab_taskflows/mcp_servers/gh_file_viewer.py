@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -9,19 +10,19 @@ logging.basicConfig(
     filemode='a'
 )
 
-from fastmcp import FastMCP
-from pydantic import Field
-import httpx
 import json
 import os
-from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from typing import Optional
-from pathlib import Path
-import aiofiles
-import zipfile
 import tempfile
+import zipfile
+from pathlib import Path
+
+import aiofiles
+import httpx
+from fastmcp import FastMCP
+from pydantic import Field
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+
 
 class Base(DeclarativeBase):
     pass
@@ -112,7 +113,7 @@ def search_zipfile(database_path, term):
                 for i, line in enumerate(f):
                     if term in str(line):
                         filename = remove_root_dir(entry.filename)
-                        if not filename in results:
+                        if filename not in results:
                             results[filename] = [i+1]
                         else:
                             results[filename].append(i+1)
@@ -154,8 +155,7 @@ async def get_file_lines_from_gh(
     if isinstance(r, str):
         return r
     lines = r.text.splitlines()
-    if start_line < 1:
-        start_line = 1
+    start_line = max(start_line, 1)
     if length < 1:
         length = 10
     lines = lines[start_line-1:start_line-1+length]
@@ -217,7 +217,7 @@ async def search_files_from_gh(
                 search_result = SearchResults(**result)
                 session.add(search_result)
             session.commit()
-        return f"Search results saved to database."
+        return "Search results saved to database."
     return json.dumps(results)
 
 @mcp.tool()

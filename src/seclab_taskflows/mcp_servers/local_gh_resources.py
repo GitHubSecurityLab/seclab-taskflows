@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -9,16 +10,13 @@ logging.basicConfig(
     filemode='a'
 )
 
-from fastmcp import FastMCP
-from pydantic import Field
-import httpx
 import json
 import os
 from pathlib import Path
-import aiofiles
-import zipfile
-import tempfile
 
+import aiofiles
+import httpx
+from fastmcp import FastMCP
 
 mcp = FastMCP("LocalGHResources")
 

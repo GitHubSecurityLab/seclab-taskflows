@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -9,16 +10,13 @@ logging.basicConfig(
     filemode='a'
 )
 
-from fastmcp import FastMCP
-from pydantic import Field
-import httpx
 import json
 import os
-from pathlib import Path
-import aiofiles
 import zipfile
-import tempfile
+from pathlib import Path
 
+from fastmcp import FastMCP
+from pydantic import Field
 
 mcp = FastMCP("LocalFileViewer")
 
@@ -61,7 +59,7 @@ def search_zipfile(database_path, term, search_dir = None):
                 for i, line in enumerate(f):
                     if term in str(line):
                         filename = remove_root_dir(entry.filename)
-                        if not filename in results:
+                        if filename not in results:
                             results[filename] = [i+1]
                         else:
                             results[filename].append(i+1)
@@ -126,8 +124,7 @@ async def get_file_lines(
     if not source_path or not source_path.exists():
         return f"Invalid {owner} and {repo}. Check that the input is correct or try to fetch the repo from gh first."
     lines = get_file(source_path, path)
-    if start_line < 1:
-        start_line = 1
+    start_line = max(start_line, 1)
     if length < 1:
         length = 10
     lines = lines[start_line-1:start_line-1+length]

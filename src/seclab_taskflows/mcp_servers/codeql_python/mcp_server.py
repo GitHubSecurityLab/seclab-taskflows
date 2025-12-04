@@ -3,29 +3,31 @@
 
 
 import logging
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
     filename='logs/mcp_codeql_python.log',
     filemode='a'
 )
-from seclab_taskflow_agent.mcp_servers.codeql.client import run_query, _debug_log
-# from seclab_taskflow_agent.path_utils import mcp_data_dir
-
-from pydantic import Field
-#from mcp.server.fastmcp import FastMCP, Context
-from fastmcp import FastMCP # use FastMCP 2.0
-from pathlib import Path
-import os
 import csv
+import importlib.resources
 import json
+import os
+import subprocess
+from pathlib import Path
+
+#from mcp.server.fastmcp import FastMCP, Context
+from fastmcp import FastMCP  # use FastMCP 2.0
+
+# from seclab_taskflow_agent.path_utils import mcp_data_dir
+from pydantic import Field
+from seclab_taskflow_agent.mcp_servers.codeql.client import _debug_log, run_query
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-import subprocess
-import importlib.resources
 
-from .codeql_sqlite_models import Base, Source
 from ..utils import process_repo
+from .codeql_sqlite_models import Base, Source
 
 MEMORY = Path(os.getenv('DATA_DIR', default='/app/data'))
 CODEQL_DBS_BASE_PATH = Path(os.getenv('CODEQL_DBS_BASE_PATH', default='/app/data'))
@@ -96,13 +98,12 @@ class CodeqlSqliteBackend:
                 existing.notes = (existing.notes or "") + notes
                 session.commit()
                 return f"Updated notes for source at {source_location}, line {line} in {repo}."
-            else:
-                if update:
-                    return f"No source exists at repo {repo}, location {source_location}, line {line} to update."
-                new_source = Source(repo = repo,  source_location = source_location, line = line, source_type = source_type, notes = notes)
-                session.add(new_source)
-                session.commit()
-                return f"Added new source for {source_location} in {repo}."
+            if update:
+                return f"No source exists at repo {repo}, location {source_location}, line {line} to update."
+            new_source = Source(repo = repo,  source_location = source_location, line = line, source_type = source_type, notes = notes)
+            session.add(new_source)
+            session.commit()
+            return f"Added new source for {source_location} in {repo}."
 
     def get_sources(self, repo):
         with Session(self.engine) as session:
@@ -221,5 +222,5 @@ if __name__ == "__main__":
     if not os.path.isdir('/.codeql/packages/codeql/python-all'):
         pack_path = importlib.resources.files('seclab_taskflows.mcp_servers.codeql_python.queries').joinpath('mcp-python')
         print(f"Installing CodeQL pack from {pack_path}")
-        subprocess.run(["codeql", "pack", "install", pack_path])
+        subprocess.run(["codeql", "pack", "install", pack_path], check=False)
     mcp.run(show_banner=False, transport="http", host="127.0.0.1", port=9998)

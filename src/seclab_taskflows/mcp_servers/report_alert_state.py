@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -9,16 +10,18 @@ logging.basicConfig(
     filemode='a'
 )
 
-from fastmcp import FastMCP
 import json
-from pathlib import Path
 import os
+from pathlib import Path
 from typing import Any
+
+from fastmcp import FastMCP
+from pydantic import Field
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from pydantic import Field
 
-from .alert_results_models import AlertResults, AlertFlowGraph, Base
+from .alert_results_models import AlertFlowGraph, AlertResults, Base
+
 
 def result_to_dict(result):
     return {
@@ -157,7 +160,7 @@ class ReportAlertStateBackend:
             result = session.query(AlertResults).filter_by(alert_id=alert_id, repo = repo).first()
         if not result:
             return "No results found."
-        return "Analysis results for alert ID {} in repo {}: {}".format(alert_id, repo, result.result)
+        return f"Analysis results for alert ID {alert_id} in repo {repo}: {result.result}"
 
     def get_alert_by_canonical_id(self, canonical_id: int) -> Any:
         with Session(self.engine) as session:
@@ -411,7 +414,7 @@ def delete_flow_graph_for_alert(alert_canonical_id: int) -> str:
 @mcp.tool()
 def update_all_alert_results_for_flow_graph(next: str, result: str, repo: str = Field(description="repo in the format owner/repo")) -> str:
     """Update all alert results for flow graphs with a specific next value."""
-    if not '/' in repo:
+    if '/' not in repo:
         return "Invalid repository format. Please provide a repository in the format 'owner/repo'."
     next = remove_line_numbers(next) if next else None
     return backend.update_all_alert_results_for_flow_graph(next, process_repo(repo), result)

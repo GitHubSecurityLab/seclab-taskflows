@@ -1,4 +1,5 @@
 import logging
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -6,11 +7,13 @@ logging.basicConfig(
     filemode='a'
 )
 
+import json
+import re
+from urllib.parse import parse_qs, urlparse
+
 from fastmcp import FastMCP
 from pydantic import Field
-import re
-import json
-from urllib.parse import urlparse, parse_qs
+
 from .gh_code_scanning import call_api
 
 mcp = FastMCP("GitHubRepoAdvisories")

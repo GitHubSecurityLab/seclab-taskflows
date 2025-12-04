@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
-from sqlalchemy import String, Text, Integer, ForeignKey, Column
-from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
-from typing import Optional
+from sqlalchemy import Column, ForeignKey, Integer, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
 
 class Base(DeclarativeBase):
     pass
@@ -64,7 +64,7 @@ class EntryPoint(Base):
     def __repr__(self):
         return (f"<EntryPoint(app_id={self.app_id}, file={self.file}, user_input={self.user_input}, "
                 f"lines={self.lines}, notes={self.notes})>")
-    
+
 class WebEntryPoint(Base): # an entrypoint of a web application (such as GET /info) with additional properties
     __tablename__ = 'web_entry_point'
 

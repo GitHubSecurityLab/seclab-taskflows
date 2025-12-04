@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -9,18 +10,16 @@ logging.basicConfig(
     filemode='a'
 )
 
-from fastmcp import FastMCP
-from pydantic import Field
-import httpx
 import json
 import os
-import yaml
-from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 from pathlib import Path
 
-from .repo_context_models import Application, EntryPoint, UserAction, WebEntryPoint, ApplicationIssue, AuditResult, Base
+from fastmcp import FastMCP
+from pydantic import Field
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
+from .repo_context_models import Application, ApplicationIssue, AuditResult, Base, EntryPoint, UserAction, WebEntryPoint
 from .utils import process_repo
 
 MEMORY = Path(os.getenv('REPO_CONTEXT_DIR', default='/app/my_data'))
@@ -125,8 +124,7 @@ class RepoContextBackend:
             existing = session.query(ApplicationIssue).filter_by(id = id).first()
             if not existing:
                 return f"Component issue with id {id} does not exist!"
-            else:
-                existing.notes += notes
+            existing.notes += notes
             session.commit()
         return f"Updated notes for application issue with id {id}"
 

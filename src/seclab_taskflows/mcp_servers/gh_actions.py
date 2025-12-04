@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import logging
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -9,16 +10,16 @@ logging.basicConfig(
     filemode='a'
 )
 
-from fastmcp import FastMCP
-from pydantic import Field
-import httpx
 import json
 import os
-import yaml
-from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 from pathlib import Path
+
+import httpx
+import yaml
+from fastmcp import FastMCP
+from pydantic import Field
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -218,9 +219,9 @@ async def check_workflow_reusable(
     for trigger in triggers:
         if isinstance(trigger, str) and trigger == "workflow_call":
             return "This workflow is reusable as a workflow call."
-        elif isinstance(trigger, dict):
+        if isinstance(trigger, dict):
             for k, v in trigger.items():
-                if 'workflow_call' == k:
+                if k == 'workflow_call':
                     return "This workflow is reusable."
     return "This workflow is not reusable."
 
@@ -236,9 +237,7 @@ async def get_high_privileged_workflow_triggers(
     results = []
     for trigger in triggers:
         if isinstance(trigger, str):
-            if trigger in high_privileged_triggers:
-                results.append(trigger)
-            elif trigger == 'workflow_run':
+            if trigger in high_privileged_triggers or trigger == 'workflow_run':
                 results.append(trigger)
         elif isinstance(trigger, dict):
             this_results = {}
@@ -246,9 +245,7 @@ async def get_high_privileged_workflow_triggers(
                 if k in high_privileged_triggers:
                     this_results[k] = v
                 elif k == 'workflow_run':
-                    if not v or isinstance(v, str):
-                        this_results[k] = v
-                    elif isinstance(v, dict) and not 'branches' in v:
+                    if not v or isinstance(v, str) or (isinstance(v, dict) and 'branches' not in v):
                         this_results[k] = v
             if this_results:
                 results.append(this_results)
@@ -293,7 +290,7 @@ async def get_workflow_user(
             if action_name in use:
                 actual_name[use] = []
         for i, line in enumerate(lines):
-            for use in actual_name.keys():
+            for use in actual_name:
                 if use in line:
                     actual_name[use].append(i + 1)
         for use, line_numbers in actual_name.items():
@@ -316,7 +313,7 @@ async def get_workflow_user(
                 workflow_use = WorkflowUses(**result)
                 session.add(workflow_use)
             session.commit()
-        return f"Search results saved to database."
+        return "Search results saved to database."
     return json.dumps(results)
 
 @mcp.tool()
