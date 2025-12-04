@@ -445,7 +445,7 @@ def add_entry_point_notes(owner: str = Field(description="The owner of the GitHu
 @mcp.tool()
 def store_new_user_action(owner: str = Field(description="The owner of the GitHub repository"),
                           repo: str = Field(description="The name of the GitHub repository"),
-                          location: str = Field(description="The directory of the component where the user action belonged to"),
+                          location: str = Field(description="The directory of the component where the user action belongs to"),
                           file: str = Field(description="The file that contains the user action"),
                           line: int = Field(description="The file line that contains the user action"),
                           notes: str = Field(description="New notes for this user action", default = "")):
