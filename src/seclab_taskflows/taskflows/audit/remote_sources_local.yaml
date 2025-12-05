@@ -5,7 +5,7 @@ seclab-taskflow-agent:
   filetype: taskflow
   version: 1
 
-model_config: seclab_taskflows.configs.model_config
+model_config: seclab_taskflows.configs.model_config_codeql_python
 
 globals:
   repo:
