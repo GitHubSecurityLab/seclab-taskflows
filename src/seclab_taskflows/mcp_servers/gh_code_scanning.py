@@ -27,7 +27,7 @@ logging.basicConfig(
 
 mcp = FastMCP("GitHubCodeScanning")
 
-GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', default='')
+GH_TOKEN = os.getenv('GH_TOKEN', default='')
 
 CODEQL_DBS_BASE_PATH = mcp_data_dir('seclab-taskflows', 'codeql', 'CODEQL_DBS_BASE_PATH')
 ALERT_RESULTS_DIR = mcp_data_dir('seclab-taskflows', 'gh_code_scanning', 'ALERT_RESULTS_DIR')
@@ -72,7 +72,7 @@ def parse_alert(alert: dict) -> dict:
 async def call_api(url: str, params: dict) -> str | httpx.Response:
     """Call the GitHub code scanning API to fetch alert."""
     headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
-                          "Authorization": f"Bearer {GITHUB_PERSONAL_ACCESS_TOKEN}"}
+                          "Authorization": f"Bearer {GH_TOKEN}"}
     async def _fetch_alerts(url, headers, params):
         try:
             async with httpx.AsyncClient(headers = headers) as client:
@@ -182,7 +182,7 @@ async def _fetch_codeql_databases(owner: str, repo: str, language: str):
     """Fetch the CodeQL databases for a given repo and language."""
     url = f"https://api.github.com/repos/{owner}/{repo}/code-scanning/codeql/databases/{language}"
     headers = {"Accept": "application/zip,application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
-                          "Authorization": f"Bearer {os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN')}"}
+                          "Authorization": f"Bearer {os.getenv('GH_TOKEN')}"}
     try:
         async with httpx.AsyncClient() as client:
             async with client.stream('GET', url, headers =headers, follow_redirects=True) as response:
@@ -238,7 +238,7 @@ async def dismiss_alert(
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
-        "Authorization": f"Bearer {GITHUB_PERSONAL_ACCESS_TOKEN}"
+        "Authorization": f"Bearer {GH_TOKEN}"
     }
 
     async with httpx.AsyncClient(headers=headers) as client:

@@ -22,7 +22,7 @@ logging.basicConfig(
 
 mcp = FastMCP("LocalGHResources")
 
-GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN')
+GH_TOKEN = os.getenv('GH_TOKEN')
 
 LOCAL_GH_DIR = mcp_data_dir('seclab-taskflows', 'local_gh_resources', 'LOCAL_GH_DIR')
 
@@ -45,7 +45,7 @@ def sanitize_file_path(file_path, allow_paths):
 async def call_api(url: str, params: dict) -> str:
     """Call the GitHub code scanning API to fetch alert."""
     headers = {"Accept": "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28",
-                          "Authorization": f"Bearer {GITHUB_PERSONAL_ACCESS_TOKEN}"}
+                          "Authorization": f"Bearer {GH_TOKEN}"}
     async def _fetch_file(url, headers, params):
         try:
             async with httpx.AsyncClient(headers = headers) as client:
@@ -67,7 +67,7 @@ async def _fetch_source_zip(owner: str, repo: str, tmp_dir):
     """Fetch the source code."""
     url = f"https://api.github.com/repos/{owner}/{repo}/zipball"
     headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
-               "Authorization": f"Bearer {GITHUB_PERSONAL_ACCESS_TOKEN}"}
+               "Authorization": f"Bearer {GH_TOKEN}"}
     try:
         async with httpx.AsyncClient() as client:
             async with client.stream('GET', url, headers =headers, follow_redirects=True) as response:

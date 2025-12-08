@@ -7,8 +7,8 @@ if [ -v CODESPACES ]; then
     if [ ! -v AI_API_TOKEN ]; then
         echo "⚠️ Running in Codespaces - please add AI_API_TOKEN to your Codespaces secrets"
     fi
-    if [ ! -v GITHUB_PERSONAL_ACCESS_TOKEN ]; then
-        echo "⚠️ Running in Codespaces - please add GITHUB_PERSONAL_ACCESS_TOKEN to your Codespaces secrets"
+    if [ ! -v GH_TOKEN ]; then
+        echo "⚠️ Running in Codespaces - please add GH_TOKEN to your Codespaces secrets"
     fi
 fi
 
