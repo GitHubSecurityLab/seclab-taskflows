@@ -17,12 +17,6 @@ hatch build
 # Install this package from local directory.
 pip install -e .
 
-# Create logs directory if it doesn't exist
-mkdir -p logs
-
-# Create optional data directories
-mkdir -p data
-
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
     echo "📝 Creating .env template..."
