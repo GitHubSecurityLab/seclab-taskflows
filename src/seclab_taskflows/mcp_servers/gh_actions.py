@@ -45,7 +45,7 @@ high_privileged_triggers = set(["issues", "issue_comment", "pull_request_comment
 
 unimportant_triggers = set(['pull_request', 'workflow_dispatch'])
 
-GITHUB_PERSONAL_ACCESS_TOKEN = os.getenv('GITHUB_PERSONAL_ACCESS_TOKEN', default='')
+GH_TOKEN = os.getenv('GH_TOKEN', default='')
 
 ACTIONS_DB_DIR = mcp_data_dir('seclab-taskflows', 'gh_actions', 'ACTIONS_DB_DIR')
 
@@ -56,7 +56,7 @@ Base.metadata.create_all(engine, tables = [WorkflowUses.__table__])
 async def call_api(url: str, params: dict, raw = False) -> str:
     """Call the GitHub code scanning API to fetch alert."""
     headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
-                          "Authorization": f"Bearer {GITHUB_PERSONAL_ACCESS_TOKEN}"}
+                          "Authorization": f"Bearer {GH_TOKEN}"}
     if raw:
         headers["Accept"] = "application/vnd.github.raw+json"
     async def _fetch(url, headers, params):

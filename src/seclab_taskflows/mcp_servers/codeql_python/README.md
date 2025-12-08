@@ -23,7 +23,7 @@ CODEQL_DBS_BASE_PATH="/workspaces/seclab-taskflows/data/codeql_databases" # path
 # Example values for a local setup, run with `python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.remote_sources_local`
 MEMCACHE_STATE_DIR="/workspaces/seclab-taskflows/data" # path to folder for storing the memcache database
 DATA_DIR="/workspaces/seclab-taskflows/data" # path to folder for storing the codeql_sqlite databases and all other data
-GITHUB_PERSONAL_ACCESS_TOKEN= # can be the same token as COPILOT_TOKEN. Or another one, with access e.g. to private repositories
+GH_TOKEN= # can be the same token as COPILOT_TOKEN. Or another one, with access e.g. to private repositories
 CODEQL_CLI= # output of command `find ~ -type f -name codeql -executable 2>/dev/null`
 
 # Example docker env run with ./run_seclab_agent.sh [...]

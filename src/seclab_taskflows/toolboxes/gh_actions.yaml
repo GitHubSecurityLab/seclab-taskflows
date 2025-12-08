@@ -10,5 +10,5 @@ server_params:
   command: python
   args: ["-m", "seclab_taskflows.mcp_servers.gh_actions"]
   env:
-    GITHUB_PERSONAL_ACCESS_TOKEN: "{{ env GITHUB_PERSONAL_ACCESS_TOKEN }}"
+    GH_TOKEN: "{{ env GH_TOKEN }}"
     ACTIONS_DB_DIR: "{{ env DATA_DIR }}"
