@@ -220,11 +220,13 @@ class RepoContextBackend:
 
     def get_app_issues(self, repo, component_id):
         with Session(self.engine) as session:
-            issues = session.query(Application, ApplicationIssue).filter(Application.repo == repo
-                                  )
+            issues = session.query(Application, ApplicationIssue).filter(
+                Application.repo == repo,
+                Application.id == ApplicationIssue.component_id
+            )
             if component_id is not None:
                 issues = issues.filter(Application.id == component_id)
-            issues = issues.filter(Application.id == ApplicationIssue.component_id).all()
+            issues = issues.all()
         return [{
                   'component_id': app.id,
                   'location' : app.location,
