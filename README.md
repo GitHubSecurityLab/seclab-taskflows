@@ -6,6 +6,7 @@ This repository contains example taskflows to use with the [SecLab Taskflow Agen
 MEMCACHE_STATE_DIR=/app/data
 CODEQL_DBS_BASE_PATH=/app/data
 DATA_DIR=/app/data
+LOG_DIR=/app/logs
 ```
 
 The `MEMCACHE_STATE_DIR` is needed to persist some intermediate data in the memcache, `DATA_DIR` is needed for various mcp server to store intermediate results. These can be set in a `.env` file in the `src` directory.
