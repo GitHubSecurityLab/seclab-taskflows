@@ -569,7 +569,7 @@ def get_component_issues(owner: str = Field(description="The owner of the GitHub
 def get_component_issues_for_repo(owner: str = Field(description="The owner of the GitHub repository"),
                          repo: str = Field(description="The name of the GitHub repository")):
     """
-    Get issues for the component.
+    Get all component issues for the repository.
     """
     repo = process_repo(owner, repo)
     return json.dumps(backend.get_app_issues(repo, None))
