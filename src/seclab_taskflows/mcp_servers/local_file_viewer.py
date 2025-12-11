@@ -106,6 +106,8 @@ async def fetch_file_content(
     if not source_path or not source_path.exists():
         return f"Invalid {owner} and {repo}. Check that the input is correct or try to fetch the repo from gh first."
     lines = get_file(source_path, path)
+    if len(lines) > 1000:
+        return f"File {path} in {owner}/{repo} is too large to display ({len(lines)} lines). Please fetch specific lines using get_file_lines tool."
     if not lines:
         return f"Unable to find file {path} in {owner}/{repo}"
     for i in range(len(lines)):
