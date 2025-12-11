@@ -11,3 +11,4 @@ server_params:
   args: ["-m", "seclab_taskflows.mcp_servers.local_file_viewer"]
   env:
     LOCAL_GH_DIR: "{{ env DATA_DIR }}"
+    LINE_LIMIT_FOR_FETCHING_FILE_CONTENT: "{{ env LINE_LIMIT_FOR_FETCHING_FILE_CONTENT }}"
