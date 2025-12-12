@@ -170,7 +170,7 @@ async def list_files_non_recursive(
     repo: str = Field(description="The name of the repository"),
     path: str = Field(description="The path to the directory in the repository")) -> str:
     """
-    List the files of a directory from a local GitHub repository non recursively.
+    List the files of a directory from a local GitHub repository non-recursively.
     """
     source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
     source_path = sanitize_file_path(source_path, [LOCAL_GH_DIR])
