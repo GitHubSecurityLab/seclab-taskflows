@@ -81,6 +81,7 @@ def _list_files(database_path, root_dir = None, recursive=True):
                     dirname = remove_root_dir(entry.filename)
                     if Path(dirname).parent == Path(root_dir):
                         results.append(dirname)
+                continue
             filename = remove_root_dir(entry.filename)
             if root_dir and not is_subdirectory(root_dir, filename):
                 continue
