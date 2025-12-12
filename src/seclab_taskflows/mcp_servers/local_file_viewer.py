@@ -80,13 +80,13 @@ def _list_files(database_path, root_dir = None, recursive=True):
                 if not recursive:
                     dirname = remove_root_dir(entry.filename)
                     if Path(dirname).parent == Path(root_dir):
-                        results.append(dirname)
+                        results.append(dirname + '/')
                 continue
             filename = remove_root_dir(entry.filename)
             if root_dir and not is_subdirectory(root_dir, filename):
                 continue
             if not recursive and Path(filename).parent != Path(root_dir):
-                    continue
+                continue
             results.append(filename)
     return results
 
@@ -171,6 +171,7 @@ async def list_files_non_recursive(
     path: str = Field(description="The path to the directory in the repository")) -> str:
     """
     List the files of a directory from a local GitHub repository non-recursively.
+    Subdirectories will be listed and indicated with a trailing slash.
     """
     source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
     source_path = sanitize_file_path(source_path, [LOCAL_GH_DIR])
