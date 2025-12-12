@@ -26,6 +26,8 @@ LOCAL_GH_DIR = mcp_data_dir('seclab-taskflows', 'local_file_viewer', 'LOCAL_GH_D
 
 LINE_LIMIT_FOR_FETCHING_FILE_CONTENT = int(os.getenv('LINE_LIMIT_FOR_FETCHING_FILE_CONTENT', default=1000))
 
+FILE_LIMIT_FOR_LIST_FILES = int(os.getenv('FILE_LIMIT_FOR_LIST_FILES', default=100))
+
 def is_subdirectory(directory, potential_subdirectory):
     directory_path = Path(directory)
     potential_subdirectory_path = Path(potential_subdirectory)
@@ -69,15 +71,21 @@ def search_zipfile(database_path, term, search_dir = None):
                             results[filename].append(i+1)
     return results
 
-def _list_files(database_path, root_dir = None):
+def _list_files(database_path, root_dir = None, recursive=True):
     results = []
     root_dir = strip_leading_dash(root_dir)
     with zipfile.ZipFile(database_path) as z:
         for entry in z.infolist():
             if entry.is_dir():
+                if not recursive:
+                    dirname = remove_root_dir(entry.filename)
+                    if Path(dirname).parent == Path(root_dir):
+                        results.append(dirname + '/')
                 continue
             filename = remove_root_dir(entry.filename)
             if root_dir and not is_subdirectory(root_dir, filename):
+                continue
+            if not recursive and Path(filename).parent != Path(root_dir):
                 continue
             results.append(filename)
     return results
@@ -152,7 +160,26 @@ async def list_files(
     if not source_path or not source_path.exists():
         return f"Invalid {owner} and {repo}. Check that the input is correct or try to fetch the repo from gh first."
     content = _list_files(source_path, path)
+    if len(content) > FILE_LIMIT_FOR_LIST_FILES:
+        return f"Too many files to display in {owner}/{repo} at path {path} ({len(content)} files). Try using `list_files_non_recursive` instead."
     return json.dumps(content, indent=2)
+
+@mcp.tool()
+async def list_files_non_recursive(
+    owner: str = Field(description="The owner of the repository"),
+    repo: str = Field(description="The name of the repository"),
+    path: str = Field(description="The path to the directory in the repository")) -> str:
+    """
+    List the files of a directory from a local GitHub repository non-recursively.
+    Subdirectories will be listed and indicated with a trailing slash.
+    """
+    source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
+    source_path = sanitize_file_path(source_path, [LOCAL_GH_DIR])
+    if not source_path or not source_path.exists():
+        return f"Invalid {owner} and {repo}. Check that the input is correct or try to fetch the repo from gh first."
+    content = _list_files(source_path, path, recursive=False)
+    return json.dumps(content, indent=2)
+
 
 @mcp.tool()
 async def search_repo(
