@@ -220,15 +220,21 @@ class RepoContextBackend:
 
     def get_app_issues(self, repo, component_id):
         with Session(self.engine) as session:
-            issues = session.query(Application, ApplicationIssue).filter(Application.id == component_id
-                                  ).filter(Application.id == ApplicationIssue.component_id).all()
+            issues = session.query(Application, ApplicationIssue).filter(
+                Application.repo == repo,
+                Application.id == ApplicationIssue.component_id
+            )
+            if component_id is not None:
+                issues = issues.filter(Application.id == component_id)
+            issues = issues.all()
         return [{
                   'component_id': app.id,
                   'location' : app.location,
                   'repo' : app.repo,
                   'component_notes' : app.notes,
                   'issue_type' : issue.issue_type,
-                  'issue_notes': issue.notes
+                  'issue_notes': issue.notes,
+                  'issue_id' : issue.id
                 } for app, issue in issues]
 
     def get_app_audit_results(self, repo, component_id, has_non_security_error, has_vulnerability):
@@ -560,6 +566,16 @@ def get_component_issues(owner: str = Field(description="The owner of the GitHub
     """
     repo = process_repo(owner, repo)
     return json.dumps(backend.get_app_issues(repo, component_id))
+
+@mcp.tool()
+def get_component_issues_for_repo(owner: str = Field(description="The owner of the GitHub repository"),
+                         repo: str = Field(description="The name of the GitHub repository")):
+    """
+    Get all component issues for the repository.
+    """
+    repo = process_repo(owner, repo)
+    return json.dumps(backend.get_app_issues(repo, None))
+
 
 @mcp.tool()
 def get_component_results(owner: str = Field(description="The owner of the GitHub repository"),
