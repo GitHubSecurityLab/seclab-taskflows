@@ -161,7 +161,7 @@ async def list_files(
         return f"Invalid {owner} and {repo}. Check that the input is correct or try to fetch the repo from gh first."
     content = _list_files(source_path, path)
     if len(content) > FILE_LIMIT_FOR_LIST_FILES:
-        return f"Too many files to display in {owner}/{repo} at path {path} ({len(content)} files). Try use `list_files_non_recursive` instead."
+        return f"Too many files to display in {owner}/{repo} at path {path} ({len(content)} files). Try using `list_files_non_recursive` instead."
     return json.dumps(content, indent=2)
 
 @mcp.tool()
