@@ -17,7 +17,6 @@ globals:
 taskflow:
   - task:
       must_complete: true
-      headless: true
       agents:
         - seclab_taskflow_agent.personalities.assistant
       toolboxes:
