@@ -10,14 +10,14 @@ seclab-taskflow-agent:
   filetype: taskflow
   version: 1
 
-model_config: seclab_taskflows.configs.model_config
-
 globals:
   repo:
+  ghsa:
 
 taskflow:
   - task:
       must_complete: true
+      headless: true
       agents:
         - seclab_taskflow_agent.personalities.assistant
       toolboxes:
@@ -34,21 +34,29 @@ taskflow:
         - seclab_taskflows.toolboxes.gh_file_viewer
         - seclab_taskflow_agent.toolboxes.memcache
       user_prompt: |
-        Fetch the details of the most recent GHSA of the repo {{ GLOBALS_repo }}.
+        Fetch the details of the GHSA {{ GLOBALS_ghsa }} of the repo {{ GLOBALS_repo }}.
 
         Analyze the description to understand what type of bug caused
-        the vulnerability.
+        the vulnerability. DO NOT perform a code audit at this stage, just 
+        look at the GHSA details.
 
-        Try to determine from the description the
-        name of the source code file that the bug was in.
+        Check if any source file is mentioned as the cause of the GHSA.
+        If so, identify the precise file path and line number.
+
+        If no file path is mentioned, then report back to the user that 
+        you cannot find any file path and end the task here.
 
         The GHSA may not specify the full path name of the source
         file, or it may mention the name of a function or method
         instead, so if you have difficulty finding the file, try
         searching for the most likely match.
 
+        Only identify the file path for now, do not look at the code or
+        fetch the file contents yet.
+
         Store a summary of your findings in the memcache with the GHSA
-        ID as the key.
+        ID as the key. That should include the file path and the function that 
+        the file is in.
 
   - task:
       must_complete: true
@@ -61,8 +69,12 @@ taskflow:
         Fetch the GHSA ID and summary that were stored in the memcache
         by the previous task.
 
+        Look at the file path and function that were identified. Use the 
+        get_file_lines_from_gh tool to fetch a small portion of the file instead of
+        fetching the entire file.
+
         Fetch the source file that was identified as the cause of the
-        GHSA in repo {{ GLOBALS_repo }}.
+        GHSA in repo {{ GLOBALS_repo }}. 
 
         Do a security audit of the code in the source file, focusing
         particularly on the type of bug that was identified as the
