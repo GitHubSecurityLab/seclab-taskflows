@@ -37,3 +37,8 @@ GITHUB_AUTH_HEADER="Bearer <my_token>"
 ```
 
 After creating an issue, additional triaging checks are applied to remove false positives by running the corresponding `review_*` taskflows.
+
+Disclaimers: 
+1. Although these taskflows have already been used to report vulnerabilities to projects, we strongly recommend carefully reviewing all output. 
+2. Note that running the taskflows can result in many tool calls, which can easily consume a large amount of quota. 
+3. The taskflows may create GitHub issues, please be considerate and seek the repo owner’s consent before running them on somebody else’s repo.
