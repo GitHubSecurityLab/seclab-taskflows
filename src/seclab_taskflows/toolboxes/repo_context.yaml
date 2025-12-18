@@ -11,3 +11,4 @@ server_params:
   args: ["-m", "seclab_taskflows.mcp_servers.repo_context"]
   env:
     REPO_CONTEXT_DIR: "{{ env DATA_DIR }}"
+    LOG_DIR: "{{ env LOG_DIR }}"

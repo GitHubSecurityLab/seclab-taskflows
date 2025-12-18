@@ -18,6 +18,7 @@ server_params:
     GH_NO_EXTENSION_UPDATE_NOTIFIER: "Disable"
     CODEQL_CLI: "{{ env CODEQL_CLI }}"
     DATA_DIR: "{{ env DATA_DIR }}"
+    LOG_DIR: "{{ env LOG_DIR }}"
 server_prompt: |
   ## CodeQL Supported Programming Languages
 

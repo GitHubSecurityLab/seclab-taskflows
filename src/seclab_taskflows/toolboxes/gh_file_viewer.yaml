@@ -12,3 +12,4 @@ server_params:
   env:
     GH_TOKEN: "{{ env GH_TOKEN }}"
     SEARCH_RESULTS_DIR: "{{ env DATA_DIR }}"
+    LOG_DIR: "{{ env LOG_DIR }}"

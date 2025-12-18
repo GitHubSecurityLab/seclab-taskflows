@@ -13,3 +13,4 @@ server_params:
     GH_TOKEN: "{{ env GH_TOKEN }}"
     CODEQL_DBS_BASE_PATH: "{{ env CODEQL_DBS_BASE_PATH }}"
     ALERT_RESULTS_DIR: "{{ env DATA_DIR }}"
+    LOG_DIR: "{{ env LOG_DIR }}"

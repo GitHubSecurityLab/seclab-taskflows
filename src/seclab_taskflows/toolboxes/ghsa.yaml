@@ -11,3 +11,4 @@ server_params:
   args: ["-m", "seclab_taskflows.mcp_servers.ghsa"]
   env:
     GH_TOKEN: "{{ env GH_TOKEN }}"
+    LOG_DIR: "{{ env LOG_DIR }}"
