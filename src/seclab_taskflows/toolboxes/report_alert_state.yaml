@@ -11,6 +11,7 @@ server_params:
   args: ["-m", "seclab_taskflows.mcp_servers.report_alert_state"]
   env:
     ALERT_RESULTS_DIR: "{{ env DATA_DIR }}"
+    LOG_DIR: "{{ env LOG_DIR }}"
 # the list of tools that you want the framework to confirm with the user before executing
 # use this to guard rail any potentially dangerous functions from MCP servers
 confirm:
