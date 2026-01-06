@@ -126,6 +126,9 @@ async def fetch_file_from_gh(
     """
     Fetch the content of a file from a GitHub repository.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     r = await call_api(
         url=f"https://api.github.com/repos/{owner}/{repo}/contents/{path}",
         params={}
@@ -146,6 +149,9 @@ async def get_file_lines_from_gh(
     length: int = Field(description="The ending line number to fetch from the file", default=10)) -> str:
     """Fetch a range of lines from a file in a GitHub repository.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     r = await call_api(
         url=f"https://api.github.com/repos/{owner}/{repo}/contents/{path}",
         params={}
@@ -171,6 +177,9 @@ async def search_file_from_gh(
     """
     Search for a term in a file from a GitHub repository.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     r = await call_api(
         url=f"https://api.github.com/repos/{owner}/{repo}/contents/{path}",
         params={}
@@ -193,6 +202,9 @@ async def search_files_from_gh(
     """
     Search for a term in a list of files from a GitHub repository.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     paths_list = [path.strip() for path in paths.split(',')]
     if not paths_list:
         return "No paths provided for search."
@@ -238,6 +250,9 @@ async def list_directory_from_gh(
     """
     Fetch the content of a directory from a GitHub repository.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     r = await call_api(
         url=f"https://api.github.com/repos/{owner}/{repo}/contents/{path}",
         params={}
@@ -259,6 +274,9 @@ async def search_repo_from_gh(
     """
     Search for the search term in the entire repository.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+    
     with tempfile.TemporaryDirectory() as tmp_dir:
         result = await _fetch_source_zip(owner, repo, tmp_dir)
         source_path = Path(f"{tmp_dir}/{owner}/{repo}.zip")
