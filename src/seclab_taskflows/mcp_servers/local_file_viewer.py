@@ -111,6 +111,9 @@ async def fetch_file_content(
     """
     Fetch the content of a file from a local GitHub repository.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
     source_path = sanitize_file_path(source_path, [LOCAL_GH_DIR])
     if not source_path or not source_path.exists():
@@ -133,6 +136,9 @@ async def get_file_lines(
     length: int = Field(description="The ending line number to fetch from the file", default=10)) -> str:
     """Fetch a range of lines from a file in a local GitHub repository.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
     source_path = sanitize_file_path(source_path, [LOCAL_GH_DIR])
     if not source_path or not source_path.exists():
@@ -155,6 +161,9 @@ async def list_files(
     """
     Recursively list the files of a directory from a local GitHub repository.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
     source_path = sanitize_file_path(source_path, [LOCAL_GH_DIR])
     if not source_path or not source_path.exists():
@@ -173,6 +182,9 @@ async def list_files_non_recursive(
     List the files of a directory from a local GitHub repository non-recursively.
     Subdirectories will be listed and indicated with a trailing slash.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
     source_path = sanitize_file_path(source_path, [LOCAL_GH_DIR])
     if not source_path or not source_path.exists():
@@ -191,6 +203,9 @@ async def search_repo(
     """
     Search for the search term in the repository or a subdirectory/file in the repository.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
     source_path = sanitize_file_path(source_path, [LOCAL_GH_DIR])
     if not source_path or not source_path.exists():

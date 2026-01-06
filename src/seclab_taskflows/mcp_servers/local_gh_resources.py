@@ -95,6 +95,9 @@ async def fetch_repo_from_gh(
     """
     Download the source code from GitHub to the local file system to speed up file search.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     result = await _fetch_source_zip(owner, repo, LOCAL_GH_DIR)
     source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
     if not source_path.exists():
@@ -106,6 +109,9 @@ async def clear_local_repo(owner: str, repo: str):
     """
     Delete the local repo.
     """
+    owner = owner.lower()
+    repo = repo.lower()
+
     source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
     source_path = sanitize_file_path(source_path, [LOCAL_GH_DIR])
     if not source_path:
