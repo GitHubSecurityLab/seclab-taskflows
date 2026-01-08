@@ -21,7 +21,7 @@ AI_API_ENDPOINT="https://models.github.ai/inference"
 
 In addition, the `GH_TOKEN` environment variable also needs to be set to allow interaction with the GitHub API, such as fetching content, creating issues etc.
 
-The repo provides a script [`run_seclab_agent.sh`](https://github.com/GitHubSecurityLab/seclab-taskflows/blob/main/src/run_seclab_agent.sh) to run a docker container of the `seclab-taskflow-agent` as outlined [here](https://github.com/GitHubSecurityLab/seclab-taskflow-agent/tree/main?tab=readme-ov-file#deploying-from-docker). Note that this script needs to be run from the `src` directory, and the `.env` file with the enviromental variables needs to be in the same directory.
+The repo provides a script [`run_seclab_agent.sh`](https://github.com/GitHubSecurityLab/seclab-taskflows/blob/main/src/run_seclab_agent.sh) to run a docker container of the `seclab-taskflow-agent` as outlined [here](https://github.com/GitHubSecurityLab/seclab-taskflow-agent/tree/main?tab=readme-ov-file#deploying-from-docker). Note that this script needs to be run from the `src` directory, and the `.env` file with the environmental variables needs to be in the same directory.
 
 Individual taskflows may need additional setup, please refer to the `README.md` in the relevant subdirectories for further requirements.
 
