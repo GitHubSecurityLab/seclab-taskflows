@@ -4,7 +4,7 @@ This repository contains example taskflows to use with the [SecLab Taskflow Agen
 
 ### Running with docker script 
 
-The recommended way of running the taskflows in this repo is by creating a codespace, and running the script [`run_seclab_agent.sh`](https://github.com/GitHubSecurityLab/seclab-taskflows/blob/main/src/run_seclab_agent.sh) to run a docker container of the `seclab-taskflow-agent` as outlined [here](https://github.com/GitHubSecurityLab/seclab-taskflow-agent/tree/main?tab=readme-ov-file#deploying-from-docker). Note that this script needs to be run from the `src` directory, and the `.env` file with the environmental variables for the custom MCP servers to store data needs to be in the same directory. 
+The recommended way of running the taskflows in this repo is by creating a codespace, and running the script [`run_seclab_agent.sh`](https://github.com/GitHubSecurityLab/seclab-taskflows/blob/main/src/run_seclab_agent.sh) to run a docker container of the `seclab-taskflow-agent` as outlined [here](https://github.com/GitHubSecurityLab/seclab-taskflow-agent/tree/main?tab=readme-ov-file#deploying-from-docker). Note that this script needs to be run from the `src` directory, and the `.env` file with the environment variables for the custom MCP servers to store data needs to be in the same directory. 
 
 First create a directory named `data` and a `.env` file in the `src` directory. For [`run_seclab_agent.sh`](https://github.com/GitHubSecurityLab/seclab-taskflows/blob/main/src/run_seclab_agent.sh) you can use:
 
