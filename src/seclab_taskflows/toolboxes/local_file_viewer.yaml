@@ -3,14 +3,13 @@
 
 seclab-taskflow-agent:
   filetype: toolbox
-  version: 1
-
+  version: "1.0"
 server_params:
   kind: stdio
   command: python
   args: ["-m", "seclab_taskflows.mcp_servers.local_file_viewer"]
   env:
-    LOCAL_GH_DIR: "{{ env DATA_DIR }}"
-    LINE_LIMIT_FOR_FETCHING_FILE_CONTENT: "{{ env LINE_LIMIT_FOR_FETCHING_FILE_CONTENT }}"
-    FILE_LIMIT_FOR_LIST_FILES: "{{ env FILE_LIMIT_FOR_LIST_FILES }}"
-    LOG_DIR: "{{ env LOG_DIR }}"
+    LOCAL_GH_DIR: "{{ env('DATA_DIR') }}"
+    LINE_LIMIT_FOR_FETCHING_FILE_CONTENT: "{{ env('LINE_LIMIT_FOR_FETCHING_FILE_CONTENT') }}"
+    FILE_LIMIT_FOR_LIST_FILES: "{{ env('FILE_LIMIT_FOR_LIST_FILES') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"

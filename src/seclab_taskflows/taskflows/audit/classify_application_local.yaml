@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals:
@@ -18,7 +17,7 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       model: general_tasks
       user_prompt: |
-        Fetch the components of the repo {{ GLOBALS_repo }}
+        Fetch the components of the repo {{ globals.repo }}
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
   - task:
@@ -29,13 +28,13 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       model: code_analysis
       user_prompt: |
-        The component is in the repo {{ RESULT_repo }} and it has component id {{ RESULT_app_id }} and location {{ RESULT_location }}.
+        The component is in the repo {{ result.repo }} and it has component id {{ result.app_id }} and location {{ result.location }}.
         The notes of the component is as follows.
 
-        {{ RESULT_notes }}
+        {{ result.notes }}
 
         Fetch the entry points and web entry points the component, then the user actions of this component.
-        Based on the entry points, web entry points, components, user actions and README.md and if available, SECURITY.md in the {{ GLOBALS_repo }},
+        Based on the entry points, web entry points, components, user actions and README.md and if available, SECURITY.md in the {{ globals.repo }},
         can you tell me what type of application this repo is and what kind of security boundary it has.
         Based on this, determine whether the components that is likely to have security problems. 
         

@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 taskflow:
@@ -18,9 +17,9 @@ taskflow:
       user_prompt: |
         The bug report is as follows:
         ```
-        {{ RESULT_value }}
+        {{ result.value }}
         ```
-        The alert_id and repo are encoded in the key {{ RESULT_key }} as
+        The alert_id and repo are encoded in the key {{ result.key }} as
         `<repo_name>_<alert_id>`. Use this to extract the alert_id and repo_name from the key. 
 
         If the alert has a high privileged trigger, then the alert is valid and your task is done. Do nothing and DO NOT continue with the task and
@@ -38,23 +37,23 @@ taskflow:
           In this case, check that the report contains a section that lists the vulnerable action users. 
           If there isn't any vulnerable action users and there is no high privileged trigger, 
           then mark the alert as invalid and 
-          using the alert_id and repo, then remove the memcache entry with the key {{ RESULT_key }}.
+          using the alert_id and repo, then remove the memcache entry with the key {{ result.key }}.
         - If it is a reusable action and contains a section that lists the vulnerable action users, then check 
           if any of the action user is a high privileged workflow. If none of the the action users is a high privileged workflow, 
-          then mark the alert as invalid and remove the memcache entry with the key {{ RESULT_key }}.
+          then mark the alert as invalid and remove the memcache entry with the key {{ result.key }}.
         - Is there any mentioning of `write` permissions or secrets used by the action? If neither are mentioned, and none of the triggers is 
-          a high privileged trigger, then mark the alert as invalid and remove the memcache entry with the key {{ RESULT_key }}.
+          a high privileged trigger, then mark the alert as invalid and remove the memcache entry with the key {{ result.key }}.
         - Is the only trigger of the alert `workflow_call` or `pull_request`? If so, and there is no mentioning of any 
-          `write` permission granted, then mark the alert as invalid and remove the memcache entry with the key {{ RESULT_key }}.
+          `write` permission granted, then mark the alert as invalid and remove the memcache entry with the key {{ result.key }}.
 
-        {{ INPUTS_vuln_specifics }}
+        {{ inputs.vuln_specifics }}
 
         IMPORTANT:
         If any of the above indicates that the alert is invalid,
-        then you MUST mark the alert as invalid and remove the memcache entry with the key {{ RESULT_key }}, even if you believe 
+        then you MUST mark the alert as invalid and remove the memcache entry with the key {{ result.key }}, even if you believe 
         the vulnerability still poses a risk. You MUST follow the instructions. You can then finish the task.
         You should then also update the alert result with the reason why the alert is invalid, using the alert_id and repo_name extracted 
-        from the key {{ RESULT_key }}.
+        from the key {{ result.key }}.
         
       toolboxes:
         - seclab_taskflow_agent.toolboxes.memcache

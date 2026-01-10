@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals:
@@ -19,7 +18,7 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
-        For the repo {{ GLOBALS_repo }} iterate over all entry points and and check if they are
+        For the repo {{ globals.repo }} iterate over all entry points and and check if they are
         reachable as a server endpoint.
         For this check the noted `file` and it's line using the file viewer.
         Then note it's path, HTTP method and note any middlewares used. Also note which roles are

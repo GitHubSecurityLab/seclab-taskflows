@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 taskflow:
@@ -14,10 +13,10 @@ taskflow:
       async: true
       model: triage
       user_prompt: |
-        The alert_id is {{ RESULT_alert_id }} and the repo is {{ RESULT_repo }}.
+        The alert_id is {{ result.alert_id }} and the repo is {{ result.repo }}.
         The notes from the alert analysis is:        
         ```
-        {{ RESULT_result }}
+        {{ result.result }}
         ```
         Check that the notes contains a section call "User-Controlled input" or similar.
         If the section is missing, then mark the alert as invalid and update the alert results

@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 taskflow:
@@ -41,14 +40,14 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
-        The alert_id is {{ RESULT_alert_id }}. The repository name is {{ RESULT_repo }}
+        The alert_id is {{ result.alert_id }}. The repository name is {{ result.repo }}
 
-        First check if an open issue with the alert id already exists in {{ RESULT_repo }}.
+        First check if an open issue with the alert id already exists in {{ result.repo }}.
         If it does, then do not create a new issue and your task is done.
 
-        Otherwise, create an issue in {{ RESULT_repo }} using these notes:
+        Otherwise, create an issue in {{ result.repo }} using these notes:
         ```
-        {{ RESULT_result }}
+        {{ result.result }}
         ```
         Remove any duplicate information of the notes and use it as the issue body.
         The issue body should be formatted in markdown.
@@ -58,14 +57,14 @@ taskflow:
         - A list of entries with the factors that make the alert an exploitable vulnerability. Prepend each entry with a bullet point, followed by the :heavy_plus_sign: emoji.
         - Another list of entries with the factors that render the vulnerability of the alert not exploitable. Prepend each entry with a bullet point, followed by the :heavy_minus_sign: emoji.
 
-        If references to source code locations are present in the notes, link them like this: https://github.com/{{ RESULT_repo }}/blob/master/{{ RESULT_file_path }}#L{{ RESULT_line_number }}). Remove any occurences of `'` from that link.
+        If references to source code locations are present in the notes, link them like this: https://github.com/{{ result.repo }}/blob/master/{{ result.file_path }}#L{{ result.line_number }}). Remove any occurences of `'` from that link.
 
-        At the bottom of the issue body create a link to the alert like this: https://github.com/{{ RESULT_repo }}/security/code-scanning/{{ RESULT_alert_id }}, name the link `Code scanning alert #{{ RESULT_alert_id }}`. Remove any occurences of `'` from that link.
+        At the bottom of the issue body create a link to the alert like this: https://github.com/{{ result.repo }}/security/code-scanning/{{ result.alert_id }}, name the link `Code scanning alert #{{ result.alert_id }}`. Remove any occurences of `'` from that link.
         Then add following text to the issue body: 🤖 I'm a robot beep boop.
         
         The title of the issue should be:
         ```
-        Code scanning alert #{{ RESULT_alert_id }} triage report for {{ RESULT_rule }}. Remove any occurences of `'` from the rule.
+        Code scanning alert #{{ result.alert_id }} triage report for {{ result.rule }}. Remove any occurences of `'` from the rule.
         ```
         Use `barry-agent` as the label for the issue.
       toolboxes:
@@ -95,14 +94,14 @@ taskflow:
       description: |
         Create GitHub issue for FP alerts and label it with FP.
       user_prompt: |
-        The alert_id is {{ RESULT_alert_id }}. The repository name is {{ RESULT_repo }}
+        The alert_id is {{ result.alert_id }}. The repository name is {{ result.repo }}
 
-        First check if an open issue with the alert id already exists in {{ RESULT_repo }}.
+        First check if an open issue with the alert id already exists in {{ result.repo }}.
         If it does, then do not create a new issue and your task is done.
 
-        Otherwise, create an issue in {{ RESULT_repo }} using these notes:
+        Otherwise, create an issue in {{ result.repo }} using these notes:
         ```
-        {{ RESULT_result }}
+        {{ result.result }}
         ```
         Remove any duplicate information of the notes and use it as the issue body.
         The issue body should be formatted in markdown.
@@ -113,14 +112,14 @@ taskflow:
         - Another list of entries with the factors that render the vulnerability of the alert not exploitable. Prepend each entry with a bullet point, followed by the :heavy_minus_sign: emoji.
         The issue body should be formatted in markdown.
 
-        If references to source code locations are present in the notes, link them like this: https://github.com/{{ RESULT_repo }}/blob/master/{{ RESULT_file_path }}#L{{ RESULT_line_number }}). Remove any occurences of `'` from that link.
+        If references to source code locations are present in the notes, link them like this: https://github.com/{{ result.repo }}/blob/master/{{ result.file_path }}#L{{ result.line_number }}). Remove any occurences of `'` from that link.
 
-        At the bottom of the issue body create a link to the alert like this: https://github.com/{{ RESULT_repo }}/security/code-scanning/{{ RESULT_alert_id }}, name the link `Code scanning alert #{{ RESULT_alert_id }}`. Remove any occurences of `'` from that link.
+        At the bottom of the issue body create a link to the alert like this: https://github.com/{{ result.repo }}/security/code-scanning/{{ result.alert_id }}, name the link `Code scanning alert #{{ result.alert_id }}`. Remove any occurences of `'` from that link.
         Then add following text to the issue body: 🤖 I'm a robot beep boop.
 
         The title of the issue should be:
         ```
-        Code scanning alert #{{ RESULT_alert_id }} triage report for {{ RESULT_rule }}. Remove any occurences of `'` from the rule.
+        Code scanning alert #{{ result.alert_id }} triage report for {{ result.rule }}. Remove any occurences of `'` from the rule.
         ```
         Use [barry-agent,FP] as labels for the issue.
       toolboxes:

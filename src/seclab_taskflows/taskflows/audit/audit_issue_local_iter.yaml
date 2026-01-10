@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals:
@@ -18,7 +17,7 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       model: general_tasks
       user_prompt: |
-        Fetch the component issues in {{ GLOBALS_repo }}.
+        Fetch the component issues in {{ globals.repo }}.
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
   - task:
@@ -30,19 +29,19 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       model: code_analysis
       user_prompt: |
-        The issue is in repo {{ RESULT_repo }} with id {{ RESULT_issue_id }}. The component is under the directory 
-        {{ RESULT_location }} with component_id {{ RESULT_component_id }}. The notes of the component is:
+        The issue is in repo {{ result.repo }} with id {{ result.issue_id }}. The component is under the directory 
+        {{ result.location }} with component_id {{ result.component_id }}. The notes of the component is:
 
-        {{ RESULT_component_notes }}
+        {{ result.component_notes }}
         
         You should use this to understand the intended purpose of the component and take it into account when 
         you audit the issue.
 
-        The type of the issue is {{ RESULT_issue_type }} and here is the notes of the issue:
+        The type of the issue is {{ result.issue_type }} and here is the notes of the issue:
 
-        {{ RESULT_issue_notes }}
+        {{ result.issue_notes }}
 
-        {{ PROMPTS_seclab_taskflows.prompts.audit.audit_issue }}
+        {% include 'seclab_taskflows.prompts.audit.audit_issue' %}
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
         - seclab_taskflows.toolboxes.local_file_viewer

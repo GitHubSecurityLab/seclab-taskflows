@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 taskflow:
@@ -16,7 +15,7 @@ taskflow:
       name: set up taskflow
       description: Clearing previous results.
       user_prompt: |
-        Clear the alert results from with the rule `{{ GLOBALS_rule }}` and all the alert flows.
+        Clear the alert results from with the rule `{{ globals.rule }}` and all the alert flows.
         Then clear the memcache.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state

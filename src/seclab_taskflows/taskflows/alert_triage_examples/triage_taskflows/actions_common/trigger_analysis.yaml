@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 taskflow:
@@ -17,8 +16,8 @@ taskflow:
       async: true
       user_prompt: |
         You must first make sure that the workflow containing the alert is active. You can do this by using the `check_workflow_active` tool with
-        the actual repository and workflow_id derived from the file path {{ RESULT_location }}.
-        If it is not `active`, then the set the `valid` field of the alert result to `false` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}
+        the actual repository and workflow_id derived from the file path {{ result.location }}.
+        If it is not `active`, then the set the `valid` field of the alert result to `false` using alert_id {{ result.alert_id }} and repo {{ result.repo }}
         and update the alert result with the reason that the action is not active and set the `valid` field of the alert to false. 
         If the workflow is not active, then your task is done. Do not continue with the task.
 
@@ -52,7 +51,7 @@ taskflow:
         Store your notes in the `results` field of the alert result by updating the alert results.
         For secrets, include the name of the secret and the line number where it is used in the notes.
 
-        When you are done, set the `valid` field of the alert result to `true` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}
+        When you are done, set the `valid` field of the alert result to `true` using alert_id {{ result.alert_id }} and repo {{ result.repo }}
         if the alert is a potential vulnerability, otherwise set it to `false`. 
 
         IMPORTANT:
