@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals:
@@ -18,7 +17,7 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       model: code_analysis
       user_prompt: |
-        Fetch the list of issues for component {{ GLOBALS_id }} in repo {{ GLOBALS_repo }}. Check if there is any issue 
+        Fetch the list of issues for component {{ globals.id }} in repo {{ globals.repo }}. Check if there is any issue 
         that involves access control or authentication. If there isn't any, then your task is finished.
 
         If there are any authentication or access control that are crucial in determining whether issue is vulnerable or not,

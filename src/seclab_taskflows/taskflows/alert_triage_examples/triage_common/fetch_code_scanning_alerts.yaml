@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 taskflow:
@@ -16,7 +15,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the open alerts from the {{ RESULT_repo }} repo to the sql database.
-        Use {{ RESULT_repo }} as the repo name for storing.
+        Fetch the open alerts from the {{ result.repo }} repo to the sql database.
+        Use {{ result.repo }} as the repo name for storing.
       toolboxes:
         - seclab_taskflows.toolboxes.gh_code_scanning

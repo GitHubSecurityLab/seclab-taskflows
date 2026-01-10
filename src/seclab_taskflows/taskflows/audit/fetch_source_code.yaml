@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals:
@@ -18,6 +17,6 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       model: general_tasks
       user_prompt: |
-        Fetch the source code of the repo {{ GLOBALS_repo }}.
+        Fetch the source code of the repo {{ globals.repo }}.
       toolboxes:
         - seclab_taskflows.toolboxes.local_gh_resources

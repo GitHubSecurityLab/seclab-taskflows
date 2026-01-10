@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: prompt
-  version: 1
-
+  version: "1.0"
 prompt: |
         The issues suggested have not been properly verified and are only suggested because they are common issues in these types of 
         application. Your task is to audit the source code to check if this type of issues is present. 

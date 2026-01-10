@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals:
@@ -19,10 +18,10 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       model: code_analysis
       user_prompt: |
-        Fetch the entry points of the repo {{ GLOBALS_repo }},
-        the user actions of the repo {{ GLOBALS_repo }} and the 
-        components of the repo {{ GLOBALS_repo }}.
-        Based on the entry points, components, user actions and README.md and, if available, SECURITY.md in the {{ GLOBALS_repo }},
+        Fetch the entry points of the repo {{ globals.repo }},
+        the user actions of the repo {{ globals.repo }} and the 
+        components of the repo {{ globals.repo }}.
+        Based on the entry points, components, user actions and README.md and, if available, SECURITY.md in the {{ globals.repo }},
         can you tell me what type of application this repo is and what kind of security boundary it has.
         For each entry point state whether they could be used for security relevant functionality. (E.g. checking that an input is well-formed) 
         Add a note regarding the most likely security problems in this entry point. E.g. if a function is used to verify some data format and
@@ -49,6 +48,6 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       model: code_analysis
       user_prompt: |
-        Fetch the issues in component with id {{ GLOBALS_id }} in the repo {{ GLOBALS_repo }}. List all issues one by one.
+        Fetch the issues in component with id {{ globals.id }} in the repo {{ globals.repo }}. List all issues one by one.
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context

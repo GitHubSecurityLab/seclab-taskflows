@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 globals:
   rule: actions/untrusted-checkout/critical
 
@@ -20,7 +19,7 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       exclude_from_context: true
       user_prompt: |
-        Fetch all the invalid alert results that have the rule `{{ GLOBALS_rule }}`.
+        Fetch all the invalid alert results that have the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -37,20 +36,20 @@ taskflow:
       user_prompt: |
         The alert results is the following:
         ```
-        {{ RESULT_result }}
+        {{ result.result }}
         ```
 
         Look for a section called "Reviewer analysis" in the alert results. If the section is not present, then your task is done.
 
-        Otherwise, dismiss the alert using the alert id {{ RESULT_alert_id }}. 
+        Otherwise, dismiss the alert using the alert id {{ result.alert_id }}. 
 
-        The repository is {{ RESULT_repo }}.
+        The repository is {{ result.repo }}.
 
         Dismiss the alert using the "Reviewer analysis" section as the dismissal reason. Summarize the section and remove any duplicate
         information. You need to summarize the reason so that it contains less than 280 characters, otherwise, the dismissal will fail.
         If that happens, then you need to summarize the section again until it is less than 280 characters and try dismissing the alert again.
 
-        Finally, set the completed field of the alert result to true, using the alert_id {{ RESULT_alert_id }}.
+        Finally, set the completed field of the alert result to true, using the alert_id {{ result.alert_id }}.
 
         Do not make any other changes to the alert result.
       toolboxes:
@@ -65,7 +64,7 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       exclude_from_context: true
       user_prompt: |
-        Fetch the all the completed alert results from that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the all the completed alert results from that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -79,17 +78,17 @@ taskflow:
       repeat_prompt: true
       async: true
       user_prompt: |
-        The alert_id is {{ RESULT_alert_id }}. The repository is {{ RESULT_repo }}.
+        The alert_id is {{ result.alert_id }}. The repository is {{ result.repo }}.
 
-        The validity of the alert is {{ RESULT_valid }}. If the alert is valid, then your task is done.
+        The validity of the alert is {{ result.valid }}. If the alert is valid, then your task is done.
         If the alert is not valid, then do the following:
 
-        First check if an issue with the alert id already exists in {{ RESULT_repo }}.
+        First check if an issue with the alert id already exists in {{ result.repo }}.
         If it does, then do not create a new issue and your task is done.
 
-        Otherwise, create an issue in {{ RESULT_repo }} using these notes:
+        Otherwise, create an issue in {{ result.repo }} using these notes:
         ```
-        {{ RESULT_result }}
+        {{ result.result }}
         ```
         Remove any duplicate information of the notes and use it as the issue body.
         The title of the issue should be:
@@ -146,7 +145,7 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.action_expert
       user_prompt: |
-        The repo and alert id can are encoded in the key {{ RESULT_key }} as follows:
+        The repo and alert id can are encoded in the key {{ result.key }} as follows:
         ```
         <encoded_repo_name>_<alert id>
         ```
@@ -155,7 +154,7 @@ taskflow:
 
         Create an issue in the repo using the following as the issue body:
         ```
-        {{ RESULT_value }}
+        {{ result.value }}
         ```
         The issue body should be formatted in markdown.
 
@@ -181,6 +180,6 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       exclude_from_context: true
       user_prompt: |
-        Fetch the all the invalid alert results from that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the all the invalid alert results from that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
