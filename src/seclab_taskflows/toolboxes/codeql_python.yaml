@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 seclab-taskflow-agent:
-  version: 1
+  version: "1.0"
   filetype: toolbox
 
 server_params:
@@ -12,13 +12,13 @@ server_params:
   command: python
   args: ["-m", "seclab_taskflows.mcp_servers.codeql_python.mcp_server"]
   env:
-    CODEQL_DBS_BASE_PATH: "{{ env CODEQL_DBS_BASE_PATH }}"
+    CODEQL_DBS_BASE_PATH: "{{ env('CODEQL_DBS_BASE_PATH') }}"
     # prevent git repo operations on gh codeql executions
     GH_NO_UPDATE_NOTIFIER: "Disable"
     GH_NO_EXTENSION_UPDATE_NOTIFIER: "Disable"
-    CODEQL_CLI: "{{ env CODEQL_CLI }}"
-    DATA_DIR: "{{ env DATA_DIR }}"
-    LOG_DIR: "{{ env LOG_DIR }}"
+    CODEQL_CLI: "{{ env('CODEQL_CLI') }}"
+    DATA_DIR: "{{ env('DATA_DIR') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"
 server_prompt: |
   ## CodeQL Supported Programming Languages
 

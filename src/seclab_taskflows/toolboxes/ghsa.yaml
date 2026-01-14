@@ -3,12 +3,11 @@
 
 seclab-taskflow-agent:
   filetype: toolbox
-  version: 1
-
+  version: "1.0"
 server_params:
   kind: stdio
   command: python
   args: ["-m", "seclab_taskflows.mcp_servers.ghsa"]
   env:
-    GH_TOKEN: "{{ env GH_TOKEN }}"
-    LOG_DIR: "{{ env LOG_DIR }}"
+    GH_TOKEN: "{{ env('GH_TOKEN') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"

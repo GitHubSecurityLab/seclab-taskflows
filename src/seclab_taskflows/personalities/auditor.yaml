@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 seclab-taskflow-agent:
-  version: 1
+  version: "1.0"
   filetype: personality
 
 personality: |

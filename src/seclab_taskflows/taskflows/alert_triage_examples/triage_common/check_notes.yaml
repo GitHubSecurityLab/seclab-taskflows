@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 taskflow:
@@ -17,10 +16,10 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       async: true
       user_prompt: |
-        The alert_id is {{ RESULT_alert_id }} and the repo is {{ RESULT_repo }}.
+        The alert_id is {{ result.alert_id }} and the repo is {{ result.repo }}.
         The notes from the alert analysis is:        
         ```
-        {{ RESULT_result }}
+        {{ result.result }}
         ```
         Check all results whether they contain next steps that need to be taken. If they do, then take those steps.
         In case code parts (such as methods) were not found previously, look them up and change the notes accordingly.

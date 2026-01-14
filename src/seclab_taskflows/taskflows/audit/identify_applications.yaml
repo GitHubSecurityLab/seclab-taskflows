@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals:
@@ -18,7 +17,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Clear the memory cache and clear the repo context results for repo {{ GLOBALS_repo }}
+        Clear the memory cache and clear the repo context results for repo {{ globals.repo }}
       toolboxes:
         - seclab_taskflow_agent.toolboxes.memcache
         - seclab_taskflows.toolboxes.repo_context
@@ -30,7 +29,7 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
-        Inspect {{ GLOBALS_repo }} and determine its function. Determine whether the repo is a framework library,
+        Inspect {{ globals.repo }} and determine its function. Determine whether the repo is a framework library,
         or a web application etc. For repo that may contain multiple applications, determine the purpose of each 
         application and the directories of each application. Repo can also be a library but contains actual applications, for 
         example, a web server and admin UI etc. that are not for testing or examples.
@@ -56,7 +55,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-          Fetch the components from the repo {{ GLOBALS_repo }}.
+          Fetch the components from the repo {{ globals.repo }}.
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
   - task:
@@ -70,16 +69,16 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
-        The component is in {{ RESULT_repo }} in the directory {{ RESULT_location }}. These are the 
+        The component is in {{ result.repo }} in the directory {{ result.location }}. These are the 
         notes for this component:
 
-        {{ RESULT_notes }}
+        {{ result.notes }}
 
         Analyze the entry points of this application. First check whether this component is a library or 
         an application. From previous analysis stated that:
 
-        is_application ? {{ RESULT_is_app }}
-        is_library ? {{ RESULT_is_library }}
+        is_application ? {{ result.is_app }}
+        is_library ? {{ result.is_library }}
         
         ## Application
 
@@ -139,7 +138,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-          Fetch the components from the repo {{ GLOBALS_repo }}.
+          Fetch the components from the repo {{ globals.repo }}.
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
   - task:
@@ -153,10 +152,10 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
-        The component is in {{ RESULT_repo }} in the directory {{ RESULT_location }}. These are the 
+        The component is in {{ result.repo }} in the directory {{ result.location }}. These are the 
         notes for this component:
 
-        {{ RESULT_notes }}
+        {{ result.notes }}
 
         Analyze the actions that an untrusted user is allowed to perform. The purpose of this task is not 
         about the security of the source code, but rather get an understanding of the purpose of the component and 
@@ -175,8 +174,8 @@ taskflow:
         First check whether this component is a library or 
         an application. From previous analysis stated that:
 
-        is_application ? {{ RESULT_is_app }}
-        is_library ? {{ RESULT_is_library }}
+        is_application ? {{ result.is_app }}
+        is_library ? {{ result.is_library }}
 
         ## Application
         
@@ -232,7 +231,7 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       model: code_analysis
       user_prompt: |
-        Fetch the entry points of the repo {{ GLOBALS_repo }} and give a summary of the notes. 
-        Fetch the user actions of the repo {{ GLOBALS_repo }} and give a summary of the notes.
+        Fetch the entry points of the repo {{ globals.repo }} and give a summary of the notes. 
+        Fetch the user actions of the repo {{ globals.repo }} and give a summary of the notes.
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context

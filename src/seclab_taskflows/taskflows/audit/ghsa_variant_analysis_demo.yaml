@@ -8,8 +8,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 globals:
   repo:
   ghsa:
@@ -33,7 +32,7 @@ taskflow:
         - seclab_taskflows.toolboxes.gh_file_viewer
         - seclab_taskflow_agent.toolboxes.memcache
       user_prompt: |
-        Fetch the details of the GHSA {{ GLOBALS_ghsa }} of the repo {{ GLOBALS_repo }}.
+        Fetch the details of the GHSA {{ globals.ghsa }} of the repo {{ globals.repo }}.
 
         Analyze the description to understand what type of bug caused
         the vulnerability. DO NOT perform a code audit at this stage, just 
@@ -73,7 +72,7 @@ taskflow:
         fetching the entire file.
 
         Fetch the source file that was identified as the cause of the
-        GHSA in repo {{ GLOBALS_repo }}. 
+        GHSA in repo {{ globals.repo }}. 
 
         Do a security audit of the code in the source file, focusing
         particularly on the type of bug that was identified as the

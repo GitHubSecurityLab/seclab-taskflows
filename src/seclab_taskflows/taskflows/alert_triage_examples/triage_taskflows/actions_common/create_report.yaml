@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 taskflow:
@@ -16,10 +15,10 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.action_expert
       user_prompt: |
-        The alert_id is {{ RESULT_alert_id }} and the repo is {{ RESULT_repo }}.
+        The alert_id is {{ result.alert_id }} and the repo is {{ result.repo }}.
         The notes from the alert analysis is:        
         ```
-        {{ RESULT_result }}
+        {{ result.result }}
         ```
 
         You now need to create a report based on the analysis of the alert.
@@ -28,16 +27,16 @@ taskflow:
         do not analyze the files, only use it to retrieve code snippets to be included in the report.
         You should also replace the word alert with vulnerability in the report. 
 
-        First determine the file path and repository of the alert from the alert location {{ RESULT_location }}.
+        First determine the file path and repository of the alert from the alert location {{ result.location }}.
         The location may indicate an external file path in a different repo.
-        Inspect the alert location at {{ RESULT_location }} in the repo {{ RESULT_repo }} to determine if it is in an external action or not.
+        Inspect the alert location at {{ result.location }} in the repo {{ result.repo }} to determine if it is in an external action or not.
         If the file path starts with `.github/workflows/external/`, then it is an external action. In this case, 
         extract the actual repository from the file path, which is encoded as follows:
         The file path is in the format `.github/workflows/external/<repo_owner>/<repo_name>/<actual_file_path>`.
         In this case, the actual repository `<repo_owner>/<repo_name>` and the file path is `<actual_file_path>`, 
-        Otherwise, it is an internal action that is in {{ RESULT_repo }} with the expected file path.
+        Otherwise, it is an internal action that is in {{ result.repo }} with the expected file path.
 
-        {{ INPUTS_vul_specifics }}
+        {{ inputs.vul_specifics }}
 
         Next, take a look at the use of secrets from the notes. Again, include code snippets from the action file that contains the use of secrets in the notes.
         If any secrets is used, then state in your report that the code execution identified in the previous step may then lead to the secrets being leaked.
@@ -73,7 +72,7 @@ taskflow:
 
         If the use has a high privileged trigger, then do the following:
         The notes will contain the line number where the reusable action is used.
-        In the report, state that the user action uses the {{ RESULT_location }} action and include the line number where it is used.
+        In the report, state that the user action uses the {{ result.location }} action and include the line number where it is used.
         Then include any permission or secret used by the user action in the report, if any.
 
         If that is the case, and there is no extra permissions granted either to the action or its users, 
@@ -81,18 +80,18 @@ taskflow:
 
         The title of the report should be something like:
         ```
-        ## {{ INPUTS_title }}
+        ## {{ inputs.title }}
         ```
 
         The first sentence of the report must contain the alert id and the repo, like:
 
         ```
-        This report is for the alert with id {{ RESULT_alert_id }} in the repository {{ RESULT_repo }}.
+        This report is for the alert with id {{ result.alert_id }} in the repository {{ result.repo }}.
         ```
 
         Include either privileged context or secret leak in the title based on the analysis of the alert.
         The report should be in markdown format.
-        When you are done, create a memcache entry with the {{ RESULT_repo }}_{{ RESULT_alert_id }} as the key and the report as the value, and store it.
+        When you are done, create a memcache entry with the {{ result.repo }}_{{ result.alert_id }} as the key and the report as the value, and store it.
 
         IMPORTANT:
         For each statement related to code, you must include the line number where the code is located in the file.

@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 taskflow:
@@ -39,7 +38,7 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       async: true
       user_prompt: |
-        Inspect the alert location at {{ RESULT_location }} in the repo {{ RESULT_repo }} to determine if it is in an exploitable path traversal vulnerability.
+        Inspect the alert location at {{ result.location }} in the repo {{ result.repo }} to determine if it is in an exploitable path traversal vulnerability.
         Exploitable means that a remote attacker would be able to control a path e.g. by sending a crafted request to the application containing a path traversal payload like `../`.
         It also means that the path traversal vulnerability is not mitigated by any other code in the repository, such as sanitization or validation of the path.
         And that the sink is a method that is used to read, write or delete files, such as `fs.readFile`, `fs.writeFile`, `fs.createWriteStream`, etc.
@@ -51,8 +50,8 @@ taskflow:
         Always note where the URL path is registered in the web framework and the HTTP method required to call it. Write the lines that register the URL path in the notes.
         Take notes while assessing the alert.
         Update the results field of the alert result with your notes using `update_alert_result` with 
-        {{ RESULT_alert_id }} as alert_id and {{ RESULT_repo }} as repo.
-        When you are done, set the `valid` field of the alert result to `true` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}
+        {{ result.alert_id }} as alert_id and {{ result.repo }} as repo.
+        When you are done, set the `valid` field of the alert result to `true` using alert_id {{ result.alert_id }} and repo {{ result.repo }}
         if the alert is a potential vulnerability, otherwise set it to `false`. 
       toolboxes:
         - seclab_taskflows.toolboxes.gh_file_viewer

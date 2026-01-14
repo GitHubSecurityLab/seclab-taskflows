@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals: 
@@ -31,7 +30,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the alert results that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the alert results that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -46,7 +45,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid alert results that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the valid alert results that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -74,9 +73,9 @@ taskflow:
         the notes.
         If you cannot find any such invocation, then mention that in your notes as well.
         Update the results field of the alert result with your notes using `update_alert_result` with 
-        {{ RESULT_alert_id }} as alert_id and {{ RESULT_repo }} as repo.
+        {{ result.alert_id }} as alert_id and {{ result.repo }} as repo.
 
-        When you are done, set the `valid` field of the alert result to `true` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}
+        When you are done, set the `valid` field of the alert result to `true` using alert_id {{ result.alert_id }} and repo {{ result.repo }}
         if the alert is a potential vulnerability, otherwise set it to `false`. 
         IMPORTANT: You must also do the following checks.
         1.If the ONLY alert trigger is `workflow_dispatche`, then you should set the `valid` field to `false` and update the alert result with the reason that the trigger is `workflow_dispatch`.
@@ -100,7 +99,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid alert results from that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the valid alert results from that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -131,7 +130,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the all the alert results from that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the all the alert results from that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -158,7 +157,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid the alert results from that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the valid the alert results from that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -169,8 +168,8 @@ taskflow:
       inputs:
         title: Checking out of untrusted code in Github Actions <action_name> may lead to code execution in privileged context/secret leak
         vul_specifics: |
-          First, the report should state that the GitHub action at {{ RESULT_location }} is checking out untrusted code. You should then include 
-          a code snippet from the file at the alert location {{ RESULT_location }}, that contains the few lines around the location where 
+          First, the report should state that the GitHub action at {{ result.location }} is checking out untrusted code. You should then include 
+          a code snippet from the file at the alert location {{ result.location }}, that contains the few lines around the location where 
           the `checkout` action is used.
 
           Next, from the analysis of the alert, identify any invocation of untrusted code after the location of the alert, where untrusted code is checked out.
@@ -187,7 +186,7 @@ taskflow:
             these cases are also considered untrusted code.
           Only include the line number and code snippet from the action file that contains the invocation of untrusted code
           in the report. Ignore the invocations that are not considered untrusted code. 
-          In the report, include code snippet where the that untrusted code is invoked from the file at {{ RESULT_location }}, 
+          In the report, include code snippet where the that untrusted code is invoked from the file at {{ result.location }}, 
           mention the line number where the untrusted code is invoked. Explain that because the action has checked out to 
           an attacker-controlled branch, the code that is invoked now lives on that branch and is under the control of the attacker,
           this invocation is therefore now executing attacker-controlled code in the context of the GitHub action.

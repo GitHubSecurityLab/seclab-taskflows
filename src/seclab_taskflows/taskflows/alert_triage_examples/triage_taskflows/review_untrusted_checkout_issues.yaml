@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 taskflow:
@@ -53,9 +52,9 @@ taskflow:
         Check if reasons for dismissing other alerts in this repo applies to this alert. If it does, 
         then dismiss this alert and add a comment to the issue to explain the reason.
       user_prompt: |
-        {{ PROMPTS_seclab_taskflows.prompts.triage_taskflows.actions_common.check_dismiss_reason }}
+        {% include 'seclab_taskflows.prompts.triage_taskflows.actions_common.check_dismiss_reason' %}
         
-        {{ PROMPTS_seclab_taskflows.prompts.triage_taskflows.actions_common.dismiss_decision }}
+        {% include 'seclab_taskflows.prompts.triage_taskflows.actions_common.dismiss_decision' %}
 
       toolboxes:
         - seclab_taskflow_agent.toolboxes.github_official
