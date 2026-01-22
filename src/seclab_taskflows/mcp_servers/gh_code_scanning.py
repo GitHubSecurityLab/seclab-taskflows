@@ -33,6 +33,7 @@ mcp = FastMCP("GitHubCodeScanning")
 GH_TOKEN = os.getenv("GH_TOKEN", default="")
 
 # Minimum number of parts in an HTML URL to extract owner/repo
+# Expected format: https://github.com/owner/repo/... (needs at least 5 parts split by '/')
 MIN_URL_PARTS = 5
 
 CODEQL_DBS_BASE_PATH = mcp_data_dir("seclab-taskflows", "codeql", "CODEQL_DBS_BASE_PATH")
