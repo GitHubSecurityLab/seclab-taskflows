@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
+from __future__ import annotations
 
 import csv
 import importlib.resources
@@ -18,8 +19,8 @@ from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from ..utils import process_repo
-from .codeql_sqlite_models import Base, Source
+from seclab_taskflows.mcp_servers.utils import process_repo
+from seclab_taskflows.mcp_servers.codeql_python.codeql_sqlite_models import Base, Source
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -53,27 +54,29 @@ def source_to_dict(result):
     }
 
 def _resolve_query_path(language: str, query: str) -> Path:
-    global TEMPLATED_QUERY_PATHS
     if language not in TEMPLATED_QUERY_PATHS:
-        raise RuntimeError(f"Error: Language `{language}` not supported!")
+        msg = f"Error: Language `{language}` not supported!"
+        raise RuntimeError(msg)
     query_path = TEMPLATED_QUERY_PATHS[language].get(query)
     if not query_path:
-        raise RuntimeError(f"Error: query `{query}` not supported for `{language}`!")
+        msg = f"Error: query `{query}` not supported for `{language}`!"
+        raise RuntimeError(msg)
     return Path(query_path)
 
 
 def _resolve_db_path(relative_db_path: str | Path):
-    global CODEQL_DBS_BASE_PATH
     # path joins will return "/B" if "/A" / "////B" etc. as well
     # not windows compatible and probably needs additional hardening
     relative_db_path = str(relative_db_path).strip().lstrip('/')
     relative_db_path = Path(relative_db_path)
     absolute_path = (CODEQL_DBS_BASE_PATH / relative_db_path).resolve()
     if not absolute_path.is_relative_to(CODEQL_DBS_BASE_PATH.resolve()):
-        raise RuntimeError(f"Error: Database path {absolute_path} is outside the base path {CODEQL_DBS_BASE_PATH}")
+        msg = f"Error: Database path {absolute_path} is outside the base path {CODEQL_DBS_BASE_PATH}"
+        raise RuntimeError(msg)
     if not absolute_path.is_dir():
         _debug_log(f"Database path not found: {absolute_path}")
-        raise RuntimeError(f"Error: Database not found at {absolute_path}!")
+        msg = f"Error: Database not found at {absolute_path}!"
+        raise RuntimeError(msg)
     return str(absolute_path)
 
 # This sqlite database is specifically made for CodeQL for Python MCP.
@@ -88,7 +91,7 @@ class CodeqlSqliteBackend:
         Base.metadata.create_all(self.engine, tables=[Source.__table__])
 
 
-    def store_new_source(self, repo, source_location, line, source_type, notes, update = False):
+    def store_new_source(self, repo, source_location, line, source_type, notes, *, update = False):
         with Session(self.engine) as session:
             existing = session.query(Source).filter_by(repo = repo, source_location = source_location, line = line).first()
             if existing:

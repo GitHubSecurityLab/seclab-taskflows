@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
+from __future__ import annotations
+
 from typing import Optional
 
 from sqlalchemy import Text

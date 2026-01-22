@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+from __future__ import annotations
+
 import json
 import logging
 import re
@@ -7,7 +12,9 @@ from fastmcp import FastMCP
 from pydantic import Field
 from seclab_taskflow_agent.path_utils import log_file_name
 
-from .gh_code_scanning import call_api
+from seclab_taskflows.mcp_servers.gh_code_scanning import call_api
+
+logger = logging.getLogger(__name__)
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -22,7 +29,7 @@ mcp = FastMCP("GitHubRepoAdvisories")
 # The advisories contain a lot of information, so we need to filter
 # some of it out to avoid exceeding the maximum prompt size.
 def parse_advisory(advisory: dict) -> dict:
-    logging.debug(f"advisory: {advisory}")
+    logger.debug("advisory: %s", advisory)
     return {
         "ghsa_id": advisory.get("ghsa_id", ""),
         "cve_id": advisory.get("cve_id", ""),
@@ -31,7 +38,7 @@ def parse_advisory(advisory: dict) -> dict:
         "state": advisory.get("state", ""),
     }
 
-async def fetch_GHSA_list_from_gh(owner: str, repo: str) -> str | list:
+async def fetch_ghsa_list_from_gh(owner: str, repo: str) -> str | list:
     """Fetch all security advisories for a specific repository."""
     url = f"https://api.github.com/repos/{owner}/{repo}/security-advisories"
     params = {'per_page': 100}
@@ -60,16 +67,16 @@ async def fetch_GHSA_list_from_gh(owner: str, repo: str) -> str | list:
     return "No advisories found."
 
 @mcp.tool()
-async def fetch_GHSA_list(owner: str = Field(description="The owner of the repo"),
+async def fetch_ghsa_list(owner: str = Field(description="The owner of the repo"),
                           repo: str = Field(description="The repository name")) -> str:
     """Fetch all GitHub Security Advisories (GHSAs) for a specific repository."""
-    results = await fetch_GHSA_list_from_gh(owner, repo)
+    results = await fetch_ghsa_list_from_gh(owner, repo)
     if isinstance(results, str):
         return results
     return json.dumps(results, indent=2)
 
 
-async def fetch_GHSA_details_from_gh(owner: str, repo: str, ghsa_id: str) -> str | dict:
+async def fetch_ghsa_details_from_gh(owner: str, repo: str, ghsa_id: str) -> str | dict:
     """Fetch the details of a repository security advisory."""
     url = f"https://api.github.com/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
     resp = await call_api(url, {})
@@ -80,11 +87,11 @@ async def fetch_GHSA_details_from_gh(owner: str, repo: str, ghsa_id: str) -> str
     return "Not found."
 
 @mcp.tool()
-async def fetch_GHSA_details(owner: str = Field(description="The owner of the repo"),
+async def fetch_ghsa_details(owner: str = Field(description="The owner of the repo"),
                              repo: str = Field(description="The repository name"),
                              ghsa_id: str = Field(description="The ghsa_id of the advisory")) -> str:
     """Fetch a GitHub Security Advisory for a specific repository and GHSA ID."""
-    results = await fetch_GHSA_details_from_gh(owner, repo, ghsa_id)
+    results = await fetch_ghsa_details_from_gh(owner, repo, ghsa_id)
     if isinstance(results, str):
         return results
     return json.dumps(results, indent=2)

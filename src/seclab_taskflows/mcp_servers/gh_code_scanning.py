@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -17,7 +19,7 @@ from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from .alert_results_models import AlertFlowGraph, AlertResults, Base
+from seclab_taskflows.mcp_servers.alert_results_models import AlertFlowGraph, AlertResults, Base
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -29,6 +31,9 @@ logging.basicConfig(
 mcp = FastMCP("GitHubCodeScanning")
 
 GH_TOKEN = os.getenv('GH_TOKEN', default='')
+
+# Minimum number of parts in an HTML URL to extract owner/repo
+MIN_URL_PARTS = 5
 
 CODEQL_DBS_BASE_PATH = mcp_data_dir('seclab-taskflows', 'codeql', 'CODEQL_DBS_BASE_PATH')
 ALERT_RESULTS_DIR = mcp_data_dir('seclab-taskflows', 'gh_code_scanning', 'ALERT_RESULTS_DIR')
@@ -54,7 +59,7 @@ def parse_alert(alert: dict) -> dict:
         if not html_url:
             return ''
         parts = html_url.split('/')
-        if len(parts) < 5:
+        if len(parts) < MIN_URL_PARTS:
             return ''
         return f"{parts[3]}/{parts[4]}".lower()
 
