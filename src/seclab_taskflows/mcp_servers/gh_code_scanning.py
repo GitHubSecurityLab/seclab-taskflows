@@ -1,22 +1,23 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
-import logging
-from fastmcp import FastMCP
-from pydantic import Field
-import httpx
-import aiofiles
 import json
+import logging
 import os
 import re
-from urllib.parse import urlparse, parse_qs
-from pathlib import Path
 import zipfile
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+import aiofiles
+import httpx
+from fastmcp import FastMCP
+from pydantic import Field
+from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
 
-from .alert_results_models import AlertResults, AlertFlowGraph, Base
+from .alert_results_models import AlertFlowGraph, AlertResults, Base
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -157,7 +158,7 @@ async def fetch_alerts_to_sql(
     ) -> str:
     """Fetch all code scanning alerts for a specific repository and store them in a SQL database."""
     results = await fetch_alerts_from_gh(owner, repo, state, rule)
-    sql_db_path = f"sqlite:///{ALERT_RESULTS_DIR}/alert_results.db" 
+    sql_db_path = f"sqlite:///{ALERT_RESULTS_DIR}/alert_results.db"
     if isinstance(results, str) or not results:
         return results
     engine = create_engine(sql_db_path, echo=False)
