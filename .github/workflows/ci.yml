@@ -34,7 +34,7 @@ jobs:
       run: pip install --upgrade hatch
 
     - name: Run static analysis
-      run: hatch fmt --check
+      run: hatch fmt --linter --check
 
     - name: Run tests
       run: hatch test --python ${{ matrix.python-version }} --cover --randomize --parallel --retries 2 --retry-delay 1

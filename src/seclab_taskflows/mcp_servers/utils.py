@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
-
 def process_repo(owner, repo):
     """
     Normalize repository identifier to lowercase format 'owner/repo'.

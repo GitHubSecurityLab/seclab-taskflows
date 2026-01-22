@@ -6,11 +6,9 @@
 import pytest
 import seclab_taskflows
 
-
 class Test00:
     def test_nothing(self):
         assert True
 
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+if __name__ == '__main__':
+    pytest.main([__file__, '-v'])
