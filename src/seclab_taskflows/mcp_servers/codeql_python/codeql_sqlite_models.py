@@ -12,7 +12,7 @@ class Base(DeclarativeBase):
 
 
 class Source(Base):
-    __tablename__ = 'source'
+    __tablename__ = "source"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     repo: Mapped[str]
@@ -22,6 +22,8 @@ class Source(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     def __repr__(self):
-        return (f"<Source(id={self.id}, repo={self.repo}, "
-                f"location={self.source_location}, line={self.line}, source_type={self.source_type}, "
-                f"notes={self.notes})>")
+        return (
+            f"<Source(id={self.id}, repo={self.repo}, "
+            f"location={self.source_location}, line={self.line}, source_type={self.source_type}, "
+            f"notes={self.notes})>"
+        )

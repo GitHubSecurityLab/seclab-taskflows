@@ -60,3 +60,42 @@ exclude_lines = [
   "if __name__ == .__main__.:",
   "if TYPE_CHECKING:",
 ]
+
+[tool.ruff.lint]
+ignore = [
+  "A001",      # Variable shadowing a Python builtin
+  "A002",      # Argument shadowing a Python builtin
+  "ARG001",    # Unused function argument
+  "B007",      # Loop control variable not used within loop body
+  "B008",      # Do not perform function call in argument defaults
+  "BLE001",    # Blind except Exception
+  "C403",      # Unnecessary list comprehension (rewrite as a set comprehension)
+  "C405",      # Unnecessary list literal (rewrite as a set literal)
+  "EM102",     # Exception must not use an f-string literal
+  "FA100",     # Add `from __future__ import annotations`
+  "FA102",     # Missing `from __future__ import annotations`
+  "FBT001",    # Boolean positional arg in function definition
+  "FBT002",    # Boolean default value in function definition
+  "G004",      # Logging statement uses f-string
+  "LOG015",    # Use `%s` formatting in logging functions
+  "N802",      # Function name should be lowercase
+  "PERF102",   # When using `dict.items()`, unnecessary `list()` call
+  "PERF401",   # Use a list comprehension to create a transformed list
+  "PIE810",    # Call `tuple` once with a single argument
+  "PLC0206",   # Extracting value from dictionary without calling `.items()`
+  "PLR2004",   # Magic value used in comparison
+  "PLW0602",   # Using global for variable but no assignment is done
+  "PLW1508",   # Invalid type for environment variable default
+  "RET504",    # Unnecessary assignment before `return` statement
+  "RUF003",    # Comment contains ambiguous unicode character
+  "RUF013",    # PEP 484 prohibits implicit `Optional`
+  "RUF015",    # Prefer `next(iter(x))` over single element slice
+  "S607",      # Starting a process with a partial executable path
+  "SIM101",    # Use a ternary expression instead of if-else-block with return statements
+  "SIM102",    # Use a single if-statement instead of nested if-statements
+  "SIM117",    # Use a single `with` statement with multiple contexts
+  "T201",      # `print` found
+  "TID252",    # Prefer absolute imports over relative imports from parent modules
+  "TRY003",    # Avoid specifying long messages outside the exception class
+  "TRY300",    # Consider moving this statement to an `else` block
+]
