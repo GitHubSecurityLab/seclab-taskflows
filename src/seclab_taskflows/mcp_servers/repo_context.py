@@ -1,20 +1,17 @@
 # SPDX-FileCopyrightText: 2025 GitHub
 # SPDX-License-Identifier: MIT
 
+import json
 import logging
+from pathlib import Path
+
 from fastmcp import FastMCP
 from pydantic import Field
-import httpx
-import json
-import os
-import yaml
-from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
+from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from pathlib import Path
-from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
 
-from .repo_context_models import Application, EntryPoint, UserAction, WebEntryPoint, ApplicationIssue, AuditResult, Base
+from .repo_context_models import Application, ApplicationIssue, AuditResult, Base, EntryPoint, UserAction, WebEntryPoint
 from .utils import process_repo
 
 logging.basicConfig(
@@ -126,8 +123,7 @@ class RepoContextBackend:
             existing = session.query(ApplicationIssue).filter_by(id = id).first()
             if not existing:
                 return f"Component issue with id {id} does not exist!"
-            else:
-                existing.notes += notes
+            existing.notes += notes
             session.commit()
         return f"Updated notes for application issue with id {id}"
 
