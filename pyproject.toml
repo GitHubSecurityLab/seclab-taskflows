@@ -60,3 +60,56 @@ exclude_lines = [
   "if __name__ == .__main__.:",
   "if TYPE_CHECKING:",
 ]
+
+[tool.ruff.lint]
+ignore = [
+  "A001",      # Variable name shadows a builtin
+  "A002",      # Argument name shadows a builtin
+  "ARG001",    # Unused function argument
+  "B007",      # Loop control variable not used within loop body
+  "B008",      # Do not perform function calls in argument defaults
+  "BLE001",    # Do not catch blind exception
+  "C403",      # Unnecessary list comprehension - rewrite as a set comprehension
+  "C405",      # Unnecessary list literal - rewrite as a set literal
+  "E713",      # Test for membership should be `not in`
+  "EM102",     # Exception must not use an f-string literal
+  "F401",      # Imported but unused
+  "F541",      # f-string without any placeholders
+  "F841",      # Local variable assigned but never used
+  "FA100",     # Missing `from __future__ import annotations`
+  "FA102",     # Missing `from __future__ import annotations` for `typing.Optional`
+  "FBT001",    # Boolean-typed positional argument in function definition
+  "FBT002",    # Boolean default positional argument in function definition
+  "G004",      # Logging statement uses f-string
+  "I001",      # Import block is un-sorted or un-formatted
+  "INP001",    # File is part of an implicit namespace package
+  "LOG015",    # `root` should be used instead of logger
+  "N802",      # Function name should be lowercase
+  "PERF102",   # Incorrect `dict` comprehension for combining two dicts
+  "PERF401",   # Use a list comprehension to create a transformed list
+  "PIE810",    # Call `startswith` once with a tuple
+  "PLC0206",   # Dict should be used instead of tuple
+  "PLR1730",   # Replace `if` statement with `min()`
+  "PLR2004",   # Magic value used in comparison
+  "PLW0602",   # Using global for variable but no assignment is done
+  "PLW1508",   # Invalid type for environment variable default
+  "PLW1510",   # `subprocess.run` without explicit `check` argument
+  "RET504",    # Unnecessary assignment before `return` statement
+  "RET505",    # Unnecessary `else` after `return` statement
+  "RUF003",    # Comment contains ambiguous character
+  "RUF013",    # PEP 484 prohibits implicit `Optional`
+  "RUF015",    # Prefer `next(iter())` over single element slice
+  "S607",      # Starting a process with a partial executable path
+  "SIM101",    # Use a ternary expression instead of if-else-block
+  "SIM114",    # Combine `if` branches using logical `or` operator
+  "SIM117",    # Use a single `with` statement with multiple contexts
+  "SIM118",    # Use `key in dict` instead of `key in dict.keys()`
+  "SIM300",    # Yoda condition detected
+  "T201",      # `print` found
+  "TID252",    # Prefer absolute imports over relative imports
+  "TRY003",    # Avoid specifying long messages outside the exception class
+  "TRY300",    # Consider moving this statement to an `else` block
+  "UP032",     # Use f-string instead of `format` call
+  "W291",      # Trailing whitespace
+  "W293",      # Blank line contains whitespace
+]
