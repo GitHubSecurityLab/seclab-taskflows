@@ -15,16 +15,17 @@ from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename=log_file_name('mcp_local_gh_resources.log'),
-    filemode='a'
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename=log_file_name("mcp_local_gh_resources.log"),
+    filemode="a",
 )
 
 mcp = FastMCP("LocalGHResources")
 
-GH_TOKEN = os.getenv('GH_TOKEN')
+GH_TOKEN = os.getenv("GH_TOKEN")
 
-LOCAL_GH_DIR = mcp_data_dir('seclab-taskflows', 'local_gh_resources', 'LOCAL_GH_DIR')
+LOCAL_GH_DIR = mcp_data_dir("seclab-taskflows", "local_gh_resources", "LOCAL_GH_DIR")
+
 
 def is_subdirectory(directory, potential_subdirectory):
     directory_path = Path(directory)
@@ -35,6 +36,7 @@ def is_subdirectory(directory, potential_subdirectory):
     except ValueError:
         return False
 
+
 def sanitize_file_path(file_path, allow_paths):
     file_path = os.path.realpath(file_path)
     for allowed_path in allow_paths:
@@ -42,13 +44,18 @@ def sanitize_file_path(file_path, allow_paths):
             return Path(file_path)
     return None
 
+
 async def call_api(url: str, params: dict) -> str:
     """Call the GitHub code scanning API to fetch alert."""
-    headers = {"Accept": "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28",
-                          "Authorization": f"Bearer {GH_TOKEN}"}
+    headers = {
+        "Accept": "application/vnd.github.raw+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": f"Bearer {GH_TOKEN}",
+    }
+
     async def _fetch_file(url, headers, params):
         try:
-            async with httpx.AsyncClient(headers = headers) as client:
+            async with httpx.AsyncClient(headers=headers) as client:
                 r = await client.get(url, params=params, follow_redirects=True)
                 r.raise_for_status()
                 return r
@@ -61,16 +68,20 @@ async def call_api(url: str, params: dict) -> str:
         except httpx.AuthenticationError as e:
             return f"Authentication error: {e}"
 
-    return await _fetch_file(url, headers = headers, params=params)
+    return await _fetch_file(url, headers=headers, params=params)
+
 
 async def _fetch_source_zip(owner: str, repo: str, tmp_dir):
     """Fetch the source code."""
     url = f"https://api.github.com/repos/{owner}/{repo}/zipball"
-    headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
-               "Authorization": f"Bearer {GH_TOKEN}"}
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": f"Bearer {GH_TOKEN}",
+    }
     try:
         async with httpx.AsyncClient() as client:
-            async with client.stream('GET', url, headers =headers, follow_redirects=True) as response:
+            async with client.stream("GET", url, headers=headers, follow_redirects=True) as response:
                 response.raise_for_status()
                 expected_path = Path(tmp_dir) / owner / f"{repo}.zip"
                 resolved_path = expected_path.resolve()
@@ -78,7 +89,7 @@ async def _fetch_source_zip(owner: str, repo: str, tmp_dir):
                     return f"Error: Invalid path for source code: {expected_path}"
                 if not Path(f"{tmp_dir}/{owner}").exists():
                     os.makedirs(f"{tmp_dir}/{owner}", exist_ok=True)
-                async with aiofiles.open(f"{tmp_dir}/{owner}/{repo}.zip", 'wb') as f:
+                async with aiofiles.open(f"{tmp_dir}/{owner}/{repo}.zip", "wb") as f:
                     async for chunk in response.aiter_bytes():
                         await f.write(chunk)
         return f"source code for {repo} fetched successfully."
@@ -88,10 +99,10 @@ async def _fetch_source_zip(owner: str, repo: str, tmp_dir):
         return f"Error: HTTP error: {e}"
     except Exception as e:
         return f"Error: An unexpected error occurred: {e}"
+
+
 @mcp.tool()
-async def fetch_repo_from_gh(
-    owner: str, repo: str
-):
+async def fetch_repo_from_gh(owner: str, repo: str):
     """
     Download the source code from GitHub to the local file system to speed up file search.
     """
@@ -103,6 +114,7 @@ async def fetch_repo_from_gh(
     if not source_path.exists():
         return result
     return f"Downloaded source code to {owner}/{repo}.zip"
+
 
 @mcp.tool()
 async def clear_local_repo(owner: str, repo: str):
