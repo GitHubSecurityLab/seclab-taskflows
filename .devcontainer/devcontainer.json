@@ -35,6 +35,12 @@
       "settings": {
         "python.useEnvironmentsExtension": true
       }
+    },
+    "codespaces": {
+      "openFiles": [
+        "README.md",
+        ".env"
+      ]
     }
   },
   // Use 'forwardPorts' to make a list of ports inside the container available locally
