@@ -16,7 +16,7 @@ fi
 if [ ! -f .env ]; then
     echo "📝 Creating .env template..."
     cp .devcontainer/env-default .env || { echo "Error creating .env"; exit 1; }
-    code .env
+    code .env || echo "ℹ️ Unable to open .env in VS Code. Please open and review the .env file manually."
     echo "⚠️  Defaults can be changed by editing the auto-generated .env file."
 fi
 
