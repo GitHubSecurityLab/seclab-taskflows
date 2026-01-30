@@ -12,4 +12,12 @@ if [ -v CODESPACES ]; then
     fi
 fi
 
+# Create .env file if it doesn't exist
+if [ ! -f .env ]; then
+    echo "📝 Creating .env template..."
+    cp .devcontainer/env-default .env || { echo "Error creating .env"; exit 1; }
+    code .env
+    echo "⚠️  Defaults can be changed by editing the auto-generated .env file."
+fi
+
 echo "💡 Remember to activate the virtual environment: source .venv/bin/activate"
