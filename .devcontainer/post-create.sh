@@ -20,9 +20,8 @@ pip install -e .
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
     echo "📝 Creating .env template..."
-    echo "# Optional: CodeQL database base path" >> .env
-    echo "CODEQL_DBS_BASE_PATH=$(realpath data)" >> .env
-    echo "⚠️  Please configure the environment or your .env file with required tokens!"
+    cp .devcontainer/env-default .env || { echo "Error creating .env"; exit 1; }
+    echo "⚠️  Defaults can be changed by editing the auto-generated .env file."
 fi
 
 echo "✅ Development environment setup complete!"
