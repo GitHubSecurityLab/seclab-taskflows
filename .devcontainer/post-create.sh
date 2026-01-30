@@ -17,11 +17,4 @@ hatch build
 # Install this package from local directory.
 pip install -e .
 
-# Create .env file if it doesn't exist
-if [ ! -f .env ]; then
-    echo "📝 Creating .env template..."
-    cp .devcontainer/env-default .env || { echo "Error creating .env"; exit 1; }
-    echo "⚠️  Defaults can be changed by editing the auto-generated .env file."
-fi
-
 echo "✅ Development environment setup complete!"
