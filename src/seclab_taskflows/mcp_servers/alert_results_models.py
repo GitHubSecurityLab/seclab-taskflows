@@ -4,6 +4,9 @@
 from sqlalchemy import String, Text, Integer, ForeignKey, Column
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
 from typing import Optional
+from seclab_taskflow_agent.path_utils import mcp_data_dir
+
+ALERT_RESULTS_DIR = mcp_data_dir("seclab-taskflows", "report_alert_state", "ALERT_RESULTS_DIR")
 
 
 class Base(DeclarativeBase):

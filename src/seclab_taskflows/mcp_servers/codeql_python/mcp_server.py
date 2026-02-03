@@ -21,6 +21,7 @@ from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
 
 from .codeql_sqlite_models import Base, Source
 from ..utils import process_repo
+from ..codeql_utils import CODEQL_DBS_BASE_PATH
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -30,7 +31,6 @@ logging.basicConfig(
 )
 
 MEMORY = mcp_data_dir("seclab-taskflows", "codeql", "DATA_DIR")
-CODEQL_DBS_BASE_PATH = mcp_data_dir("seclab-taskflows", "codeql", "CODEQL_DBS_BASE_PATH")
 
 mcp = FastMCP("CodeQL-Python")
 

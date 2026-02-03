@@ -10,8 +10,8 @@ import os
 from pathlib import Path
 import aiofiles
 import zipfile
-import tempfile
-from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
+from seclab_taskflow_agent.path_utils import log_file_name
+from .local_gh_resources import LOCAL_GH_DIR
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -21,8 +21,6 @@ logging.basicConfig(
 )
 
 mcp = FastMCP("LocalFileViewer")
-
-LOCAL_GH_DIR = mcp_data_dir("seclab-taskflows", "local_file_viewer", "LOCAL_GH_DIR")
 
 LINE_LIMIT_FOR_FETCHING_FILE_CONTENT = int(os.getenv("LINE_LIMIT_FOR_FETCHING_FILE_CONTENT", default=1000))
 
