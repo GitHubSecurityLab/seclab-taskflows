@@ -39,8 +39,7 @@
     },
     "codespaces": {
       "openFiles": [
-        "README.md",
-        ".env"
+        "README.md"
       ]
     }
   },
