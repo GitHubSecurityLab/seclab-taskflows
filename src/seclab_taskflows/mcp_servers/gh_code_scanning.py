@@ -14,9 +14,10 @@ from pathlib import Path
 import zipfile
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
+from seclab_taskflow_agent.path_utils import log_file_name
 
-from .alert_results_models import AlertResults, AlertFlowGraph, Base
+from .alert_results_models import AlertResults, AlertFlowGraph, Base, ALERT_RESULTS_DIR
+from .codeql_utils import CODEQL_DBS_BASE_PATH
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -28,9 +29,6 @@ logging.basicConfig(
 mcp = FastMCP("GitHubCodeScanning")
 
 GH_TOKEN = os.getenv("GH_TOKEN", default="")
-
-CODEQL_DBS_BASE_PATH = mcp_data_dir("seclab-taskflows", "codeql", "CODEQL_DBS_BASE_PATH")
-ALERT_RESULTS_DIR = mcp_data_dir("seclab-taskflows", "gh_code_scanning", "ALERT_RESULTS_DIR")
 
 
 def parse_alert(alert: dict) -> dict:
