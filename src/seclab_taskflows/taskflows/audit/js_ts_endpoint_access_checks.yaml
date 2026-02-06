@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 # Taskflow to analyze the access control checks of endpoints in a JavaScript or TypeScript web project.
 # It uses a CodeQL database for the analysis. (specified by the repo_nwo input)
 taskflow:
@@ -25,7 +24,7 @@ taskflow:
       inputs:
         repo_nwo: 
       user_prompt: |
-        Fetch CodeQL database for the {{ INPUTS_repo_nwo }} repository for the
+        Fetch CodeQL database for the {{ inputs.repo_nwo }} repository for the
         JavaScript language.
 
         You are auditing code using the previously fetched

@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals:
@@ -18,7 +17,7 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       model: code_analysis
       user_prompt: |
-        Fetch the issues in component with id {{ GLOBALS_id }} in the repo {{ GLOBALS_repo }}. Audit the second issue that was suggested.
+        Fetch the issues in component with id {{ globals.id }} in the repo {{ globals.repo }}. Audit the second issue that was suggested.
 
         The issues suggested are have not been probably verified and are only suggested because they are common issues in these types of 
         application. You task is to audit the source code to check if this type of issues is present.

@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals:
@@ -19,9 +18,9 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       model: code_analysis
       user_prompt: |
-        Fetch the issues in component with id {{ GLOBALS_id }} in the repo {{ GLOBALS_repo }}. Audit the first issue.
+        Fetch the issues in component with id {{ globals.id }} in the repo {{ globals.repo }}. Audit the first issue.
 
-        {{ PROMPTS_seclab_taskflows.prompts.audit.audit_issue }}
+        {% include 'seclab_taskflows.prompts.audit.audit_issue' %}
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
         - seclab_taskflows.toolboxes.local_file_viewer

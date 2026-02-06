@@ -3,8 +3,7 @@
 
 seclab-taskflow-agent:
   filetype: taskflow
-  version: 1
-
+  version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
 globals: 
@@ -33,7 +32,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the alert results that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the alert results that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -48,7 +47,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid alert results that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the valid alert results that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -61,9 +60,9 @@ taskflow:
         - seclab_taskflows.personalities.action_expert
       model: triage
       user_prompt: |
-        The alert_id is {{ RESULT_alert_id }} and the repo is {{ RESULT_repo }}.
+        The alert_id is {{ result.alert_id }} and the repo is {{ result.repo }}.
 
-        Take a look at the code at near the alert location {{ RESULT_location }}. This usually contains some user inputs being evaluated or executed, 
+        Take a look at the code at near the alert location {{ result.location }}. This usually contains some user inputs being evaluated or executed, 
         which may lead to code injection. For example:
         ```
         run: |
@@ -77,7 +76,7 @@ taskflow:
         because it is then used in the script in the `run` field, it may lead to code injection.
 
         IMPORTANT:
-        1. Only look at the expression that is evaluated at the alert location {{ RESULT_location }}, and don't consider other 
+        1. Only look at the expression that is evaluated at the alert location {{ result.location }}, and don't consider other 
         expressions that may be evaluated in the same script or workflow. However, there may be multiple
         expressions that are evaluated at the same alert location, so you should look for all of them.
         2. Double quotations around the expression does not prevent code injection, so you should still consider it as a code injection vulnerability.
@@ -193,17 +192,17 @@ taskflow:
 
         Note any valid sanitizer or checks in the notes, including the lines of the checks or sanitizer and mention that the code is not vulnerable to code injection.
         ONLY consider the exact sanitizers stated above, and do not try to reason about other sanitizers or checks that may be present in the code.
-        Check to make sure that the sanitizers or checks happens before the code injection vulnerability at {{ RESULT_location }}.
+        Check to make sure that the sanitizers or checks happens before the code injection vulnerability at {{ result.location }}.
 
         ## Validity decision
 
         When deciding whether the code is vulnerable to code injection, DO NOT consider how the code is used in the rest of the workflow, 
-        only consider whether the code at the alert location {{ RESULT_location }} is affected by a sanitizer or a check that takes 
-        place before the code injection vulnerability at {{ RESULT_location }}.
+        only consider whether the code at the alert location {{ result.location }} is affected by a sanitizer or a check that takes 
+        place before the code injection vulnerability at {{ result.location }}.
 
-        If the sanitizer is still valid include update the alert results with these information using the alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }} in the 
+        If the sanitizer is still valid include update the alert results with these information using the alert_id {{ result.alert_id }} and repo {{ result.repo }} in the 
         `update_alert_result` tool with your notes as the `result`. Remember to include the line numbers of the checks or sanitizers in the notes.
-        and then set the `valid` field of the alert result to `false` using alert_id {{ RESULT_alert_id }} and repo {{ RESULT_repo }}.
+        and then set the `valid` field of the alert result to `false` using alert_id {{ result.alert_id }} and repo {{ result.repo }}.
 
         IMPORTANT:
         You must only based your decision on the present of sanitizer and check and not any other factors. And do not include 
@@ -219,7 +218,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid alert results from that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the valid alert results from that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -250,7 +249,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the all the alert results from that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the all the alert results from that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -270,7 +269,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid the alert results from that has the rule `{{ GLOBALS_rule }}`.
+        Fetch the valid the alert results from that has the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -281,8 +280,8 @@ taskflow:
       inputs:
         title: Code injection in Github Actions <action_name>
         vul_specifics: |
-          First, the report should state that the GitHub action at {{ RESULT_location }} executing user input. 
-          Add a code snippet from the file at {{ RESULT_location }} that contains the code injection vulnerability and 
+          First, the report should state that the GitHub action at {{ result.location }} executing user input. 
+          Add a code snippet from the file at {{ result.location }} that contains the code injection vulnerability and 
           explain which user input is being evaluated or executed, which may lead to code injection.
   - task:
       must_complete: true
