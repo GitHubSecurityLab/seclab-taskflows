@@ -8,7 +8,7 @@
 #  cd <empty directory>
 #  python -m venv venv
 #  source venv/bin/activate
-#  pip install hatch
+#  pip install hatch uv
 #  git clone https://github.com/GitHubSecurityLab/seclab-taskflows.git
 #  ./seclab-taskflows/scripts/create_repo.sh "My Project"
 #
