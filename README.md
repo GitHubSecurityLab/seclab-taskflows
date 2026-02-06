@@ -31,7 +31,7 @@ Individual taskflows may need additional setup, please refer to the `README.md` 
 After setting the relevant env vars, run an example taskflow with:
 
 ```bash
-./scripts/run_seclab_agent.sh python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.ghsa_variant_analysis_demo -g repo=github/cmark-gfm -g ghsa=GHSA-c944-cv5f-hpvr
+./scripts/run_seclab_agent.sh -t seclab_taskflows.taskflows.audit.ghsa_variant_analysis_demo -g repo=github/cmark-gfm -g ghsa=GHSA-c944-cv5f-hpvr
 ```
 
 ## Background
