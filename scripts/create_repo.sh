@@ -59,7 +59,7 @@ echo "# Taskflows" > "$SRCDIR/taskflows/README.md"
 mkdir "$SRCDIR/toolboxes"
 echo "# Toolboxes" > "$SRCDIR/toolboxes/README.md"
 
-# Add dependency on seclab-taskflows
+# Add dependency on seclab-taskflow-agent
 uv add seclab-taskflow-agent --active --frozen
 
 # Create initial git commit.
