@@ -1,10 +1,35 @@
 # GitHub Security Lab Taskflows
 
-This repository contains example taskflows to use with the [SecLab Taskflow Agent](https://github.com/GitHubSecurityLab/seclab-taskflow-agent), as well as the custom MCP servers that are needed to run the taskflows. 
+This repository contains example taskflows to use with the [SecLab Taskflow Agent](https://github.com/GitHubSecurityLab/seclab-taskflow-agent), as well as the custom MCP servers that are needed to run the taskflows.
 
-## Running with docker script 
+## Quick start
 
-The recommended way of running the taskflows in this repo is by creating a codespace, and running the script [`run_seclab_agent.sh`](scripts/run_seclab_agent.sh) to run a docker container of the `seclab-taskflow-agent` as outlined [here](https://github.com/GitHubSecurityLab/seclab-taskflow-agent/tree/main?tab=readme-ov-file#deploying-from-docker). Note that this script needs to be run from the main directory of the repo, and the `.env` file with the environment variables for the custom MCP servers to store data needs to be in the same directory. 
+* Create a personal access token (PAT) with Models access. [This blog post](https://github.blog/security/community-powered-security-with-ai-an-open-source-framework-for-security-research/) explains how to create a PAT and save it as a codespace secret.
+* Go to https://github.com/GitHubSecurityLab/seclab-taskflows and start a codespace.
+* Wait a few minutes for the codespace to start. It's ready when you see `(.venv)` before the prompt in the terminal.
+* Run the demo:
+
+```bash
+python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.ghsa_variant_analysis_demo -g repo=github/cmark-gfm -g ghsa=GHSA-c944-cv5f-hpvr
+```
+
+Now try running our auditing taskflows on one of your projects.
+Here, we're using the [OWASP Juice Shop](https://github.com/juice-shop/juice-shop) as an example:
+
+```bash
+./scripts/audit/run_audit.sh juice-shop/juice-shop
+```
+
+> ⚠️ Note: the auditing taskflows can take several hours to run, especially on larger projects, and make a _lot_ of AI requests.
+> You will almost certainly need a [Copilot Pro](https://github.com/github-copilot/pro) account to run them.
+
+The results of the audit are written to an SQLite database, which is opened automatically in an SQLite viewer at
+the end of the run. The results are in the table named "audit_result". The table has a column named "has_vulnerability",
+with a checkmark in the row that are most likely to be genuine vulnerabilities.
+
+## Running with docker script
+
+We recommend running taskflows in a sandboxed environment. [GitHub Codespaces](https://github.com/features/codespaces) are convenient, or if you prefer you can use the script [`run_seclab_agent.sh`](scripts/run_seclab_agent.sh) to run a docker container of the `seclab-taskflow-agent` as outlined [here](https://github.com/GitHubSecurityLab/seclab-taskflow-agent/tree/main?tab=readme-ov-file#deploying-from-docker). Note that this script needs to be run from the main directory of the repo, and the `.env` file with the environment variables for the custom MCP servers to store data needs to be in the same directory.
 
 First, create a `.env` file in the main directory of the repo. For [`run_seclab_agent.sh`](scripts/run_seclab_agent.sh) you can use:
 
@@ -56,4 +81,3 @@ This project is licensed under the terms of the [MIT](https://spdx.org/licenses/
 ## Support
 
 [SUPPORT](./SUPPORT.md)
-
