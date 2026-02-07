@@ -19,7 +19,7 @@ if [ ! -f .env ]; then
     # install the Copilot version of .env, otherwise install the default version.
     ENV_VERSION="env-default"
     if [ -v AI_API_TOKEN ]; then
-        if curl --fail https://api.githubcopilot.com/models -H "Authorization: Bearer $AI_API_TOKEN" -H "Copilot-Integration-Id: vscode-chat"; then
+        if curl --fail --silent --show-error https://api.githubcopilot.com/models -H "Authorization: Bearer $AI_API_TOKEN" -H "Copilot-Integration-Id: vscode-chat" > /dev/null; then
             ENV_VERSION="env-copilot"
         fi
     fi
