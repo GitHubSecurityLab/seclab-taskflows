@@ -1,6 +1,6 @@
 # Uncomment the endpoint that you want to use:
 #AI_API_ENDPOINT=https://models.github.ai/inference
-#AI_API_ENDPOINT=https://api.githubcopilot.com
+AI_API_ENDPOINT=https://api.githubcopilot.com
 #AI_API_ENDPOINT=https://api.openai.com/v1
 
 # Uncomment to set the model temperature

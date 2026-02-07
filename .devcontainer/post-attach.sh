@@ -15,7 +15,15 @@ fi
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
     echo "📝 Creating .env template..."
-    cp .devcontainer/env-default .env || { echo "Error creating .env"; exit 1; }
+    # Test whether a simple curl command to api.githubcopilot.com works. If so
+    # install the Copilot version of .env, otherwise install the default version.
+    ENV_VERSION="env-default"
+    if [ -v AI_API_TOKEN ]; then
+        if curl --fail https://api.githubcopilot.com/models -H "Authorization: Bearer $AI_API_TOKEN" -H "Copilot-Integration-Id: vscode-chat"; then
+            ENV_VERSION="env-copilot"
+        fi
+    fi
+    cp .devcontainer/${ENV_VERSION} .env || { echo "Error creating .env"; exit 1; }
     code .env || echo "ℹ️ Unable to open .env in VS Code. Please open and review the .env file manually."
     echo "⚠️  Defaults can be changed by editing the auto-generated .env file."
 fi
