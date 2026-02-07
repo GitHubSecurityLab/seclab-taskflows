@@ -25,7 +25,7 @@ Here, we're using the [OWASP Juice Shop](https://github.com/juice-shop/juice-sho
 
 The results of the audit are written to an SQLite database, which is opened automatically in an SQLite viewer at
 the end of the run. The results are in the table named "audit_result". The table has a column named "has_vulnerability",
-with a checkmark in the row that are most likely to be genuine vulnerabilities.
+with checkmarks in the rows that are most likely to be genuine vulnerabilities.
 
 ## Running with docker script
 
