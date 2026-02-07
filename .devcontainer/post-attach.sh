@@ -23,7 +23,7 @@ if [ ! -f .env ]; then
             ENV_VERSION="env-copilot"
         fi
     fi
-    cp .devcontainer/${ENV_VERSION} .env || { echo "Error creating .env"; exit 1; }
+    cp ".devcontainer/${ENV_VERSION}" .env || { echo "Error creating .env"; exit 1; }
     code .env || echo "ℹ️ Unable to open .env in VS Code. Please open and review the .env file manually."
     echo "⚠️  Defaults can be changed by editing the auto-generated .env file."
 fi
