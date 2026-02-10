@@ -4,7 +4,6 @@ This repository contains example taskflows to use with the [SecLab Taskflow Agen
 
 ## Quick start
 
-* Create a personal access token (PAT) with Models access. [This blog post](https://github.blog/security/community-powered-security-with-ai-an-open-source-framework-for-security-research/) explains how to create a PAT and save it as a codespace secret.
 * Go to https://github.com/GitHubSecurityLab/seclab-taskflows and start a codespace.
 * Wait a few minutes for the codespace to start. It's ready when you see `(.venv)` before the prompt in the terminal.
 * Run the demo:
