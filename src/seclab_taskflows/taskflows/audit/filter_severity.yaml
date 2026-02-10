@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      model: general_tasks
+      user_prompt: |
+        Fetch the vulnerable issues in {{ globals.repo }}.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+  - task:
+      must_complete: true
+      repeat_prompt: true
+      async: true
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      model: code_analysis
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.local_file_viewer
+      user_prompt: |
+        The audit result has id {{ result.result_id }}. It is in the component with id {{ result.component_id }}
+        at the location {{ result.location }}. It is in the repository {{ result.repo }}. 
+        The notes for the audit result are as follows:
+        
+        {{ result.notes }}
+
+        Determine the low severity results based on the following criteria:
+        - blind SSRF that has limited on the information it discloses. For example, an SSRF that only gives a different 
+        HTTP status for a specific type of endpoint and rejects all other endpoints (e.g. the endpoint must respond with a certain type of payload), and does not disclose any information other than the HTTP status code.
+        - Path traversal or partial path traversal that can only read access to a specific directory with limited types of files (e.g. it can only access log files, or it can only access files with a specific extension).
+        - Path traversal or partial path traversal that only discloses the existence of files or directories, and does not disclose any additional information about the file or directory.
+        - Information disclosure that only discloses whether a specific condition is true, or some 
+        id number, publicly available resources, such as source code files or documentation,
+        and does not disclose any additional information. For example, an information disclosure that only discloses whether a specific user exists, 
+        or an information disclosure that only discloses whether a specific issue id exists in the system.
+        - Issues that requires a malicious admin users to exploit during installation, configuration or other 
+        set up process. 
+        - When running CLI tools or installers, we assume the user already has control on the device. 
+        Any issues that only allows a local user to gain access of the device with running these tools or during installation 
+        is considered low severity.
+        However, do not exclude issues in installation or configuration that can be exploited by non-admin users.
+        - CSRF or XSS issues that can only be exploited during a very specific time window. For example, 
+        CSRF or XSS that can only be exploited during the installation process.
+        - Stored XSS that requires an admin user to upload malicious contents.
+        - Issue with very limited impact, such as 
+        forcing a user to log out, rate limiting, DoS issues.
+        - Misclassified issues that does not have a valid attack scenario or impact.
+        - Issues that requires knowledge of the victim's private information (e.g. secret tokens, private keys, credentials)
+        in order to exploit.
+        - Issues that requires physical access to the device or system, or sharing a device with the victim.
+        - Blind SQL injection that does not return any data, and only returns a different HTTP status code for a specific type of endpoint, and does not disclose any information other than the HTTP status code.
+
+        If you decided to reject an issue, provide the reason, and then 
+        store a low severity reason for the result with the id {{ result.result_id }}. Otherwise, 
+        you can finish the task.
+
+        DO NOT change or store anything for the current audit result.
+
+
+

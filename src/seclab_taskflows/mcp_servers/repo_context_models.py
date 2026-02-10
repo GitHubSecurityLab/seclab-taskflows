@@ -60,6 +60,19 @@ class AuditResult(Base):
             f"component_id={self.component_id}, issue_type={self.issue_type}, issue_id={self.issue_id}, notes={self.notes})>"
         )
 
+class LowSeverityAuditResult(Base):
+    __tablename__ = "low_severity_audit_result"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    repo: Mapped[str]
+    component_id = Column(Integer, ForeignKey("application.id", ondelete="CASCADE"))
+    result_id = Column(Integer, ForeignKey("audit_result.id", ondelete="CASCADE"))
+    reason: Mapped[str] = mapped_column(Text)
+
+    def __repr__(self):
+        return (
+            f"<LowSeverityAuditResult(id={self.id}, repo={self.repo}, "
+            f"component_id={self.component_id}, result_id={self.result_id}, reason={self.reason})>"
+        )
 
 class EntryPoint(Base):
     __tablename__ = "entry_point"

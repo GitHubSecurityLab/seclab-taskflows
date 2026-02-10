@@ -15,6 +15,7 @@ from pathlib import Path
 from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
 
 from .repo_context_models import Application, EntryPoint, UserAction, WebEntryPoint, ApplicationIssue, AuditResult, Base
+from .repo_context_models import LowSeverityAuditResult
 from .utils import process_repo
 
 logging.basicConfig(
@@ -25,7 +26,6 @@ logging.basicConfig(
 )
 
 MEMORY = mcp_data_dir("seclab-taskflows", "repo_context", "REPO_CONTEXT_DIR")
-
 
 def app_to_dict(result):
     return {
@@ -107,6 +107,7 @@ class RepoContextBackend:
                 WebEntryPoint.__table__,
                 ApplicationIssue.__table__,
                 AuditResult.__table__,
+                LowSeverityAuditResult.__table__,
             ],
         )
 
@@ -239,6 +240,22 @@ class RepoContextBackend:
                 session.add(new_user_action)
             session.commit()
         return f"Updated or added user action for {file} and {line} in {repo}."
+    
+    def store_low_severity_reason(self, repo, component_id, result_id, reason):
+        with Session(self.engine) as session:
+            existing = session.query(LowSeverityAuditResult).filter_by(repo=repo, result_id=result_id).first()
+            if existing:
+                existing.reason_for_rejection += reason
+            else:
+                new_low_severity_result = LowSeverityAuditResult(
+                    repo=repo,
+                    component_id=component_id,
+                    result_id=result_id,
+                    reason=reason,
+                )
+                session.add(new_low_severity_result)
+            session.commit()
+        return f"Updated or added low severity result for {repo} and result id {result_id}"
 
     def get_app(self, repo, location):
         with Session(self.engine) as session:
@@ -294,6 +311,7 @@ class RepoContextBackend:
                 "repo": app.repo,
                 "issue_type": issue.issue_type,
                 "issue_id": issue.issue_id,
+                "result_id" : issue.id,
                 "notes": issue.notes,
                 "has_vulnerability": issue.has_vulnerability,
                 "has_non_security_error": issue.has_non_security_error,
@@ -782,6 +800,19 @@ def get_potential_audit_results_for_repo(
         backend.get_app_audit_results(repo, component_id=None, has_non_security_error=True, has_vulnerability=None)
     )
 
+@mcp.tool()
+def store_low_severity_reason(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+    result_id: int = Field(description="The ID of the audit result"),
+    reason: str = Field(description="The reason why this issue is not considered high severity"),
+):
+    """
+    Store the reason for auditing an issue as low severity.
+    """
+    repo = process_repo(owner, repo)
+    return backend.store_low_severity_reason(repo, component_id, result_id, reason)
 
 @mcp.tool()
 def clear_repo(
