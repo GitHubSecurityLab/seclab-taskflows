@@ -245,7 +245,7 @@ class RepoContextBackend:
         with Session(self.engine) as session:
             existing = session.query(LowSeverityAuditResult).filter_by(repo=repo, result_id=result_id).first()
             if existing:
-                existing.reason_for_rejection += reason
+                existing.reason += reason
             else:
                 new_low_severity_result = LowSeverityAuditResult(
                     repo=repo,
@@ -407,6 +407,7 @@ class RepoContextBackend:
             session.query(ApplicationIssue).filter_by(repo=repo).delete()
             session.query(WebEntryPoint).filter_by(repo=repo).delete()
             session.query(AuditResult).filter_by(repo=repo).delete()
+            session.query(LowSeverityAuditResult).filter_by(repo=repo).delete()
             session.commit()
         return f"Cleared results for repo {repo}"
 
