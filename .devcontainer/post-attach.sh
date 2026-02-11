@@ -9,16 +9,14 @@ if [ ! -f .env ]; then
     # Test whether api.githubcopilot.com works with the GITHUB_TOKEN
     # provided by the codespace. If so, configure .env to use that token.
     USE_GITHUB_TOKEN="false"
-    if [ ! -v AI_API_TOKEN ]; then
-        if [ -v CODESPACES ]; then
-            if curl --fail --silent --show-error https://api.githubcopilot.com/models -H "Authorization: Bearer $GITHUB_TOKEN" > /dev/null; then
-                USE_GITHUB_TOKEN="true"
-                echo 'AI_API_TOKEN=${GITHUB_TOKEN}' >> .env
-                if [ ! -v GH_TOKEN ]; then
-                    echo 'GH_TOKEN=${GITHUB_TOKEN}' >> .env
-                fi
-                echo >> .env
-           fi
+    if [ ! -v AI_API_TOKEN ] && [ -v CODESPACES ] && [ -v GITHUB_TOKEN ]; then
+        if curl --fail --silent --show-error https://api.githubcopilot.com/models -H "Authorization: Bearer $GITHUB_TOKEN" > /dev/null; then
+            USE_GITHUB_TOKEN="true"
+            echo 'AI_API_TOKEN=${GITHUB_TOKEN}' >> .env
+            if [ ! -v GH_TOKEN ]; then
+                echo 'GH_TOKEN=${GITHUB_TOKEN}' >> .env
+            fi
+            echo >> .env
         fi
     fi
 
