@@ -17,7 +17,7 @@ taskflow:
       user_prompt: |
         Fetch the file {{ result.user }} from the repo {{ result.repo }}.
         
-        Get the high privileged triggers for the of the workflow in the file {{ result.user }} and check if it is reusable. 
+        Get the high privileged triggers for the workflow in the file {{ result.user }} and check if it is reusable. 
         If it does not contain any high privileged trigger AND it is not a reusable action, then the task is done.
 
         Otherwise, check that the action specified by {{ result.user }} in repo {{ result.repo }} is active.
@@ -34,7 +34,7 @@ taskflow:
         You must mention the fact that {{ result.user }} uses {{ result.action }} in lines {{ result.lines }}
         in the notes.
         You must also include all the permissions granted to the {{ result.user }} action in the notes, and all the triggers of the action.
-        Finally, update the all the alert result that has {{ result.action }} with the results in your notes using `update_all_alert_results_for_flow_graph` with 
+        Finally, update all the alert results that have {{ result.action }} with the results in your notes using `update_all_alert_results_for_flow_graph` with
         your notes as the `results`, {{ result.action }} as the `next` and {{ result.repo }} as the `repo`.
       toolboxes:
         - seclab_taskflows.toolboxes.gh_file_viewer

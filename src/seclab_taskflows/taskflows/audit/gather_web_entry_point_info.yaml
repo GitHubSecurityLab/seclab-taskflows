@@ -18,10 +18,10 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
-        For the repo {{ globals.repo }} iterate over all entry points and and check if they are
+        For the repo {{ globals.repo }} iterate over all entry points and check if they are
         reachable as a server endpoint.
-        For this check the noted `file` and it's line using the file viewer.
-        Then note it's path, HTTP method and note any middlewares used. Also note which roles are
+        For this check the noted `file` and its line using the file viewer.
+        Then note its path, HTTP method and note any middlewares used. Also note which roles are
         allowed to call it. Note which kind of authentication is required for that endpoint.
         For each entry point identified as a web endpoint create a new web entry point using
         the information gathered.

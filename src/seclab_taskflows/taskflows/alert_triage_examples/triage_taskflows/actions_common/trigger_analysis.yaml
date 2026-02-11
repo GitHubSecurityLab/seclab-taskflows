@@ -42,7 +42,7 @@ taskflow:
 
         1. Inspect the workflow file to see if any permission is granted to the action. List all the permissions in your notes
         2. Then check and see if the action is using any secrets.
-           IMPORTANT: Do not consider GITHUB_TOKEN as a secret. Include the name of the all the secrets and their line numbers in the notes.
+           IMPORTANT: Do not consider GITHUB_TOKEN as a secret. Include the name of all the secrets and their line numbers in the notes.
 
 
         Take notes while assessing the alert, including the trigger, permissions, and secrets used by the action.

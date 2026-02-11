@@ -20,23 +20,23 @@ taskflow:
         Fetch the list of issues for component {{ globals.id }} in repo {{ globals.repo }}. Check if there is any issue 
         that involves access control or authentication. If there isn't any, then your task is finished.
 
-        If there are any authentication or access control that are crucial in determining whether issue is vulnerable or not,
-        then go through these measures and look carefully to see if there is any way to bypass these checks. Also look for 
-        inconsistencies in access controls. The goal of this task is to scrutinize the access control, authentication
-        relevent to the issue. You should limit your audit to those that are involved in the in issue. 
+        If there are any authentication or access controls that are crucial in determining whether the issue is vulnerable or not,
+        then go through these measures and look carefully to see if there is any way to bypass these checks. Also look for
+        inconsistencies in access controls. The goal of this task is to scrutinize the access control and authentication
+        relevant to the issue. You should limit your audit to those that are involved in the issue. 
 
-        Look at the authentication and access control mechanism used in this component. Note that the implementation of 
-        the authentication and access control may well be defined outside of this component. In which case, you need to 
-        look at files in the repo outside of the component. For each end point, take note of 
-        its intended functionality and any access control/authetnication that is applied. When looking at access control,
+        Look at the authentication and access control mechanisms used in this component. Note that the implementation of
+        the authentication and access control may well be defined outside of this component. In which case, you need to
+        look at files in the repo outside of the component. For each endpoint, take note of
+        its intended functionality and any access control/authentication that is applied. When looking at access control,
         do not just check if access control is applied, but note down the exact role/authority that is required.
 
-        Go through the list of access control and authentication that you made earlier, and consider the followings:
-        - Look through end points functionalities and identify those that should require similar level of privilege. For example, 
-        endpoint that modifies data should require similar privilege to endpoints that write to data, but endpoints that only 
-        read data allows lower privilege. Within the group of endpoint, do access control ensure that they have the same privilege?
-        Or do some endpoint required higher privilege than others? Take a note of such inconsistencies stating clearly 
-        which endpoints should require similar privilege but doesn't. Then decide whether it is 
+        Go through the list of access control and authentication that you made earlier, and consider the following:
+        - Look through endpoint functionalities and identify those that should require similar levels of privilege. For example,
+        endpoints that modify data should require similar privilege to endpoints that write to data, but endpoints that only
+        read data allow lower privilege. Within the group of endpoints, does access control ensure that they have the same privilege?
+        Or do some endpoints require higher privilege than others? Take note of such inconsistencies stating clearly
+        which endpoints should require similar privilege but don't. Then decide whether it is
         a security issue or not.
 
         - Are there other ways to bypass ownership/access control checks via IDOR etc.?

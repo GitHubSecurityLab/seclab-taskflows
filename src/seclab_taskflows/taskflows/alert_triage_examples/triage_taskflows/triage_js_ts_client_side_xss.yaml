@@ -53,8 +53,8 @@ taskflow:
         Exploitable means that a remote attacker would be able to inject a malicious script into the web application that would be executed in the context of a user visiting the page.
         This could include a `javascript:` URL, a `<script>` tag, or any other way to inject JavaScript code into the page.
         It also means that the XSS vulnerability is not mitigated by any other code in the repository, such as sanitization or validation of the input.
-        Check if the code tries to sanitize or validate the input. F.ex. if the output is encoded before being sent back. Or if a Regex is used to validate the input.
-        Also check if the Regex only let's true a subset of the provided input.
+        Check if the code tries to sanitize or validate the input. For example, if the output is encoded before being sent back. Or if a Regex is used to validate the input.
+        Also check if the Regex only lets through a subset of the provided input.
         Take note of relevant regex patterns.
         Analyze all Regex patterns used in the code to see if they are effective against cross-site scripting (XSS) attacks. Let's think step by step and explain how the Regex works.
         If you encounter methods used for validation or sanitization, look them up and check if they are effective against cross-site scripting (XSS) attacks.
@@ -75,7 +75,7 @@ taskflow:
 
         If the vulnerable code sink is part of code that retrieves messages from WebSockets e.g. inside `onMessage`,
         the XSS-vulnerability is likely not exploitable as the attacker would need to be able to send a message to the WebSocket
-        (this might be possible if the WebSocket would be used as some sort of chat notifcation system between users).
+        (this might be possible if the WebSocket would be used as some sort of chat notification system between users).
         Take notes while assessing the alert.
         If prompt token count exceeds the given limit note this in the result and mark the task as complete.
         Update the results field of the alert result with your notes using `update_alert_result` with 
@@ -92,7 +92,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid alert results that has the rule `{{ globals.rule }}`.
+        Fetch the valid alert results that have the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -122,7 +122,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid alert results that has the rule `{{ globals.rule }}`.
+        Fetch the valid alert results that have the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -140,7 +140,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid alert results that has the rule `{{ globals.rule }}`.
+        Fetch the valid alert results that have the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:

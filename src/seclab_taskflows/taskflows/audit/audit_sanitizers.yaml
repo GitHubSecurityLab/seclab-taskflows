@@ -35,7 +35,7 @@ taskflow:
         Also do not include issues that require system to be already compromised, such as issues that rely on malicious 
         configurations etc.
 
-        For each scenario, consider what privilege and access does the attacker need to gain and do not include issues that 
+        For each scenario, consider what privilege and access the attacker needs to gain and do not include issues that
         require high privilege or access to the system.
 
         Store a component issue entry for each type of issue identified.
