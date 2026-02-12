@@ -36,8 +36,13 @@ taskflow:
         Fetch the entry points and web entry points of the component, then the user actions of this component.
         Based on the entry points, web entry points, components, user actions and README.md and if available, SECURITY.md in the {{ globals.repo }},
         can you tell me what type of application this repo is and what kind of security boundary it has.
-        Based on this, determine whether the component is likely to have security problems. 
-        
+        Based on this, determine whether the component is likely to have security problems.
+
+        ## Known Security Advisories for this Repository
+
+        Fetch the security advisories for {{ globals.repo }} from memcache (stored under the key 'security_advisories_{{ globals.repo }}'). If the value in the memcache is null, clearly state so and skip advisory analysis. Otherwise, state how many advisories were found.
+        Review these advisories and consider them when identifying security risks. If you identify code that is similar to a known advisory pattern, highlight that connection.
+
         Identify the most likely security problems in the component. Your task is not to carry out a full audit, but to
         identify the main risk in the component so that further analysis can be carried out.
         Do not be too specific about an issue, but rather craft your report based on the general functionality and type of
@@ -50,7 +55,7 @@ taskflow:
         - Is this component likely to take untrusted user input? For example, remote web requests or IPC, RPC calls?
         - What is the intended purpose of this component and its functionality? Does it allow high privileged actions?
         Is it intended to provide such functionalities for all users? Or is there complex access control logic involved?
-        - The component itself may also have its own `README.md` (or a subdirectory of it may have a `README.md`). Take 
+        - The component itself may also have its own `README.md` (or a subdirectory of it may have a `README.md`). Take
         a look at those files to help understand the functionality of the component.
 
         For example, an Admin UI/dashboard may be susceptible to client side Javascript vulnerabilities such as XSS, CSRF.
@@ -60,7 +65,7 @@ taskflow:
         a web frontend may allow users to access their own content and admins to access all content, but users should not
         be able to access another users' content in general.
 
-        We're looking for more concrete and serious security issues that affects system integrity or 
+        We're looking for more concrete and serious security issues that affects system integrity or
         lead to information leak, so please do not include issues like brute force, Dos, log injection etc.
 
         Also do not include issues that require the system to be already compromised, such as issues that rely on malicious
@@ -72,9 +77,9 @@ taskflow:
         Your task is to identify risk rather than properly audit and find security issues. Do not look too much into
         the implementation or scrutinize the security measures such as access control and sanitizers at this stage.
         Instead, report more general risks that are associated with the type of component
-        that you are looking at. 
+        that you are looking at.
 
-        It is not your task to audit the security measures, but rather just to identify the risks and suggest some issues 
+        It is not your task to audit the security measures, but rather just to identify the risks and suggest some issues
         that is worth auditing.
 
         Reflect on your notes and check that the attack scenario meets the above requirements. Exclude low severity issues or
@@ -85,3 +90,5 @@ taskflow:
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
         - seclab_taskflows.toolboxes.local_file_viewer
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.security_advisories
