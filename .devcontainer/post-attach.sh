@@ -54,6 +54,7 @@ if [ ! -f .env ]; then
     echo "#LOG_DIR=/app/logs" >> .env
 
     code .env || echo "ℹ️ Unable to open .env in VS Code. Please open and review the .env file manually."
+    code README.md
     echo "⚠️  Defaults can be changed by editing the auto-generated .env file."
 fi
 
