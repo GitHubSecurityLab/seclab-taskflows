@@ -137,7 +137,7 @@ taskflow:
           echo "The issue title is: ${{ env.ISSUE_TITLE }}"
         ```
         IMPORTANT:
-        However, if envoirnment variables are not set in the `env` section, but are set in the `run` section, then it is vulnerable to code injection:
+        However, if environment variables are not set in the `env` section, but are set in the `run` section, then it is vulnerable to code injection:
         ```
         run: |
           echo "TITLE=${{ github.event.issue.title }}" >> $GITHUB_ENV
@@ -200,13 +200,13 @@ taskflow:
         only consider whether the code at the alert location {{ result.location }} is affected by a sanitizer or a check that takes 
         place before the code injection vulnerability at {{ result.location }}.
 
-        If the sanitizer is still valid include update the alert results with these information using the alert_id {{ result.alert_id }} and repo {{ result.repo }} in the 
-        `update_alert_result` tool with your notes as the `result`. Remember to include the line numbers of the checks or sanitizers in the notes.
+        If the sanitizer is still valid, update the alert results with this information using the alert_id {{ result.alert_id }} and repo {{ result.repo }} in the
+        `update_alert_result` tool with your notes as the `result`. Remember to include the line numbers of the checks or sanitizers in the notes,
         and then set the `valid` field of the alert result to `false` using alert_id {{ result.alert_id }} and repo {{ result.repo }}.
 
         IMPORTANT:
-        You must only based your decision on the present of sanitizer and check and not any other factors. And do not include 
-        comment on any other factors that may affect the code injection vulnerability.
+        You must only base your decision on the presence of sanitizers and checks and not any other factors. And do not include
+        comments on any other factors that may affect the code injection vulnerability.
       toolboxes:
         - seclab_taskflows.toolboxes.gh_file_viewer
         - seclab_taskflows.toolboxes.report_alert_state
@@ -218,7 +218,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid alert results from that has the rule `{{ globals.rule }}`.
+        Fetch the valid alert results that have the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -249,7 +249,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the all the alert results from that has the rule `{{ globals.rule }}`.
+        Fetch all the alert results that have the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -259,7 +259,7 @@ taskflow:
         Review the information gathered from the audit notes to determine whether this alert is a FP.
       inputs:
         vuln_specifics: |
-          DO NOT look for sanitizers of user input beyond those mentioned in the notes. If the notes does not 
+          DO NOT look for sanitizers of user input beyond those mentioned in the notes. If the notes do not
           mention any sanitizers used on the user input, then assume that the user input is not sanitized, even if
           you think the code is safe from code injection.
   - task:
@@ -269,7 +269,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the valid the alert results from that has the rule `{{ globals.rule }}`.
+        Fetch the valid alert results that have the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -309,5 +309,5 @@ taskflow:
       uses: seclab_taskflows.taskflows.alert_triage_examples.triage_taskflows.actions_common.check_report
       inputs:
         vuln_specifics: |
-          You decision must be based only on the criteria above, and not any other factors. 
+          Your decision must be based only on the criteria above, and not any other factors.
           DO NOT mark the alert as invalid if you think the code is safe from code injection.

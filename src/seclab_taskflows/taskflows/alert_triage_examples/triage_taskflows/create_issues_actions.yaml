@@ -64,7 +64,7 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       exclude_from_context: true
       user_prompt: |
-        Fetch the all the completed alert results from that has the rule `{{ globals.rule }}`.
+        Fetch all the completed alert results that have the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -180,6 +180,6 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       exclude_from_context: true
       user_prompt: |
-        Fetch the all the invalid alert results from that has the rule `{{ globals.rule }}`.
+        Fetch all the invalid alert results that have the rule `{{ globals.rule }}`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state

@@ -17,7 +17,7 @@ taskflow:
       model: code_analysis
       user_prompt: |
         Fetch the components in {{ globals.repo }} and then identify the one where {{ globals.location }}
-        belong. Give me the id of this component, then. Fetch the issues in this component in the repo {{ globals.repo }}. Give a summary of each type of issue in this
+        belongs. Give me the ID of this component. Fetch the issues in this component in the repo {{ globals.repo }}. Give a summary of each type of issue in this
         component.
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context

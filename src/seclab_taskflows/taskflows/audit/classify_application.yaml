@@ -24,19 +24,19 @@ taskflow:
         can you tell me what type of application this repo is and what kind of security boundary it has.
         Based on this, identify the components that are most likely to have security problems. For each component, 
         state the precise component id, and the location. (You can group multiple components that serves a single functionalities together)
-        State the most likely security problems in these components. For example, an Admin UI/dashboard may be susceptible to client side 
-        Javascript vulnerabilities such as XSS, CSRF. 
-        An authentication/authorization component may be susceptible to IDOL, bypasses etc.
-        Components that grants user accesses to data may require access control or authentication.
+        State the most likely security problems in these components. For example, an Admin UI/dashboard may be susceptible to client side
+        Javascript vulnerabilities such as XSS, CSRF.
+        An authentication/authorization component may be susceptible to IDOR, bypasses etc.
+        Components that grant user access to data may require access control or authentication.
 
         We're looking for more concrete and serious security issues that affects system integrity or 
         lead to information leak, so please do not include issues like brute force, Dos, log injection etc.
 
-        Also do not include issues that requires system to be already compromised, such as issues that relies on maliciious 
+        Also do not include issues that require the system to be already compromised, such as issues that rely on malicious
         configurations etc.
 
-        For each scenario, consider what privilege and access does the attacker needs to gain and do not include issues that 
-        requires high privilege or access to the system.
+        For each scenario, consider what privilege and access the attacker needs to gain and do not include issues that
+        require high privilege or access to the system.
 
         Store a component issue entry for each type of issue identified.
       toolboxes:

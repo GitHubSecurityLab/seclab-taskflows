@@ -18,7 +18,7 @@ taskflow:
         ```
         {{ result.result }}
         ```
-        Check that the notes contains a section call "User-Controlled input" or similar.
+        Check that the notes contain a section called "User-Controlled input" or similar.
         If the section is missing, then mark the alert as invalid and update the alert results
         with the reason saying that no user input is found.
       toolboxes:

@@ -19,19 +19,19 @@ taskflow:
       user_prompt: |
         Fetch the issues in component with id {{ globals.id }} in the repo {{ globals.repo }}. Audit the second issue that was suggested.
 
-        The issues suggested are have not been probably verified and are only suggested because they are common issues in these types of 
-        application. You task is to audit the source code to check if this type of issues is present.
+        The issues suggested have not been properly verified and are only suggested because they are common issues in these types of
+        applications. Your task is to audit the source code to check if this type of issue is present.
 
-        You need to take into account of the intention and threat model of the component in component notes to determine if an issue 
-        is a valid security issue or if it is an intended functionality. You can fetch entry points, web entry points and user actions 
+        You need to take into account the intention and threat model of the component in the component notes to determine if an issue
+        is a valid security issue or if it is an intended functionality. You can fetch entry points, web entry points and user actions
         to help you determine the intended usage of the component.
 
         For example, the application may be a dashboard frontend that allow user to query various databases, in this case, being able 
         to query these databases is not considered a security issue or info leak.
 
-        Or an application may be an Admin UI intended for an admin user to perform high privilege actions. In this case, the absense of
-        authentication or bypasses would be a security issue. However, issues that are reachable only after authentication are not 
-        generally considered security issue, unless it has unintended consequences or are XSS, CSRF type issues.
+        Or an application may be an Admin UI intended for an admin user to perform high privilege actions. In this case, the absence of
+        authentication or bypasses would be a security issue. However, issues that are reachable only after authentication are not
+        generally considered security issues, unless they have unintended consequences or are XSS, CSRF type issues.
 
         Do not consider scenarios where authentication is bypassed via stolen credential etc. We only consider situations that are 
         achievable from within the source code itself.

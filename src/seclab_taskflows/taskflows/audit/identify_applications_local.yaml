@@ -33,8 +33,8 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
         Inspect {{ globals.repo }} and determine its function. Determine whether the repo is a framework library,
-        or a web application etc. For repo that may contain multiple applications, determine the purpose of each 
-        application and the directories of each application. Repo can also be a library but contains actual applications, for 
+        or a web application etc. For repos that may contain multiple applications, determine the purpose of each
+        application and the directories of each application. Repos can also be libraries but contain actual applications, for
         example, a web server and admin UI etc. that are not for testing or examples.
 
         Be granular when identifying components. Even if the repo is a library, do not store it as a single component.
@@ -43,7 +43,7 @@ taskflow:
         often more granular components that represents different functionalities. Inspect file content if necessary 
         to get an idea of the functionality of the component.
 
-        For web application, each component should consists of a single web service/server.
+        For web applications, each component should consist of a single web service/server.
         
         Apart from source code, it is also useful to look at the README.md and documentations in 
         the repo.
@@ -95,9 +95,9 @@ taskflow:
 
         For application components, you should consider the following:
 
-        Does this application consumes untrusted input, for example, web request? Or does it interact with 
-        other applications and can take input from them? User supplied arguments, 
-        configuration files, web request from hardcoded url or environment variables are not considered untrusted 
+        Does this application consume untrusted input, for example, web requests? Or does it interact with
+        other applications and can take input from them? User supplied arguments,
+        configuration files, web requests from hardcoded URLs or environment variables are not considered untrusted
         input. 
         
         However, if user arguments are pointing to some untrusted resources, then they can be considered as 
@@ -159,7 +159,7 @@ taskflow:
       async: true
       max_steps: 100
       name: user actions analysis
-      description: Identify actions that untrusted users are allowed performed the component.
+      description: Identify actions that untrusted users are allowed to perform on the component.
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
@@ -168,16 +168,16 @@ taskflow:
 
         {{ result.notes }}
 
-        Analyze the actions that an untrusted user is allowed to perform. The purpose of this task is not 
-        about the security of the source code, but rather get an understanding of the purpose of the component and 
+        Analyze the actions that an untrusted user is allowed to perform. The purpose of this task is not
+        about the security of the source code, but rather to get an understanding of the purpose of the component and
         what an untrusted user should be allowed to do under the intention of the component.
-        For example, the component may have an api that allows an untrusted user to run aribitrary command. In this 
-        case, the intention and purpose of the component is for user to run arbitrary command, and so the user action in 
+        For example, the component may have an API that allows an untrusted user to run arbitrary commands. In this
+        case, the intention and purpose of the component is for users to run arbitrary commands, and so the user action in
         this case is arbitrary code execution. 
 
-        Similarly, an api may allow a user to read and write files to a specific directory. In this case the intention and 
-        the user action is to read and write to restricted directory. This is different to allowing a user read and write 
-        to any directories. Be precise in these details when looking at user action.
+        Similarly, an API may allow a user to read and write files to a specific directory. In this case the intention and
+        the user action is to read and write to a restricted directory. This is different from allowing a user to read and write
+        to any directories. Be precise in these details when looking at user actions.
 
         Do not consider security risk or potential bypasses or any potential privilege escalations that is outside of the 
         intended use. Focus only on the intended use here.
@@ -192,8 +192,8 @@ taskflow:
         
         For application components, you should consider the following:
 
-        What actions can a user perform using the application? Can they exectue arbitrary code? Can they 
-        make arbitrary web request? Can they read any local file? Consider restrictions that are placed on the actions 
+        What actions can a user perform using the application? Can they execute arbitrary code? Can they
+        make arbitrary web requests? Can they read any local file? Consider restrictions that are placed on the actions
         that a user can perform using the application, and what actions the user should not be allowed to do
         when using the application.
 
@@ -207,14 +207,14 @@ taskflow:
         application library may provide functionalities for the library user to run arbitrary script to configure 
         the application. These are not considered "allowed actions" from an untrusted user point of view.
 
-        However, if a library exposes a REST api that allows arbitrary files to be read by unauthenticated users, 
-        then it reading arbitrary files is consider an "allowed" activity. Note any "allow" activity and how 
+        However, if a library exposes a REST API that allows arbitrary files to be read by unauthenticated users,
+        then reading arbitrary files is considered an "allowed" activity. Note any "allow" activity and how
         they are exposed to untrusted users, referencing the file and function in detail.
 
-        Ignore applications within the library such as default UI, etc. as these are going 
+        Ignore applications within the library such as default UI, etc. as these are going
         to be analyzed separately. Focus on the library code.
 
-        Store an user_action entry stating precising the file and line number where the allowed action is performed, and
+        Store a user_action entry stating precisely the file and line number where the allowed action is performed, and
         provide notes about the action.
 
         Note that line number has to be integer. If an user action spans multiple lines, then use the first line as the line 

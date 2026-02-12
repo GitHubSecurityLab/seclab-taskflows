@@ -26,7 +26,7 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Fetch the alert results that has the rule `js/path-injection`.
+        Fetch the alert results that have the rule `js/path-injection`.
       toolboxes:
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
@@ -69,7 +69,7 @@ taskflow:
       async: true
       user_prompt: |
         Check all results whether they contain next steps that need to be taken. If they do, then take those steps.
-        In case code parts (such as methods) were not found previosuly, look them up and change the notes accordingly.
+        In case code parts (such as methods) were not found previously, look them up and change the notes accordingly.
         Update the results field of the alert result with your notes using `update_alert_result` using the updated notes. 
       toolboxes:
         - seclab_taskflows.toolboxes.gh_file_viewer

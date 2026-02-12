@@ -30,8 +30,8 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
         Inspect {{ globals.repo }} and determine its function. Determine whether the repo is a framework library,
-        or a web application etc. For repo that may contain multiple applications, determine the purpose of each 
-        application and the directories of each application. Repo can also be a library but contains actual applications, for 
+        or a web application etc. For repos that may contain multiple applications, determine the purpose of each
+        application and the directories of each application. Repos can also be libraries but contain actual applications, for
         example, a web server and admin UI etc. that are not for testing or examples.
         
         Apart from source code, it is also useful to look at the README.md and documentations in 
@@ -65,7 +65,7 @@ taskflow:
       async: true
       max_steps: 100
       name: entry point analysis
-      description: Identify entry points that allows untrusted users to interact with the component.
+      description: Identify entry points that allow untrusted users to interact with the component.
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
@@ -84,9 +84,9 @@ taskflow:
 
         For application components, you should consider the following:
 
-        Does this application consumes untrusted input, for example, web request? Or does it interact with 
-        other applications and can take input from them? User supplied arguments, 
-        configuration files, web request from hardcoded url or environment variables are not considered untrusted 
+        Does this application consume untrusted input, for example, web requests? Or does it interact with
+        other applications and can take input from them? User supplied arguments,
+        configuration files, web requests from hardcoded URLs or environment variables are not considered untrusted
         input. 
         
         However, if user arguments are pointing to some untrusted resources, then they can be considered as 
@@ -95,8 +95,8 @@ taskflow:
 
         ## Library
 
-        For library code, identify the functions that are exposed to a library user. Consider the library user 
-        as trusted and instead focus on functionalities that consumes untrusted input when they are used for 
+        For library code, identify the functions that are exposed to a library user. Consider the library user
+        as trusted and instead focus on functionalities that consume untrusted input when they are used for 
         building applications. 
         
         Ignore applications within the library such as default UI, etc. as these are going 
