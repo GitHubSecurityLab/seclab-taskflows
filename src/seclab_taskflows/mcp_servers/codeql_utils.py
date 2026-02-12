@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-FileCopyrightText: GitHub, Inc.
 # SPDX-License-Identifier: MIT
 
 from seclab_taskflow_agent.path_utils import mcp_data_dir
