@@ -1,0 +1,102 @@
+# Local Setup Guide
+
+Quick guide for running seclab-taskflows locally without Codespaces.
+
+## Prerequisites
+
+- Python 3.10-3.13 (required by seclab-taskflow-agent; Python 3.14 not yet supported)
+- GitHub CLI (`gh`) - [install here](https://cli.github.com/)
+- GitHub authentication via `gh auth login`
+- `passage` password manager with Copilot API token stored at `github/capi-token`
+
+## Setup
+
+1. **Authenticate with GitHub:**
+
+```bash
+gh auth login
+```
+
+2. **Store Copilot API token in passage:**
+
+```bash
+# If not already stored
+passage insert github/capi-token
+```
+
+3. **Run setup script:**
+
+```bash
+./scripts/setup_local.sh
+```
+
+This creates a `.venv` and installs all dependencies. Tokens are automatically configured:
+- `GH_TOKEN` from `passage show github/capi-token` (for GitHub API access)
+- `AI_API_TOKEN` from `passage show github/capi-token` (for Copilot API access)
+
+**Optional:** Set custom AI endpoint (defaults to GitHub Copilot):
+```bash
+# Default (GitHub Copilot) - Claude Opus 4.6 + GPT-5-mini
+export AI_API_ENDPOINT="https://api.githubcopilot.com"
+
+# Or use GitHub Models (OpenAI models only, requires temperature=1)
+export AI_API_ENDPOINT="https://models.github.ai/inference"
+```
+
+## Running Audits
+
+```bash
+./scripts/run_audit_local.sh owner/repo
+```
+
+Example:
+```bash
+./scripts/run_audit_local.sh juice-shop/juice-shop
+```
+
+**Note:** Audits can take several hours and make many AI requests. Uses Claude Opus 4.6 (1M context window) for code analysis and GPT-5-mini for general tasks and triage. A GitHub Copilot Pro account is recommended.
+
+## Results
+
+Results are stored in timestamped directories:
+```
+~/.local/share/seclab-taskflow-agent/audits/<repo>_<timestamp>/
+```
+
+Each audit creates:
+- `data/repo_context.db` - SQLite database with audit results
+- `data/vulns/` - Individual vulnerability reports
+- `logs/audit.log` - Complete audit log
+- `agent_out/` - Consolidated package with all outputs
+
+View results in the `audit_result` table. Rows with `has_vulnerability=true` are most likely genuine vulnerabilities.
+
+## Troubleshooting
+
+**Missing dependencies:**
+```bash
+source .venv/bin/activate
+pip install -e .
+```
+
+**Token issues:**
+```bash
+# Verify passage has the token
+passage show github/capi-token
+
+# Verify gh CLI is authenticated
+gh auth status
+
+# Re-authenticate if needed
+gh auth login
+```
+
+**View results manually:**
+```bash
+# Find your most recent audit
+ls -lt ~/.local/share/seclab-taskflow-agent/audits/
+
+# View results from specific audit
+sqlite3 ~/.local/share/seclab-taskflow-agent/audits/<repo>_<timestamp>/agent_out/repo_context.db \
+  'SELECT * FROM audit_result WHERE has_vulnerability = 1;'
+```
