@@ -34,13 +34,11 @@
         "qwtel.sqlite-viewer"
       ],
       "settings": {
-        "python.useEnvironmentsExtension": true
+        "python.useEnvironmentsExtension": true,
+        "workbench.editorAssociations": {
+            "*.md": "vscode.markdown.preview.editor"
+        }
       }
-    },
-    "codespaces": {
-      "openFiles": [
-        "README.md"
-      ]
     }
   },
   // Use 'forwardPorts' to make a list of ports inside the container available locally
