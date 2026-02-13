@@ -19,13 +19,16 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       model: general_tasks
       user_prompt: |
-        Fetch and review the security advisories for the repo {{ globals.repo }}.
+        Fetch all GitHub Security Advisories (GHSAs) for the repo {{ globals.repo }}.
+
+        After fetching, store the list of advisories in memcache under the key 'security_advisories_{{ globals.repo }}'.
 
         Provide a summary of:
         1. How many advisories were found
         2. The severity levels of the advisories
         3. Key recommendations for addressing them
       toolboxes:
-        - seclab_taskflows.toolboxes.security_advisories
+        - seclab_taskflows.toolboxes.ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
         - seclab_taskflows.toolboxes.local_file_viewer
         - seclab_taskflows.toolboxes.gh_file_viewer

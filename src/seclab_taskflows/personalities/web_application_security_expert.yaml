@@ -20,4 +20,4 @@ toolboxes:
   - seclab_taskflow_agent.toolboxes.memcache
   - seclab_taskflows.toolboxes.gh_file_viewer
   - seclab_taskflow_agent.toolboxes.codeql
-  - seclab_taskflows.toolboxes.security_advisories
+  - seclab_taskflows.toolboxes.ghsa

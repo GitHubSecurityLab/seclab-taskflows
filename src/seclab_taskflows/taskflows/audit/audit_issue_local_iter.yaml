@@ -51,4 +51,4 @@ taskflow:
         - seclab_taskflows.toolboxes.repo_context
         - seclab_taskflows.toolboxes.local_file_viewer
         - seclab_taskflow_agent.toolboxes.memcache
-        - seclab_taskflows.toolboxes.security_advisories
+        - seclab_taskflows.toolboxes.ghsa
