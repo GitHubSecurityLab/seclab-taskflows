@@ -1,15 +1,15 @@
-# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-FileCopyrightText: GitHub, Inc.
 # SPDX-License-Identifier: MIT
 
 seclab-taskflow-agent:
   filetype: toolbox
-  version: 1
+  version: "1.0"
 
 server_params:
   kind: stdio
   command: python
   args: ["-m", "seclab_taskflows.mcp_servers.security_advisories"]
   env:
-    GH_TOKEN: "{{ env GH_TOKEN }}"
-    LOG_DIR: "{{ env LOG_DIR }}"
-    MEMCACHE_STATE_DIR: "{{ env MEMCACHE_STATE_DIR }}"
+    GH_TOKEN: "{{ env('GH_TOKEN') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"
+    MEMCACHE_STATE_DIR: "{{ env('MEMCACHE_STATE_DIR', required=False) }}"

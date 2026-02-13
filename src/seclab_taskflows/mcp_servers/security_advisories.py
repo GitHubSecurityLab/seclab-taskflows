@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 GitHub
+# SPDX-FileCopyrightText: GitHub, Inc.
 # SPDX-License-Identifier: MIT
 
 import logging
@@ -25,27 +25,6 @@ GH_TOKEN = os.getenv("GH_TOKEN", default="")
 # Initialize memcache backend to store advisories directly
 MEMCACHE_DIR = mcp_data_dir("seclab-taskflow-agent", "memcache", "MEMCACHE_STATE_DIR")
 memcache_backend = SqliteBackend(str(MEMCACHE_DIR))
-
-
-async def call_api(url: str) -> str:
-    """Call the GitHub API to fetch security advisories."""
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Authorization": f"Bearer {GH_TOKEN}",
-    }
-
-    try:
-        async with httpx.AsyncClient(headers=headers) as client:
-            r = await client.get(url, follow_redirects=True)
-            r.raise_for_status()
-            return r.text
-    except httpx.RequestError as e:
-        return f"Request error: {e}"
-    except httpx.HTTPStatusError as e:
-        return f"HTTP error {e.response.status_code}: {e.response.text}"
-    except Exception as e:
-        return f"Error: {e}"
 
 
 def is_recent_advisory(advisory: dict, years: int = 3) -> bool:
@@ -104,16 +83,15 @@ async def get_security_advisories(
     Returns a filtered list of security advisories with ghsa_id, summary, description, and severity for each advisory published in the last N years.
     Also stores the result in memcache under the key 'security_advisories_{owner}/{repo}'.
     """
-    owner = owner.strip().lower()
-    repo = repo.strip().lower()
-    gh_token = os.getenv("GH_TOKEN", "")
+    owner = owner.strip()
+    repo = repo.strip()
     advisories = []
     page = 1
     while True:
         url = f"https://api.github.com/repos/{owner}/{repo}/security-advisories?per_page=100&page={page}"
         headers = {
             "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {gh_token}",
+            "Authorization": f"Bearer {GH_TOKEN}",
             "X-GitHub-Api-Version": "2022-11-28",
         }
         try:
@@ -130,6 +108,8 @@ async def get_security_advisories(
                 page += 1
         except httpx.HTTPStatusError as e:
             return f"HTTP error {e.response.status_code}: {e.response.text}"
+        except json.JSONDecodeError as e:
+            return f"JSON parsing error: {e}"
         except Exception as e:
             return f"Error: {e}"
     filtered = filter_advisories(advisories, years)
@@ -139,8 +119,8 @@ async def get_security_advisories(
     try:
         memcache_backend.set_state(memcache_key, filtered)
         logging.info(f"Stored {len(filtered)} advisories in memcache under key '{memcache_key}'")
-    except Exception as e:
-        logging.error(f"Failed to store advisories in memcache: {e}")
+    except Exception:
+        logging.exception("Failed to store advisories in memcache")
     
     # Return JSON string to the caller
     return json.dumps(filtered, indent=2)
