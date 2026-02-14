@@ -29,20 +29,26 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       model: code_analysis
       user_prompt: |
-        The issue is in repo {{ result.repo }} with id {{ result.issue_id }}. The component is under the directory 
+        The issue is in repo {{ result.repo }} with id {{ result.issue_id }}. The component is under the directory
         {{ result.location }} with component_id {{ result.component_id }}. The notes of the component is:
 
         {{ result.component_notes }}
         
-        You should use this to understand the intended purpose of the component and take it into account when 
+        You should use this to understand the intended purpose of the component and take it into account when
         you audit the issue.
 
         The type of the issue is {{ result.issue_type }} and here is the notes of the issue:
 
         {{ result.issue_notes }}
 
+        ## Known Security Advisories for this Repository
+        
+        Fetch the security advisories for {{ globals.repo }} from memcache (stored under the key 'security_advisories_{{ globals.repo }}'). If the value in the memcache is null, clearly state so. Otherwise, state how many advisories were found.
+        Review these advisories and consider them when identifying security risks. If you identify code that is an actual vulnerability with similar pattern to a known advisory, highlight that connection.
+
         {% include 'seclab_taskflows.prompts.audit.audit_issue' %}
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
         - seclab_taskflows.toolboxes.local_file_viewer
-        
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.ghsa
