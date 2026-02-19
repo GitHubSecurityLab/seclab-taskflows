@@ -8,6 +8,7 @@ model_config: seclab_taskflows.configs.model_config
 
 globals:
   repo:
+  use_advisory:
 # Taskflow to analyze the general contextual information of a project and classify the different applications within it
 taskflow:
   - task:
@@ -38,7 +39,9 @@ taskflow:
         can you tell me what type of application this repo is and what kind of security boundary it has.
         Based on this, determine whether the component is likely to have security problems.
 
+        {% if globals.use_advisory == 'true' %}
         {% include 'seclab_taskflows.prompts.audit.known_security_advisories' %}
+        {% endif %}
 
         Identify the most likely security problems in the component. Your task is not to carry out a full audit, but to
         identify the main risk in the component so that further analysis can be carried out.

@@ -8,6 +8,7 @@ model_config: seclab_taskflows.configs.model_config
 
 globals:
   repo:
+  use_advisory:
 # Taskflow to audit some potential issues.
 taskflow:
   - task:
@@ -41,7 +42,9 @@ taskflow:
 
         {{ result.issue_notes }}
 
+        {% if globals.use_advisory == 'true' %}
         {% include 'seclab_taskflows.prompts.audit.known_security_advisories' %}
+        {% endif %}
 
         {% include 'seclab_taskflows.prompts.audit.audit_issue' %}
       toolboxes:

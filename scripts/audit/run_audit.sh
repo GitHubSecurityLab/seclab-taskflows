@@ -33,8 +33,8 @@ if [ "$USE_ADVISORY" = true ]; then
   python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.fetch_security_advisories -g repo="$1"
 fi
 
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.classify_application_local -g repo="$1"
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.audit_issue_local_iter -g repo="$1"
+python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.classify_application_local -g repo="$1" -g use_advisory="$USE_ADVISORY"
+python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.audit_issue_local_iter -g repo="$1" -g use_advisory="$USE_ADVISORY"
 
 set +e
 
