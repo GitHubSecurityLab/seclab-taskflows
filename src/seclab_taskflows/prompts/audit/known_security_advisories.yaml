@@ -7,5 +7,5 @@ seclab-taskflow-agent:
 prompt: |
         ## Known Security Advisories for this Repository
 
-        Fetch the security advisories for {{ globals.repo }} from memcache (stored under the key 'security_advisories_{{ globals.repo }}'). If the value in the memcache is null, clearly state so and skip advisory analysis. Otherwise, state how many advisories were found.
+        Fetch the security advisories for {{ globals.repo }} from memcache (stored under the key 'security_advisories_{{ globals.repo }}'). If the value in the memcache is null or an error message, clearly state that no advisories are available and skip advisory analysis. Otherwise, state how many advisories were found.
         Review these advisories and consider them when identifying security risks. If you identify code that is similar to a known advisory pattern, highlight that connection.

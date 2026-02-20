@@ -21,12 +21,14 @@ taskflow:
       user_prompt: |
         Fetch all GitHub Security Advisories (GHSAs) for the repo {{ globals.repo }}.
 
-        After fetching, store the list of advisories in memcache under the key 'security_advisories_{{ globals.repo }}'.
+        If an error occurs during fetching, store the error message in memcache under the key 'security_advisories_{{ globals.repo }}'.
+        Ensure the error message starts with "Error:" followed by a description of the error.
 
-        Provide a summary of:
+        If fetching is successful, store the list of advisories in memcache under the key 'security_advisories_{{ globals.repo }}'.
+
+        If one ore more advisories are found, provide a summary of the findings including:
         1. How many advisories were found
         2. The severity levels of the advisories
-        3. Key recommendations for addressing them
       toolboxes:
         - seclab_taskflows.toolboxes.ghsa
         - seclab_taskflow_agent.toolboxes.memcache
