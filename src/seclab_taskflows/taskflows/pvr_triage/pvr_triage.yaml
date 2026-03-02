@@ -1,0 +1,226 @@
+# PVR Triage Taskflow
+#
+# Fetches a draft GHSA submitted via Private Vulnerability Reporting,
+# verifies the vulnerability claim against actual source code, assesses
+# impact and report quality, and generates a structured triage analysis
+# for the maintainer.
+#
+# Usage:
+#   python -m seclab_taskflow_agent \
+#     -t seclab_taskflows.taskflows.pvr_triage.pvr_triage \
+#     -g repo=owner/repo \
+#     -g ghsa=GHSA-xxxx-xxxx-xxxx
+#
+# Required environment variables:
+#   GH_TOKEN        - GitHub token with repo and security_events scope
+#   AI_API_TOKEN    - API token for the AI model provider
+#   AI_API_ENDPOINT - Model provider endpoint (default: GitHub Copilot API)
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: taskflow
+
+model_config: seclab_taskflows.configs.model_config_pvr_triage
+
+globals:
+  # GitHub repository in owner/repo format
+  repo:
+  # GHSA ID of the draft advisory to triage
+  ghsa:
+
+taskflow:
+  # -------------------------------------------------------------------------
+  # Task 1: Initialize
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      headless: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Clear the memory cache.
+
+  # -------------------------------------------------------------------------
+  # Task 2: Fetch and parse the draft GHSA
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Fetch the security advisory {{ globals.ghsa }} for repository {{ globals.repo }}.
+
+        Extract the owner and repo name from "{{ globals.repo }}" (format: owner/repo).
+
+        Store the full raw advisory description text under key "pvr_description".
+
+        Then store a structured summary in memcache under the key "pvr_parsed" as a JSON
+        object with these fields:
+          - ghsa_id: the GHSA ID
+          - repo: "{{ globals.repo }}"
+          - summary: the advisory one-line summary
+          - severity_claimed: the severity rating in the advisory (critical/high/medium/low)
+          - vuln_type: vulnerability class (e.g. "path traversal", "IDOR", "XSS", "SQL injection")
+          - affected_component: the component, endpoint, or feature described as vulnerable
+          - affected_files: list of source file paths explicitly mentioned (empty list if none)
+          - affected_functions: list of function/method names mentioned (empty list if none)
+          - affected_versions: for version ranges, prefer the structured vulnerabilities[].vulnerable_versions
+            field from the advisory API response. Fall back to parsing the description only if
+            the structured field is absent or empty. Empty list if none found.
+          - poc_provided: true if a proof-of-concept or reproduction steps are described
+          - poc_summary: brief description of the PoC steps, or null if none provided
+          - quality_signals:
+              has_file_references: true if specific source file paths are cited
+              has_line_numbers: true if specific line numbers are cited
+              has_poc: true if reproduction steps are provided
+              has_version_info: true if specific affected versions are mentioned
+              has_code_snippets: true if actual code is quoted in the report
+
+        Do not perform any code analysis yet.
+
+  # -------------------------------------------------------------------------
+  # Task 3: Verify vulnerability in source code
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "pvr_parsed" and "pvr_description" from memcache.
+
+        Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
+
+        Verify the vulnerability at the affected version, not HEAD.
+        If affected_versions lists a version (e.g. "<= 1.25.4"), resolve the
+        upper bound to a git commit SHA using resolve_version_ref, then use
+        fetch_file_at_ref to fetch code at that SHA. If no version is specified,
+        fall back to fetch_file_from_gh / get_file_lines_from_gh (HEAD).
+
+        If affected_files or affected_versions are empty, read pvr_description
+        directly to identify any file paths, function names, or version references
+        the extraction may have missed. Advisory descriptions vary widely in format
+        and structure — treat pvr_parsed as a starting point, not a complete picture.
+
+        For each file path identified:
+          1. Resolve the version to a SHA (if available).
+          2. Fetch the file at that SHA using fetch_file_at_ref.
+          3. Locate the affected function(s) at the stated line numbers.
+          4. Check whether the vulnerability pattern described in the advisory
+             is present at that version.
+          5. Look for authorization checks, input validation, or other mitigations.
+
+        If no specific files are named, use search_repo_from_gh to locate
+        the affected function names or code patterns.
+
+        Focus on the specific code path described. Do not perform a broad audit.
+
+        Store your findings under memcache key "code_verification" as JSON:
+          - ref_used: the git SHA or ref used for code fetching (or "HEAD" if none)
+          - files_examined: list of file paths fetched
+          - vulnerability_confirmed: true / false / null (null = could not determine)
+          - confirmation_evidence: precise description of what the code does,
+            including file path and line numbers
+          - mitigation_found: true if existing checks prevent exploitation
+          - mitigation_details: description of mitigating code, or null
+          - notes: any additional observations
+
+  # -------------------------------------------------------------------------
+  # Task 4: Generate triage report
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "pvr_parsed", "pvr_description", and "code_verification" from memcache.
+
+        Generate a triage analysis report in markdown and store it under
+        memcache key "triage_report".
+
+        The report must follow this structure exactly:
+
+        ---
+
+        ## PVR Triage Analysis: {{ globals.ghsa }}
+
+        **Repository:** {{ globals.repo }}
+        **Claimed Severity:** [from pvr_parsed]
+        **Vulnerability Type:** [from pvr_parsed]
+
+        ### Verdict
+
+        **[CONFIRMED / UNCONFIRMED / INCONCLUSIVE]**
+
+        One or two sentences stating the verdict and the primary reason.
+
+        ### Code Verification
+
+        State the git ref (version tag / commit SHA) used for analysis, or note
+        if HEAD was used and why.
+        Describe exactly what code was examined and what was found.
+        Reference specific file paths and line numbers.
+        If the vulnerability is confirmed, show the vulnerable code pattern.
+        If unconfirmed, explain what the code actually does and why it is not vulnerable.
+        If inconclusive, explain what could not be determined and why.
+
+        ### Severity Assessment
+
+        State whether the claimed severity is accurate, overstated, or understated.
+        Base this on the actual exploitability and impact from the code evidence.
+
+        ### Report Quality
+
+        Assess the quality of the PVR submission:
+        - Note which claims were accurate (correct file paths, line numbers, functions)
+        - Note any inaccuracies (wrong paths, non-existent functions, incorrect PoC)
+        - Rate overall quality: High / Medium / Low
+        - High: specific, accurate, verified PoC
+        - Medium: partially accurate, some details wrong or missing
+        - Low: vague, speculative, or significantly inaccurate ("AI slop")
+
+        ### Recommendations
+
+        Provide 1-3 specific, actionable recommendations for the maintainer.
+        If confirmed: suggest the fix approach.
+        If unconfirmed: suggest whether to close, request more info, or monitor.
+        If low quality: recommend closing with explanation.
+
+        ---
+
+        Be factual. Do not include anything not supported by code evidence.
+        Keep the report concise. Aim for under 600 words.
+
+  # -------------------------------------------------------------------------
+  # Task 5: Save report to disk and print path
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve the "triage_report" from memcache.
+
+        Call save_triage_report with:
+          - ghsa_id: "{{ globals.ghsa }}"
+          - report: the full report content exactly as stored in memcache
+
+        Then print the report content verbatim, followed by a blank line and:
+        "Report saved to: <path returned by save_triage_report>"

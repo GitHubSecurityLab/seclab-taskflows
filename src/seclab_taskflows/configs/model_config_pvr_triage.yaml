@@ -1,0 +1,19 @@
+# PVR triage model configuration.
+# Uses GitHub Copilot API endpoint by default (AI_API_ENDPOINT=https://api.githubcopilot.com).
+# Override AI_API_ENDPOINT and AI_API_TOKEN for other providers.
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: model_config
+
+models:
+  # Primary model for code analysis and triage reasoning
+  triage: claude-opus-4.6-1m
+  # Lighter model for structured data extraction tasks
+  extraction: gpt-5-mini
+
+model_settings:
+  extraction:
+    temperature: 1
+  triage:
+    temperature: 1
