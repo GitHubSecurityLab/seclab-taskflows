@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
 # PVR GHSA MCP Server
 #
 # Tools for fetching and parsing draft GitHub Security Advisories

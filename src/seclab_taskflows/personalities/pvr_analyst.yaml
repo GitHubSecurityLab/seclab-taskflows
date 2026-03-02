@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
 # Personality for PVR (Private Vulnerability Report) triage analysis.
 
 seclab-taskflow-agent:

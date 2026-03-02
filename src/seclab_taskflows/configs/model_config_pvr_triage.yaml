@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
 # PVR triage model configuration.
 # Uses GitHub Copilot API endpoint by default (AI_API_ENDPOINT=https://api.githubcopilot.com).
 # Override AI_API_ENDPOINT and AI_API_TOKEN for other providers.

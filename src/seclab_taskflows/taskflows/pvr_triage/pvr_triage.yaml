@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
 # PVR Triage Taskflow
 #
 # Fetches a draft GHSA submitted via Private Vulnerability Reporting,

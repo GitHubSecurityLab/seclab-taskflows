@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
 # Toolbox: PVR GHSA advisory fetcher
 #
 # Provides tools for fetching draft GitHub Security Advisories submitted
@@ -14,5 +17,6 @@ server_params:
   command: python
   args: ["-m", "seclab_taskflows.mcp_servers.pvr_ghsa"]
   env:
+    GH_TOKEN: "{{ env('GH_TOKEN') }}"
     LOG_DIR: "{{ env('LOG_DIR') }}"
     REPORT_DIR: "{{ env('REPORT_DIR') }}"
