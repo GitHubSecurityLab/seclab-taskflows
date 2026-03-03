@@ -57,10 +57,9 @@ OSS maintainers get flooded with low-quality vulnerability reports via GitHub's 
    │  (one at a time) │  │  (all at once)       │
    │                  │  │                      │
    │  confirm-gated:  │  │  • list_pending      │
-   │  accept          │  │  • for each:         │
+   │  accept (→draft) │  │  • for each:         │
    │  comment         │  │    - confirm-gated   │
-   │  reject          │  │
-   │                  │  │      write-back      │
+   │  reject (→closed)│  │      write-back      │
    │                  │  │    - mark as sent    │
    │  mark as sent    │  │  • "Sent N/M"        │
    └──────────────────┘  └──────────────────────┘
@@ -128,7 +127,8 @@ Every completed triage records **verdict + quality** against the reporter's GitH
 ```bash
 ./scripts/run_pvr_triage.sh batch          owner/repo            # see inbox
 ./scripts/run_pvr_triage.sh triage         owner/repo GHSA-xxx   # analyse one
-./scripts/run_pvr_triage.sh respond_batch  owner/repo comment    # send all drafts
+./scripts/run_pvr_triage.sh respond        owner/repo GHSA-xxx accept   # accept one
+./scripts/run_pvr_triage.sh respond_batch  owner/repo comment           # send all drafts
 ```
 
 ---
