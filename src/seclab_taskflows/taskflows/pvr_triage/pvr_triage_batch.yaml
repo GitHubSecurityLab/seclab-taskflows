@@ -3,7 +3,7 @@
 
 # PVR Triage Batch Taskflow
 #
-# Lists draft PVR advisories for a repository, scores each unprocessed one by
+# Lists PVR advisories in triage state for a repository, scores each unprocessed one by
 # priority (based on severity and quality signals), and outputs a ranked
 # markdown table to REPORT_DIR for maintainer review.
 # Advisories with an existing triage report in REPORT_DIR are skipped.
@@ -31,7 +31,7 @@ globals:
 
 taskflow:
   # -------------------------------------------------------------------------
-  # Task 1: List draft advisories
+  # Task 1: List triage advisories
   # -------------------------------------------------------------------------
   - task:
       must_complete: true
@@ -44,14 +44,14 @@ taskflow:
       user_prompt: |
         Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
 
-        Call list_pvr_advisories with owner, repo, and state="draft" to retrieve
-        all draft advisories.
+        Call list_pvr_advisories with owner, repo, and state="triage" to retrieve
+        all advisories in triage state.
 
         Store the full JSON list under memcache key "pvr_queue".
 
-        Print: "Found N draft advisories for {{ globals.repo }}." where N is the count.
+        Print: "Found N triage advisories for {{ globals.repo }}." where N is the count.
 
-        If no advisories are found, print "No draft advisories found." and stop.
+        If no advisories are found, print "No triage advisories found." and stop.
 
   # -------------------------------------------------------------------------
   # Task 2: Score each advisory

@@ -3,8 +3,8 @@
 
 # PVR GHSA MCP Server
 #
-# Tools for fetching and parsing draft GitHub Security Advisories
-# submitted via Private Vulnerability Reporting (PVR).
+# Tools for fetching and parsing GitHub Security Advisories
+# submitted via Private Vulnerability Reporting (PVR) (triage state).
 # Uses the gh CLI for all GitHub API calls.
 
 from __future__ import annotations
@@ -142,7 +142,7 @@ def fetch_pvr_advisory(
     Fetch a single repository security advisory by GHSA ID.
 
     Returns structured advisory metadata and the full description text.
-    Works for draft advisories (requires repo or security_events scope on GH_TOKEN).
+    Works for advisories in triage state (requires repo or security_events scope on GH_TOKEN).
     """
     path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
     data, err = _gh_api(path)
@@ -157,12 +157,12 @@ def list_pvr_advisories(
     owner: str = Field(description="Repository owner (user or org name)"),
     repo: str = Field(description="Repository name"),
     state: str = Field(
-        default="draft",
-        description="Advisory state to filter by: draft, published, rejected, or withdrawn. Default: draft",
+        default="triage",
+        description="Advisory state to filter by: triage, published, rejected, or withdrawn. Default: triage",
     ),
 ) -> str:
     """
-    List repository security advisories, defaulting to draft state.
+    List repository security advisories, defaulting to triage state.
 
     Returns a JSON summary list (no description text). Each entry includes
     ghsa_id, severity, summary, state, pvr_submission, and created_at.
@@ -386,7 +386,7 @@ def reject_pvr_advisory(
     comment: str = Field(description="Explanation comment to post on the advisory"),
 ) -> str:
     """
-    Reject a draft security advisory and post a comment explaining the decision.
+    Reject a security advisory and post a comment explaining the decision.
 
     Sets the advisory state to 'rejected' via the GitHub API, then posts a
     comment with the provided explanation. Requires a GH_TOKEN with
@@ -408,7 +408,7 @@ def withdraw_pvr_advisory(
     comment: str = Field(description="Explanation comment to post on the advisory"),
 ) -> str:
     """
-    Withdraw a draft security advisory (for self-submitted drafts) and post a comment.
+    Withdraw a security advisory in triage state and post a comment.
 
     Sets the advisory state to 'withdrawn' via the GitHub API, then posts a
     comment with the provided explanation. Requires a GH_TOKEN with

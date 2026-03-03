@@ -3,10 +3,10 @@
 
 # Toolbox: PVR GHSA advisory fetcher
 #
-# Provides tools for fetching draft GitHub Security Advisories submitted
+# Provides tools for fetching GitHub Security Advisories in triage state submitted
 # via Private Vulnerability Reporting. Uses the gh CLI for API calls.
 #
-# Requires GH_TOKEN with repo or security_events scope to read draft advisories.
+# Requires GH_TOKEN with repo or security_events scope to read advisories in triage state.
 
 seclab-taskflow-agent:
   version: "1.0"

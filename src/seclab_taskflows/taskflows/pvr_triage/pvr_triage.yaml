@@ -3,7 +3,7 @@
 
 # PVR Triage Taskflow
 #
-# Fetches a draft GHSA submitted via Private Vulnerability Reporting,
+# Fetches a GHSA in triage state submitted via Private Vulnerability Reporting,
 # verifies the vulnerability claim against actual source code, assesses
 # impact and report quality, and generates a structured triage analysis
 # for the maintainer.
@@ -28,7 +28,7 @@ model_config: seclab_taskflows.configs.model_config_pvr_triage
 globals:
   # GitHub repository in owner/repo format
   repo:
-  # GHSA ID of the draft advisory to triage
+  # GHSA ID of the advisory to triage
   ghsa:
 
 taskflow:
@@ -46,7 +46,7 @@ taskflow:
         Clear the memory cache.
 
   # -------------------------------------------------------------------------
-  # Task 2: Fetch and parse the draft GHSA
+  # Task 2: Fetch and parse the GHSA
   # -------------------------------------------------------------------------
   - task:
       must_complete: true

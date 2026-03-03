@@ -6,7 +6,7 @@ This document describes every scoring decision made by the PVR triage taskflows:
 
 ## 1. Batch Priority Score (`pvr_triage_batch`)
 
-Used to rank unprocessed draft advisories before triage.
+Used to rank unprocessed advisories in triage state before analysis.
 
 ### Severity weight
 

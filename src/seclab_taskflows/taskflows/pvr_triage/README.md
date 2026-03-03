@@ -1,6 +1,6 @@
 # PVR Triage Taskflows
 
-Tools for triaging GitHub Security Advisories submitted via [Private Vulnerability Reporting (PVR)](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability). The taskflows fetch a draft advisory, verify the claimed vulnerability against actual source code, score report quality, and generate a structured analysis and a ready-to-send response draft.
+Tools for triaging GitHub Security Advisories submitted via [Private Vulnerability Reporting (PVR)](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability). The taskflows fetch an advisory in triage state, verify the claimed vulnerability against actual source code, score report quality, and generate a structured analysis and a ready-to-send response draft.
 
 Four taskflows cover the full triage lifecycle:
 
@@ -46,7 +46,7 @@ LOG_DIR=/path/to/logs
 
 ## Taskflow 1 — Single advisory triage (`pvr_triage`)
 
-Runs a full analysis on one draft GHSA and produces:
+Runs a full analysis on one GHSA in triage state and produces:
 
 - A structured triage report saved to `REPORT_DIR/<GHSA-ID>_triage.md`
 - A response draft saved to `REPORT_DIR/<GHSA-ID>_response_triage.md`
@@ -100,7 +100,7 @@ python -m seclab_taskflow_agent \
 
 ## Taskflow 2 — Batch inbox scoring (`pvr_triage_batch`)
 
-Lists draft advisories for a repository, scores each unprocessed one by priority, and saves a ranked markdown table. Advisories with an existing triage report in `REPORT_DIR` are skipped and their count is noted in the output.
+Lists advisories in triage state for a repository, scores each unprocessed one by priority, and saves a ranked markdown table. Advisories with an existing triage report in `REPORT_DIR` are skipped and their count is noted in the output.
 
 ```bash
 python -m seclab_taskflow_agent \
@@ -163,7 +163,7 @@ python -m seclab_taskflow_agent \
 |---|---|---|
 | `comment` | Posts the response draft as a comment on the advisory | Default for all verdicts — sends your reply without changing state |
 | `reject` | Sets advisory state to `rejected`, then posts the comment | Report is clearly invalid or low quality |
-| `withdraw` | Sets advisory state to `withdrawn`, then posts the comment | Your own self-submitted draft that should be removed |
+| `withdraw` | Sets advisory state to `withdrawn`, then posts the comment | Your own self-submitted advisory that should be removed |
 
 > **Note:** `pvr_respond` requires that `pvr_triage` has already been run for the GHSA, so that both `<GHSA-ID>_triage.md` and `<GHSA-ID>_response_triage.md` exist in `REPORT_DIR`.
 
@@ -220,7 +220,7 @@ Prints a final count: `"Sent N / M responses."`
    - Edit the response draft (_response_triage.md) if needed.
 
 4a. Send responses one at a time with pvr_respond:
-    - action=comment   → post reply only (advisory stays draft)
+    - action=comment   → post reply only (advisory stays in triage state)
     - action=reject    → reject + post reply
     - action=withdraw  → withdraw + post reply
 

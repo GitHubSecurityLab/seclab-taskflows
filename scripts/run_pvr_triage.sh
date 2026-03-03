@@ -33,7 +33,7 @@ Usage: $(basename "$0") <command> [args]
 
 Commands:
   batch          <owner/repo>
-      Score unprocessed draft advisories and save a ranked queue table to REPORT_DIR.
+      Score unprocessed triage advisories and save a ranked queue table to REPORT_DIR.
       Advisories already present in REPORT_DIR are skipped.
 
   triage         <owner/repo> <GHSA-xxxx-xxxx-xxxx>
@@ -48,7 +48,7 @@ Commands:
       action = comment | reject | withdraw
 
   demo           <owner/repo>
-      Full pipeline on the given repo (batch → triage on first draft advisory → report preview).
+      Full pipeline on the given repo (batch → triage on first triage advisory → report preview).
       Does not post anything to GitHub.
 
 Environment:
@@ -162,13 +162,13 @@ cmd_respond_batch() {
 cmd_demo() {
     local repo="${1:?Usage: $0 demo <owner/repo>}"
 
-    # Pick the first draft advisory, or bail if none
+    # Pick the first triage advisory, or bail if none
     local ghsa
-    ghsa="$(gh api "/repos/${repo}/security-advisories?state=draft&per_page=1" \
+    ghsa="$(gh api "/repos/${repo}/security-advisories?state=triage&per_page=1" \
         --jq '.[0].ghsa_id // empty' 2>/dev/null)" || true
 
     if [ -z "${ghsa}" ]; then
-        echo "No draft advisories found in ${repo}. Create one at:" >&2
+        echo "No triage advisories found in ${repo}. Create one at:" >&2
         echo "  https://github.com/${repo}/security/advisories/new" >&2
         exit 1
     fi
