@@ -95,7 +95,7 @@ python -m seclab_taskflow_agent \
 
 ## Taskflow 2 — Batch inbox scoring (`pvr_triage_batch`)
 
-Lists all draft advisories for a repository, scores them by priority, and saves a ranked markdown table — useful for deciding which reports to triage first.
+Lists draft advisories for a repository, scores each unprocessed one by priority, and saves a ranked markdown table. Advisories with an existing triage report in `REPORT_DIR` are skipped and their count is noted in the output.
 
 ```bash
 python -m seclab_taskflow_agent \
@@ -118,12 +118,13 @@ Saved to `REPORT_DIR/batch_queue_<repo>_<date>.md`:
 
 ### Priority scoring
 
-```
-priority_score = severity_weight + quality_weight + already_triaged_penalty
+Advisories with an existing report in `REPORT_DIR` are skipped entirely. Only unprocessed advisories are scored:
 
-severity_weight:   critical=4  high=3  medium=2  low=1  unknown=1
-quality_weight:    has_file_references(+1) + has_poc(+1) + has_line_numbers(+1)
-already_triaged:   -3 (advisory already has a report in REPORT_DIR)
+```
+priority_score = severity_weight + quality_weight
+
+severity_weight:  critical=4  high=3  medium=2  low=1  unknown=1
+quality_weight:   has_file_references(+1) + has_poc(+1) + has_line_numbers(+1)
 ```
 
 **Suggested actions:**
@@ -134,8 +135,6 @@ already_triaged:   -3 (advisory already has a report in REPORT_DIR)
 | ≥ 3 | Triage Soon |
 | 2 | Triage |
 | ≤ 1 | Likely Low Quality — Fast Close |
-| Already triaged (CONFIRMED) | Fix/Publish |
-| Already triaged (UNCONFIRMED/INCONCLUSIVE) | Review/Close |
 
 ---
 

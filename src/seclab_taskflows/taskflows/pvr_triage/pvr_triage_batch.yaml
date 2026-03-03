@@ -3,9 +3,10 @@
 
 # PVR Triage Batch Taskflow
 #
-# Lists all draft PVR advisories for a repository, scores each one by
-# priority (based on severity, quality signals, and triage status), and
-# outputs a ranked markdown table to REPORT_DIR for maintainer review.
+# Lists draft PVR advisories for a repository, scores each unprocessed one by
+# priority (based on severity and quality signals), and outputs a ranked
+# markdown table to REPORT_DIR for maintainer review.
+# Advisories with an existing triage report in REPORT_DIR are skipped.
 #
 # Usage:
 #   python -m seclab_taskflow_agent \
@@ -96,7 +97,13 @@ taskflow:
            priority_score, already_triaged, verdict, suggested_action}
 
         Sort the list by priority_score descending.
-        Store under memcache key "scored_queue".
+
+        Split the list:
+          - scored_queue: entries where already_triaged=false only
+          - skipped_count: count of entries where already_triaged=true
+
+        Store scored_queue under memcache key "scored_queue".
+        Store skipped_count under memcache key "skipped_count".
 
   # -------------------------------------------------------------------------
   # Task 3: Generate and save ranked queue report
@@ -110,7 +117,7 @@ taskflow:
         - seclab_taskflows.toolboxes.pvr_ghsa
         - seclab_taskflow_agent.toolboxes.memcache
       user_prompt: |
-        Retrieve "scored_queue" from memcache.
+        Retrieve "scored_queue" and "skipped_count" from memcache.
 
         Generate today's date in YYYY-MM-DD format.
 
@@ -119,7 +126,8 @@ taskflow:
         # PVR Batch Triage Queue: {{ globals.repo }}
 
         **Generated:** [today's date]
-        **Total advisories:** [count]
+        **Pending triage:** [count of scored_queue entries]
+        **Skipped (already triaged):** [skipped_count]
 
         | GHSA | Severity | Vuln Type | Quality Signals | Priority | Status | Suggested Action |
         |------|----------|-----------|-----------------|----------|--------|-----------------|
@@ -136,12 +144,15 @@ taskflow:
             "Not triaged"
           - Suggested Action: from suggested_action field
 
+        If scored_queue is empty, replace the table with:
+        "No pending advisories."
+
         After the table, add a section:
 
         ## Summary
 
         List any advisories with priority_score >= 5 as "Requires immediate attention."
-        List any already_triaged advisories as "Previously triaged — verify closure."
+        If skipped_count > 0, note: "[skipped_count] already-triaged advisories skipped."
 
         Sanitize the repo name for use in a filename: replace "/" and any non-alphanumeric
         characters (except "-" and "_") with "_".

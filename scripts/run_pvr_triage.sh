@@ -32,7 +32,8 @@ Usage: $(basename "$0") <command> [args]
 
 Commands:
   batch   <owner/repo>
-      Score all draft advisories and save a ranked queue table to REPORT_DIR.
+      Score unprocessed draft advisories and save a ranked queue table to REPORT_DIR.
+      Advisories already present in REPORT_DIR are skipped.
 
   triage  <owner/repo> <GHSA-xxxx-xxxx-xxxx>
       Run full triage on one advisory: verify code, generate report + response draft.
