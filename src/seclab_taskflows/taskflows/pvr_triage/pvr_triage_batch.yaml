@@ -1,0 +1,154 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+# PVR Triage Batch Taskflow
+#
+# Lists all draft PVR advisories for a repository, scores each one by
+# priority (based on severity, quality signals, and triage status), and
+# outputs a ranked markdown table to REPORT_DIR for maintainer review.
+#
+# Usage:
+#   python -m seclab_taskflow_agent \
+#     -t seclab_taskflows.taskflows.pvr_triage.pvr_triage_batch \
+#     -g repo=owner/repo
+#
+# Required environment variables:
+#   GH_TOKEN        - GitHub token with repo and security_events scope
+#   AI_API_TOKEN    - API token for the AI model provider
+#   AI_API_ENDPOINT - Model provider endpoint (default: GitHub Copilot API)
+#   REPORT_DIR      - Directory where triage reports are stored (and batch output is saved)
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: taskflow
+
+model_config: seclab_taskflows.configs.model_config_pvr_triage
+
+globals:
+  # GitHub repository in owner/repo format
+  repo:
+
+taskflow:
+  # -------------------------------------------------------------------------
+  # Task 1: List draft advisories
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
+
+        Call list_pvr_advisories with owner, repo, and state="draft" to retrieve
+        all draft advisories.
+
+        Store the full JSON list under memcache key "pvr_queue".
+
+        Print: "Found N draft advisories for {{ globals.repo }}." where N is the count.
+
+        If no advisories are found, print "No draft advisories found." and stop.
+
+  # -------------------------------------------------------------------------
+  # Task 2: Score each advisory
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "pvr_queue" from memcache.
+
+        Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
+
+        For each advisory in pvr_queue:
+          1. Call fetch_pvr_advisory to get the full advisory details.
+          2. Check for existing triage by calling read_triage_report with the ghsa_id.
+             If the result does not start with "Report not found", mark already_triaged=true
+             and extract the verdict from the report content.
+             Otherwise, mark already_triaged=false and verdict=null.
+          3. Extract quality signals from the description:
+             - has_file_references: description mentions specific file paths
+             - has_poc: description includes reproduction steps or exploit code
+             - has_line_numbers: description cites line numbers
+          4. Compute priority_score using this formula:
+             severity_weight: critical=4, high=3, medium=2, low=1, unknown=1
+             quality_weight: has_file_references(+1) + has_poc(+1) + has_line_numbers(+1)
+             already_triaged_penalty: -3 if already_triaged else 0
+             priority_score = severity_weight + quality_weight + already_triaged_penalty
+          5. Determine suggested_action:
+             - If already_triaged and verdict is UNCONFIRMED or INCONCLUSIVE: "Review/Close"
+             - If already_triaged and verdict is CONFIRMED: "Fix/Publish"
+             - If priority_score >= 5: "Triage Immediately"
+             - If priority_score >= 3: "Triage Soon"
+             - If priority_score <= 1: "Likely Low Quality — Fast Close"
+             - Otherwise: "Triage"
+
+        Build a list of scored entries, each with:
+          {ghsa_id, severity, summary, vuln_type, quality_signals,
+           priority_score, already_triaged, verdict, suggested_action}
+
+        Sort the list by priority_score descending.
+        Store under memcache key "scored_queue".
+
+  # -------------------------------------------------------------------------
+  # Task 3: Generate and save ranked queue report
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "scored_queue" from memcache.
+
+        Generate today's date in YYYY-MM-DD format.
+
+        Build a report string with this structure:
+
+        # PVR Batch Triage Queue: {{ globals.repo }}
+
+        **Generated:** [today's date]
+        **Total advisories:** [count]
+
+        | GHSA | Severity | Vuln Type | Quality Signals | Priority | Status | Suggested Action |
+        |------|----------|-----------|-----------------|----------|--------|-----------------|
+        [one row per advisory, sorted by priority_score desc]
+
+        For each row:
+          - GHSA: the ghsa_id as a plain string
+          - Severity: severity from the advisory
+          - Vuln Type: vuln_type (truncated to 30 chars if needed)
+          - Quality Signals: compact representation, e.g. "PoC, Files, Lines" for all three,
+            or list only the signals present, or "None" if all false
+          - Priority: priority_score as an integer
+          - Status: "Triaged (CONFIRMED)" / "Triaged (UNCONFIRMED)" / "Triaged (INCONCLUSIVE)" /
+            "Not triaged"
+          - Suggested Action: from suggested_action field
+
+        After the table, add a section:
+
+        ## Summary
+
+        List any advisories with priority_score >= 5 as "Requires immediate attention."
+        List any already_triaged advisories as "Previously triaged — verify closure."
+
+        Sanitize the repo name for use in a filename: replace "/" and any non-alphanumeric
+        characters (except "-" and "_") with "_".
+
+        Call save_triage_report with:
+          - ghsa_id: "batch_queue_[sanitized_repo]_[today's date]"
+          - report: the full report string
+
+        Print: "Batch queue report saved to: <path returned by save_triage_report>"
+        Then print the full report.

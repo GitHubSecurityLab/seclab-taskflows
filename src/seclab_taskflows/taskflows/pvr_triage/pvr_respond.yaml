@@ -1,0 +1,115 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+# PVR Respond Taskflow
+#
+# Loads a previously generated triage report and response draft from disk
+# and executes the selected write-back action on the GitHub advisory.
+# All write-back API calls are confirm-gated in the pvr_ghsa toolbox.
+#
+# Usage:
+#   python -m seclab_taskflow_agent \
+#     -t seclab_taskflows.taskflows.pvr_triage.pvr_respond \
+#     -g repo=owner/repo \
+#     -g ghsa=GHSA-xxxx-xxxx-xxxx \
+#     -g action=reject|comment|withdraw
+#
+# Required environment variables:
+#   GH_TOKEN        - GitHub token with security_events write scope
+#   AI_API_TOKEN    - API token for the AI model provider
+#   AI_API_ENDPOINT - Model provider endpoint (default: GitHub Copilot API)
+#   REPORT_DIR      - Directory where triage reports are stored
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: taskflow
+
+model_config: seclab_taskflows.configs.model_config_pvr_triage
+
+globals:
+  # GitHub repository in owner/repo format
+  repo:
+  # GHSA ID of the advisory to act on
+  ghsa:
+  # Action to perform: reject, comment, or withdraw
+  action:
+
+taskflow:
+  # -------------------------------------------------------------------------
+  # Task 1: Load triage report and response draft from disk
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Read the triage report for advisory "{{ globals.ghsa }}" using read_triage_report
+        with ghsa_id="{{ globals.ghsa }}".
+
+        Store the triage report content under memcache key "triage_report".
+
+        Read the response draft using read_triage_report with
+        ghsa_id="{{ globals.ghsa }}_response".
+
+        Store the response draft content under memcache key "response_draft".
+
+        From the triage report, extract and print:
+          - Verdict (CONFIRMED / UNCONFIRMED / INCONCLUSIVE)
+          - Report Quality (High / Medium / Low)
+          - A 1-2 sentence summary of the findings
+
+        Then print the full response draft.
+
+        If either file is missing (read_triage_report returns "Report not found"),
+        print a clear error message and stop.
+
+  # -------------------------------------------------------------------------
+  # Task 2: Confirm and execute write-back action
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "triage_report" and "response_draft" from memcache.
+
+        Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
+
+        The requested action is: "{{ globals.action }}"
+
+        Execute the action as follows:
+
+          If action is "reject":
+            Call reject_pvr_advisory with:
+              - owner: extracted owner
+              - repo: extracted repo
+              - ghsa_id: "{{ globals.ghsa }}"
+              - comment: response_draft
+
+          If action is "withdraw":
+            Call withdraw_pvr_advisory with:
+              - owner: extracted owner
+              - repo: extracted repo
+              - ghsa_id: "{{ globals.ghsa }}"
+              - comment: response_draft
+
+          If action is "comment":
+            Call add_pvr_advisory_comment with:
+              - owner: extracted owner
+              - repo: extracted repo
+              - ghsa_id: "{{ globals.ghsa }}"
+              - body: response_draft
+
+          If action is anything else:
+            Print: "Unknown action '{{ globals.action }}'. Valid actions: reject, comment, withdraw"
+            and stop.
+
+        Print the result returned by the API call.

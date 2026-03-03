@@ -10,6 +10,7 @@
 import json
 import logging
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -29,19 +30,30 @@ logging.basicConfig(
 mcp = FastMCP("PVRAdvisories")
 
 
-def _gh_api(path: str, method: str = "GET") -> tuple[dict | list | None, str | None]:
+def _gh_api(
+    path: str,
+    method: str = "GET",
+    body: dict | None = None,
+) -> tuple[dict | list | None, str | None]:
     """
     Call the GitHub REST API via the gh CLI.
 
     Returns (data, error). On success data is the parsed JSON response and
     error is None. On failure data is None and error is a string.
+    If body is provided it is passed as JSON via stdin (--input -).
     """
     cmd = ["gh", "api", "--method", method, path]
     env = os.environ.copy()
+    stdin_data = None
+
+    if body is not None:
+        cmd += ["--input", "-"]
+        stdin_data = json.dumps(body)
 
     try:
         result = subprocess.run(
             cmd,
+            input=stdin_data,
             capture_output=True,
             text=True,
             env=env,
@@ -288,6 +300,201 @@ def save_triage_report(
     out_path.write_text(content, encoding="utf-8")
     logging.info("Triage report written to %s", out_path)
     return str(out_path.resolve())
+
+
+def _post_advisory_comment(owner: str, repo: str, ghsa_id: str, body: str) -> str:
+    """
+    Internal helper: post a comment on a security advisory.
+
+    Attempts to use the GitHub advisory comments API. If that endpoint is not
+    available, falls back to appending a '## Maintainer Response' section to the
+    advisory description instead. Called by both the MCP tool wrapper and the
+    reject/withdraw tools so they all share the same logic without going through
+    the FunctionTool wrapper.
+    """
+    comment_path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}/comments"
+    cmd = [
+        "gh", "api",
+        "--method", "POST",
+        comment_path,
+        "--input", "-",
+    ]
+    env = os.environ.copy()
+    try:
+        result = subprocess.run(
+            cmd,
+            input=json.dumps({"body": body}),
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        return "Error: gh api call timed out"
+    except FileNotFoundError:
+        return "Error: gh CLI not found in PATH"
+
+    if result.returncode == 0:
+        try:
+            data = json.loads(result.stdout)
+            url = data.get("html_url", data.get("url", "posted"))
+            return f"Comment posted: {url}"
+        except json.JSONDecodeError:
+            return "Comment posted."
+
+    # Fall back: append maintainer response to advisory description
+    logging.warning(
+        "Advisory comments API unavailable (%s); falling back to description update",
+        result.stderr.strip(),
+    )
+    adv_path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
+    adv_data, adv_err = _gh_api(adv_path)
+    if adv_err:
+        return f"Error fetching advisory for fallback comment: {adv_err}"
+    existing_desc = adv_data.get("description", "") or ""
+    updated_desc = existing_desc + f"\n\n## Maintainer Response\n\n{body}"
+    _, patch_err = _gh_api(adv_path, method="PATCH", body={"description": updated_desc})
+    if patch_err:
+        return f"Error updating advisory description: {patch_err}"
+    return "Comment appended to advisory description (comments API unavailable)."
+
+
+@mcp.tool()
+def reject_pvr_advisory(
+    owner: str = Field(description="Repository owner (user or org name)"),
+    repo: str = Field(description="Repository name"),
+    ghsa_id: str = Field(description="GHSA ID of the advisory, e.g. GHSA-xxxx-xxxx-xxxx"),
+    comment: str = Field(description="Explanation comment to post on the advisory"),
+) -> str:
+    """
+    Reject a draft security advisory and post a comment explaining the decision.
+
+    Sets the advisory state to 'rejected' via the GitHub API, then posts a
+    comment with the provided explanation. Requires a GH_TOKEN with
+    security_events write scope.
+    """
+    path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
+    _, err = _gh_api(path, method="PATCH", body={"state": "rejected"})
+    if err:
+        return f"Error rejecting advisory {ghsa_id}: {err}"
+    result = _post_advisory_comment(owner, repo, ghsa_id, comment)
+    return f"Advisory {ghsa_id} rejected. Comment: {result}"
+
+
+@mcp.tool()
+def withdraw_pvr_advisory(
+    owner: str = Field(description="Repository owner (user or org name)"),
+    repo: str = Field(description="Repository name"),
+    ghsa_id: str = Field(description="GHSA ID of the advisory, e.g. GHSA-xxxx-xxxx-xxxx"),
+    comment: str = Field(description="Explanation comment to post on the advisory"),
+) -> str:
+    """
+    Withdraw a draft security advisory (for self-submitted drafts) and post a comment.
+
+    Sets the advisory state to 'withdrawn' via the GitHub API, then posts a
+    comment with the provided explanation. Requires a GH_TOKEN with
+    security_events write scope.
+    """
+    path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
+    _, err = _gh_api(path, method="PATCH", body={"state": "withdrawn"})
+    if err:
+        return f"Error withdrawing advisory {ghsa_id}: {err}"
+    result = _post_advisory_comment(owner, repo, ghsa_id, comment)
+    return f"Advisory {ghsa_id} withdrawn. Comment: {result}"
+
+
+@mcp.tool()
+def add_pvr_advisory_comment(
+    owner: str = Field(description="Repository owner (user or org name)"),
+    repo: str = Field(description="Repository name"),
+    ghsa_id: str = Field(description="GHSA ID of the advisory, e.g. GHSA-xxxx-xxxx-xxxx"),
+    body: str = Field(description="Comment text to post on the advisory"),
+) -> str:
+    """
+    Post a comment on a security advisory.
+
+    Attempts to use the GitHub advisory comments API. If that endpoint is not
+    available, falls back to appending a '## Maintainer Response' section to the
+    advisory description instead.
+    """
+    return _post_advisory_comment(owner, repo, ghsa_id, body)
+
+
+@mcp.tool()
+def find_similar_triage_reports(
+    vuln_type: str = Field(description="Vulnerability class to search for, e.g. 'path traversal', 'XSS'"),
+    affected_component: str = Field(description="Component, endpoint, or feature to search for"),
+) -> str:
+    """
+    Search existing triage reports for similar vulnerability types and affected components.
+
+    Scans REPORT_DIR for *_triage.md files and performs case-insensitive substring
+    matching on the header lines for vuln_type and affected_component.
+    Returns a JSON list of matching reports with ghsa_id, verdict, quality, and path.
+    """
+    if not REPORT_DIR.exists():
+        return json.dumps([])
+
+    matches = []
+    vuln_lower = vuln_type.lower()
+    component_lower = affected_component.lower()
+
+    for report_path in sorted(REPORT_DIR.glob("*_triage.md")):
+        # Skip batch queue reports and response drafts — only match individual GHSA triage reports
+        stem = report_path.stem  # e.g. "GHSA-xxxx-xxxx-xxxx_triage"
+        if stem.startswith("batch_queue_") or stem.endswith("_response_triage"):
+            continue
+        try:
+            content = report_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+
+        content_lower = content.lower()
+        if vuln_lower not in content_lower and component_lower not in content_lower:
+            continue
+
+        # Extract GHSA ID from filename: {ghsa_id}_triage.md
+        ghsa_id = stem.replace("_triage", "")
+
+        # Extract verdict from report (handles **CONFIRMED** and **[CONFIRMED]**)
+        verdict = "UNKNOWN"
+        verdict_match = re.search(r"\*\*\[?\s*(CONFIRMED|UNCONFIRMED|INCONCLUSIVE)\s*\]?\*\*", content)
+        if verdict_match:
+            verdict = verdict_match.group(1)
+
+        # Extract quality rating
+        quality = "Unknown"
+        quality_match = re.search(r"Rate overall quality[:\s]*\**\s*(High|Medium|Low)\b", content, re.IGNORECASE)
+        if not quality_match:
+            quality_match = re.search(r"\b(High|Medium|Low)\b.*quality", content, re.IGNORECASE)
+        if quality_match:
+            quality = quality_match.group(1)
+
+        matches.append({
+            "ghsa_id": ghsa_id,
+            "verdict": verdict,
+            "quality": quality,
+            "path": str(report_path),
+        })
+
+    return json.dumps(matches, indent=2)
+
+
+@mcp.tool()
+def read_triage_report(
+    ghsa_id: str = Field(description="GHSA ID, used to locate the report file, e.g. GHSA-xxxx-xxxx-xxxx"),
+) -> str:
+    """
+    Read a previously saved triage report from disk.
+
+    Reads REPORT_DIR/{ghsa_id}_triage.md and returns its content.
+    Returns an error string if the file does not exist.
+    """
+    safe_name = "".join(c for c in ghsa_id if c.isalnum() or c in "-_")
+    report_path = REPORT_DIR / f"{safe_name}_triage.md"
+    if not report_path.exists():
+        return f"Report not found: {report_path}"
+    return report_path.read_text(encoding="utf-8")
 
 
 if __name__ == "__main__":
