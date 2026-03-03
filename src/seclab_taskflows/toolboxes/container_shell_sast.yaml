@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: toolbox
+  version: "1.0"
+
+server_params:
+  kind: stdio
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.container_shell"]
+  env:
+    CONTAINER_IMAGE: "seclab-shell-sast:latest"
+    CONTAINER_WORKSPACE: "{{ env('CONTAINER_WORKSPACE', required=False) }}"
+    CONTAINER_TIMEOUT: "{{ env('CONTAINER_TIMEOUT', '60') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"
+
+confirm:
+  - shell_exec
+
+server_prompt: |
+  ## Container Shell (SAST)
+  You have access to an isolated Docker container for static analysis and code exploration.
+  Source code is available at /workspace. All tools run inside the container.
+
+  Available tools:
+  - semgrep       — SAST scanner; run with `semgrep scan --config=auto /workspace`
+  - pyan3         — Python static call graph generator (dot output for graphviz)
+  - ctags         — Multi-language tag/symbol index (`ctags -R .`)
+  - global (gtags/global) — Source code cross-reference: `gtags` to index, `global -r <sym>` to find callers
+  - cscope        — C/C++ cross-reference browser (`cscope -R -b` to build, `cscope -R -L -2 <sym>` for callers)
+  - graphviz (dot) — Render dot graphs: `dot -Tpng callgraph.dot -o callgraph.png`
+  - ripgrep (rg)  — Fast regex search: `rg <pattern> /workspace`
+  - fd            — Fast file finder: `fd -e py /workspace`
+  - tree          — Directory structure: `tree /workspace`
+  - grep, sed, awk, find — Standard code exploration
+
+  Typical call graph workflow (Python):
+  1. `fd -e py /workspace | head -30` — find Python files
+  2. `pyan3 $(fd -e py /workspace | tr '\n' ' ') --dot --no-defines > /tmp/cg.dot`
+  3. `dot -Tsvg /tmp/cg.dot -o /tmp/cg.svg && cat /tmp/cg.svg | head -100`
+
+  Typical call graph workflow (C):
+  1. `cd /workspace && ctags -R --fields=+ne .`
+  2. `cd /workspace && cscope -R -b && cscope -R -L -2 <function>`

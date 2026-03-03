@@ -30,6 +30,11 @@ build_network() {
     docker build -t seclab-shell-network-analysis:latest "${CONTAINERS_DIR}/network_analysis/"
 }
 
+build_sast() {
+    echo "Building seclab-shell-sast..."
+    docker build -t seclab-shell-sast:latest "${CONTAINERS_DIR}/sast/"
+}
+
 target="${1:-all}"
 
 case "$target" in
@@ -44,14 +49,19 @@ case "$target" in
         build_base
         build_network
         ;;
+    sast)
+        build_base
+        build_sast
+        ;;
     all)
         build_base
         build_malware
         build_network
+        build_sast
         ;;
     *)
         echo "Unknown target: $target" >&2
-        echo "Usage: $0 [base|malware|network|all]" >&2
+        echo "Usage: $0 [base|malware|network|sast|all]" >&2
         exit 1
         ;;
 esac

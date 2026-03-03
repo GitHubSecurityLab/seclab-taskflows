@@ -194,3 +194,9 @@ class TestToolboxYaml:
         result = tools.get_toolbox("seclab_taskflows.toolboxes.container_shell_network_analysis")
         assert result is not None
         assert result["seclab-taskflow-agent"]["filetype"] == "toolbox"
+
+    def test_toolbox_yaml_valid_sast(self):
+        tools = AvailableTools()
+        result = tools.get_toolbox("seclab_taskflows.toolboxes.container_shell_sast")
+        assert result is not None
+        assert result["seclab-taskflow-agent"]["filetype"] == "toolbox"

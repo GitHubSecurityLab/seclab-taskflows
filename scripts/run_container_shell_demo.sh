@@ -9,6 +9,7 @@
 #   ./scripts/run_container_shell_demo.sh base    [workspace_dir]
 #   ./scripts/run_container_shell_demo.sh malware [workspace_dir] [target_filename]
 #   ./scripts/run_container_shell_demo.sh network [workspace_dir] [capture_filename]
+#   ./scripts/run_container_shell_demo.sh sast    [workspace_dir] [target]
 #
 # If workspace_dir is omitted a temporary directory is used.
 # Requires AI_API_TOKEN to be set in the environment.
@@ -27,7 +28,7 @@ fi
 
 demo="${1:-}"
 if [ -z "$demo" ]; then
-    echo "Usage: $0 <base|malware|network> [workspace_dir] [target]" >&2
+    echo "Usage: $0 <base|malware|network|sast> [workspace_dir] [target]" >&2
     exit 1
 fi
 
@@ -72,8 +73,54 @@ case "$demo" in
             -t seclab_taskflows.taskflows.container_shell.demo_network_analysis \
             -g capture="$capture"
         ;;
+    sast)
+        target="${3:-.}"
+        if [ ! -d "$workspace" ] && [ ! -f "${workspace}/${target}" ]; then
+            echo "No source found at ${workspace}/${target}" >&2
+            echo "Provide a source directory or file in workspace_dir." >&2
+            exit 1
+        fi
+        if [ "$target" = "." ] && [ -z "$(ls -A "$workspace" 2>/dev/null)" ]; then
+            echo "Generating demo Python source in ${workspace}"
+            cat > "${workspace}/demo.py" <<'PYEOF'
+import os
+import subprocess
+
+
+def read_config(path):
+    with open(path) as f:
+        return f.read()
+
+
+def run_command(cmd):
+    # intentional anti-pattern for demo purposes
+    return subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+
+def process_input(user_input):
+    result = run_command(f"echo {user_input}")
+    return result.stdout
+
+
+def main():
+    config = read_config("/etc/demo.conf") if os.path.exists("/etc/demo.conf") else ""
+    output = process_input("hello world")
+    print(config, output)
+
+
+if __name__ == "__main__":
+    main()
+PYEOF
+            target="demo.py"
+        fi
+        CONTAINER_WORKSPACE="$workspace" \
+        LOG_DIR="${__root}/logs" \
+        python -m seclab_taskflow_agent \
+            -t seclab_taskflows.taskflows.container_shell.demo_sast \
+            -g target="$target"
+        ;;
     *)
-        echo "Unknown demo: $demo. Choose base, malware, or network." >&2
+        echo "Unknown demo: $demo. Choose base, malware, network, or sast." >&2
         exit 1
         ;;
 esac

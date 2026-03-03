@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+# Demo: SAST container shell.
+# Analyses source code in CONTAINER_WORKSPACE using semgrep, ctags, and pyan3.
+# Example:
+#   CONTAINER_WORKSPACE=/path/to/src python -m seclab_taskflow_agent \
+#     -t seclab_taskflows.taskflows.container_shell.demo_sast \
+#     -g target=mymodule.py
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+
+globals:
+  target: "."
+
+taskflow:
+  - task:
+      must_complete: true
+      headless: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.container_shell_sast
+      env:
+        CONTAINER_WORKSPACE: "{{ env('CONTAINER_WORKSPACE') }}"
+      user_prompt: |
+        Perform static analysis on the source code at /workspace/{{ globals.target }}.
+
+        1. Directory overview:
+           `tree /workspace/{{ globals.target }} 2>/dev/null | head -40`
+
+        2. Locate source files:
+           `fd -e py -e c -e h /workspace/{{ globals.target }} | head -30`
+
+        3. Security scan with semgrep (report findings only, suppress progress):
+           `semgrep scan --config=auto --quiet /workspace/{{ globals.target }} 2>/dev/null`
+           If semgrep requires network access and it is unavailable, note that and skip.
+
+        4. Symbol index with ctags:
+           `ctags -R --fields=+ne -f /tmp/tags /workspace/{{ globals.target }} && grep -v "^!" /tmp/tags | head -40`
+
+        5. Call graph (Python only — skip if no .py files):
+           `pyan3 $(fd -e py /workspace/{{ globals.target }} | tr '\n' ' ') --dot --no-defines 2>/dev/null | head -60`
+
+        6. Cross-reference entry points with GNU global:
+           `cd /workspace/{{ globals.target }} && gtags --compact -v 2>/dev/null && global -x main 2>/dev/null || echo "gtags: no entry point found"`
+
+        Based on the above, summarize:
+        - Security findings from semgrep (severity, rule, file, line)
+        - Key functions/classes and their call relationships
+        - Identified entry points and reachable sensitive operations
+        - Areas recommended for deeper review

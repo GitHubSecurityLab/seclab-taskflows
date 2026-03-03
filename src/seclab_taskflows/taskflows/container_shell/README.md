@@ -4,7 +4,7 @@ Runs arbitrary CLI commands inside an isolated Docker container. One container
 per MCP server process — started on the first `shell_exec` call, stopped on
 exit. An optional host directory is mounted at `/workspace` inside the container.
 
-Three container profiles are provided. Each has its own Dockerfile, toolbox
+Four container profiles are provided. Each has its own Dockerfile, toolbox
 YAML, and demo taskflow.
 
 ## Profiles
@@ -21,6 +21,10 @@ yara, exiftool, checksec, capstone, pwntools, volatility3.
 Packet capture analysis and network recon. Extends base with nmap, tcpdump,
 tshark, netcat, dig, jq, httpie.
 
+**sast** (`seclab-shell-sast:latest`)
+Static analysis and code exploration. Extends base with semgrep, pyan3,
+universal-ctags, GNU global, cscope, graphviz, ripgrep, fd, tree.
+
 ## Building the images
 
 Run from the repository root:
@@ -35,6 +39,7 @@ To build a single profile (the base image is always built first when needed):
 ./scripts/build_container_images.sh base
 ./scripts/build_container_images.sh malware
 ./scripts/build_container_images.sh network
+./scripts/build_container_images.sh sast
 ```
 
 Images only need to be rebuilt when a Dockerfile changes.
@@ -78,6 +83,22 @@ CONTAINER_WORKSPACE=/tmp/captures python -m seclab_taskflow_agent \
     -t seclab_taskflows.taskflows.container_shell.demo_network_analysis \
     -g capture=sample.pcap
 ```
+
+**SAST demo** — static analysis and call graph extraction for a source repo:
+
+```
+CONTAINER_WORKSPACE=/path/to/src python -m seclab_taskflow_agent \
+    -t seclab_taskflows.taskflows.container_shell.demo_sast
+```
+
+If no source is present the runner script generates a demo Python file with a
+shell-injection anti-pattern so semgrep has something to find:
+
+```
+./scripts/run_container_shell_demo.sh sast
+```
+
+Override the analysis target with `-g target=<path>` (relative to /workspace).
 
 ## Using container_shell in your own taskflows
 
