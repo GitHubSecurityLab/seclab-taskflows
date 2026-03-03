@@ -113,3 +113,6 @@ taskflow:
             and stop.
 
         Print the result returned by the API call.
+
+        On success (action was not "anything else"), call mark_response_sent with
+        ghsa_id="{{ globals.ghsa }}" to record that this response has been sent.

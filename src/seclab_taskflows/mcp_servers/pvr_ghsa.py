@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastmcp import FastMCP
@@ -521,6 +522,61 @@ def read_triage_report(
     if not report_path.exists():
         return f"Report not found: {report_path}"
     return report_path.read_text(encoding="utf-8")
+
+
+@mcp.tool()
+def list_pending_responses() -> str:
+    """
+    List advisories that have a response draft but have not yet been sent.
+
+    Globs REPORT_DIR for *_response_triage.md files and skips any whose
+    corresponding *_response_sent.md marker exists.
+    Returns a JSON list of {ghsa_id, triage_report_exists} objects.
+    """
+    if not REPORT_DIR.exists():
+        return json.dumps([])
+
+    results = []
+    for draft_path in sorted(REPORT_DIR.glob("*_response_triage.md")):
+        # stem is e.g. "GHSA-xxxx-xxxx-xxxx_response_triage"
+        stem = draft_path.stem
+        # Extract ghsa_id: remove "_response_triage" suffix
+        ghsa_id = stem.replace("_response_triage", "")
+        safe_name = "".join(c for c in ghsa_id if c.isalnum() or c in "-_")
+
+        # Skip if sent marker exists
+        sent_marker = REPORT_DIR / f"{safe_name}_response_sent.md"
+        if sent_marker.exists():
+            continue
+
+        triage_report = REPORT_DIR / f"{safe_name}_triage.md"
+        results.append({
+            "ghsa_id": ghsa_id,
+            "triage_report_exists": triage_report.exists(),
+        })
+
+    return json.dumps(results, indent=2)
+
+
+@mcp.tool()
+def mark_response_sent(
+    ghsa_id: str = Field(description="GHSA ID of the advisory whose response was sent"),
+) -> str:
+    """
+    Create a marker file indicating that the response for this advisory has been sent.
+
+    Writes REPORT_DIR/{ghsa_id}_response_sent.md with an ISO timestamp.
+    Returns the path of the created marker, or an error string if ghsa_id is empty.
+    """
+    safe_name = "".join(c for c in ghsa_id if c.isalnum() or c in "-_")
+    if not safe_name:
+        return "Error: ghsa_id produced an empty filename after sanitization"
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    marker_path = REPORT_DIR / f"{safe_name}_response_sent.md"
+    timestamp = datetime.now(timezone.utc).isoformat()
+    marker_path.write_text(f"Response sent: {timestamp}\n", encoding="utf-8")
+    logging.info("Response sent marker written to %s", marker_path)
+    return str(marker_path.resolve())
 
 
 if __name__ == "__main__":

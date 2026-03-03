@@ -2,13 +2,14 @@
 
 Tools for triaging GitHub Security Advisories submitted via [Private Vulnerability Reporting (PVR)](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability). The taskflows fetch a draft advisory, verify the claimed vulnerability against actual source code, score report quality, and generate a structured analysis and a ready-to-send response draft.
 
-Three taskflows cover the full triage lifecycle:
+Four taskflows cover the full triage lifecycle:
 
 | Taskflow | Purpose |
 |---|---|
 | `pvr_triage` | Deep-analyse one advisory end-to-end |
 | `pvr_triage_batch` | Score an entire inbox and produce a ranked queue |
-| `pvr_respond` | Post or save the response once you've reviewed the analysis |
+| `pvr_respond` | Post the response for one advisory once you've reviewed the analysis |
+| `pvr_respond_batch` | Scan REPORT_DIR and post all pending response drafts in a single session |
 
 ---
 
@@ -62,7 +63,11 @@ python -m seclab_taskflow_agent \
 
 1. **Initialize** — clears the in-memory cache.
 2. **Fetch & parse** — fetches the advisory from the GitHub API and extracts structured metadata: vulnerability type, affected component, file references, PoC quality signals, reporter credits.
-3. **Quality gate** — calls `get_reporter_score` for the reporter's history and `find_similar_triage_reports` to detect duplicates. Computes a `fast_close` flag when the report has no file references, no PoC, no line numbers, *and* a similar report already exists. Fast-close skips deep code analysis.
+3. **Quality gate** — calls `get_reporter_score` for the reporter's history and `find_similar_triage_reports` to detect duplicates. Computes `fast_close` using a reputation-gated decision tree:
+   - **high-trust reporter** → always `fast_close = false` (full verification).
+   - **skepticism reporter** → `fast_close = true` when all three quality signals are absent (prior similar report not required).
+   - **normal / no history** → `fast_close = true` only when all three signals are absent *and* a prior similar report exists.
+   Fast-close skips deep code analysis.
 4. **Code verification** — resolves the claimed version to a git tag/SHA, fetches the relevant source files, and checks whether the vulnerability pattern is actually present. After verifying at the claimed version, also checks HEAD to determine patch status (`still_vulnerable` / `patched` / `could_not_determine`). Skipped automatically when `fast_close` is true.
 5. **Report generation** — writes a markdown report covering: Verdict, Code Verification, Severity Assessment, CVSS 3.1 assessment, Duplicate/Prior Reports, Patch Status, Report Quality, Reporter Reputation, and Recommendations.
 6. **Save report** — writes the report to `REPORT_DIR/<GHSA-ID>_triage.md` and prints the path.
@@ -110,11 +115,13 @@ Saved to `REPORT_DIR/batch_queue_<repo>_<date>.md`:
 ```markdown
 # PVR Batch Triage Queue: owner/repo
 
-| GHSA | Severity | Vuln Type | Quality Signals | Priority | Status | Suggested Action |
-|------|----------|-----------|-----------------|----------|--------|-----------------|
-| GHSA-... | high | SQL injection | PoC, Files | 6 | Not triaged | Triage Immediately |
-| GHSA-... | medium | XSS | None | 1 | Not triaged | Likely Low Quality — Fast Close |
+| GHSA | Age (days) | Severity | Vuln Type | Quality Signals | Priority | Status | Suggested Action |
+|------|------------|----------|-----------|-----------------|----------|--------|-----------------|
+| GHSA-... | 14 | high | SQL injection | PoC, Files | 6 | Not triaged | Triage Immediately |
+| GHSA-... | 3 | medium | XSS | None | 1 | Not triaged | Likely Low Quality — Fast Close |
 ```
+
+Rows are sorted by priority score descending; ties are broken by `created_at` ascending (oldest advisory first).
 
 ### Priority scoring
 
@@ -164,6 +171,40 @@ python -m seclab_taskflow_agent \
 
 The toolbox marks `reject_pvr_advisory`, `withdraw_pvr_advisory`, and `add_pvr_advisory_comment` as `confirm`-gated. The agent will print the verdict, quality rating, and full response draft, then ask for explicit confirmation before making any change to GitHub.
 
+After a successful write-back, `pvr_respond` calls `mark_response_sent` to create a `<GHSA-ID>_response_sent.md` marker so `pvr_respond_batch` will skip this advisory in future runs.
+
+---
+
+## Taskflow 4 — Bulk respond (`pvr_respond_batch`)
+
+Scans `REPORT_DIR` for advisories that have a response draft (`*_response_triage.md`) but no sent marker (`*_response_sent.md`), then posts each response to GitHub in a single session.
+
+```bash
+python -m seclab_taskflow_agent \
+  -t seclab_taskflows.taskflows.pvr_triage.pvr_respond_batch \
+  -g repo=owner/repo \
+  -g action=comment
+
+# or via the helper script:
+./scripts/run_pvr_triage.sh respond_batch owner/repo comment
+```
+
+### How it works
+
+**Task 1** calls `list_pending_responses` (local read-only, no confirm gate) to find all unsent drafts and prints a summary table. If there are no pending drafts it stops immediately.
+
+**Task 2** iterates over every pending entry:
+1. Reads the triage report and response draft from disk.
+2. Prints a per-item preview (GHSA, verdict, first 200 chars of response).
+3. Executes the chosen action (`comment` / `reject` / `withdraw`) via the confirm-gated write-back tool.
+4. On success, calls `mark_response_sent` to create a `*_response_sent.md` marker so the advisory is skipped in future runs.
+
+Prints a final count: `"Sent N / M responses."`
+
+### Sent markers
+
+`pvr_respond` also calls `mark_response_sent` after a successful write-back, keeping single-advisory and bulk responds in sync. Once a marker exists, neither `pvr_respond` nor `pvr_respond_batch` will attempt to re-send.
+
 ---
 
 ## Typical workflow
@@ -178,10 +219,15 @@ The toolbox marks `reject_pvr_advisory`, `withdraw_pvr_advisory`, and `add_pvr_a
    - Check the Verdict and Code Verification sections.
    - Edit the response draft (_response_triage.md) if needed.
 
-4. Run pvr_respond to send the response:
-   - action=comment   → post reply only (advisory stays draft)
-   - action=reject    → reject + post reply
-   - action=withdraw  → withdraw + post reply
+4a. Send responses one at a time with pvr_respond:
+    - action=comment   → post reply only (advisory stays draft)
+    - action=reject    → reject + post reply
+    - action=withdraw  → withdraw + post reply
+
+4b. Or send all pending drafts at once with pvr_respond_batch:
+    Scans REPORT_DIR for unsent drafts (no _response_sent.md marker)
+    and posts them all in one session.
+    Useful after triaging a batch in step 2.
 ```
 
 ### Example session
@@ -202,7 +248,7 @@ python -m seclab_taskflow_agent \
 cat reports/GHSA-1234-5678-abcd_triage.md
 cat reports/GHSA-1234-5678-abcd_response_triage.md
 
-# Step 4a: send a comment (most common — doesn't change advisory state)
+# Step 4a: send a comment for one advisory (doesn't change advisory state)
 python -m seclab_taskflow_agent \
   -t seclab_taskflows.taskflows.pvr_triage.pvr_respond \
   -g repo=acme/widget \
@@ -215,6 +261,12 @@ python -m seclab_taskflow_agent \
   -g repo=acme/widget \
   -g ghsa=GHSA-1234-5678-abcd \
   -g action=reject
+
+# Step 4c: or post all pending drafts at once (after triaging several advisories)
+python -m seclab_taskflow_agent \
+  -t seclab_taskflows.taskflows.pvr_triage.pvr_respond_batch \
+  -g repo=acme/widget \
+  -g action=comment
 ```
 
 ---
@@ -233,7 +285,7 @@ The quality gate in Task 3 of `pvr_triage` calls `get_reporter_score` automatica
 | confirmed_pct ≤ 20% or Low-quality share ≥ 50% | treat with skepticism |
 | Otherwise | normal |
 
-A "treat with skepticism" score alone does not trigger fast-close — it is informational. Fast-close is triggered only by the combination of missing quality signals *and* an existing duplicate report.
+Reputation directly gates the fast-close decision. See [SCORING.md](SCORING.md) Section 3 for the full three-path decision table and reputation × fast-close matrix.
 
 ---
 
@@ -258,4 +310,5 @@ All files are written to `REPORT_DIR` (default: `./reports`).
 |---|---|---|
 | `<GHSA-ID>_triage.md` | `pvr_triage` task 6 | Full triage analysis report |
 | `<GHSA-ID>_response_triage.md` | `pvr_triage` task 8 | Plain-text response draft for the reporter |
-| `batch_queue_<repo>_<date>.md` | `pvr_triage_batch` task 3 | Ranked inbox table |
+| `<GHSA-ID>_response_sent.md` | `pvr_respond` / `pvr_respond_batch` | Marker: response has been sent (contains ISO timestamp) |
+| `batch_queue_<repo>_<date>.md` | `pvr_triage_batch` task 3 | Ranked inbox table with Age column |

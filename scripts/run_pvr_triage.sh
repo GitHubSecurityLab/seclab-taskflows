@@ -5,10 +5,11 @@
 # Local test / demo script for the PVR triage taskflows.
 #
 # Usage:
-#   ./scripts/run_pvr_triage.sh batch   <owner/repo>
-#   ./scripts/run_pvr_triage.sh triage  <owner/repo> <GHSA-xxxx-xxxx-xxxx>
-#   ./scripts/run_pvr_triage.sh respond <owner/repo> <GHSA-xxxx-xxxx-xxxx> <comment|reject|withdraw>
-#   ./scripts/run_pvr_triage.sh demo    <owner/repo>
+#   ./scripts/run_pvr_triage.sh batch          <owner/repo>
+#   ./scripts/run_pvr_triage.sh triage         <owner/repo> <GHSA-xxxx-xxxx-xxxx>
+#   ./scripts/run_pvr_triage.sh respond        <owner/repo> <GHSA-xxxx-xxxx-xxxx> <comment|reject|withdraw>
+#   ./scripts/run_pvr_triage.sh respond_batch  <owner/repo> <comment|reject|withdraw>
+#   ./scripts/run_pvr_triage.sh demo           <owner/repo>
 #
 # Environment (any already-set values are respected):
 #   GH_TOKEN        — GitHub token; falls back to: gh auth token
@@ -31,18 +32,22 @@ usage() {
 Usage: $(basename "$0") <command> [args]
 
 Commands:
-  batch   <owner/repo>
+  batch          <owner/repo>
       Score unprocessed draft advisories and save a ranked queue table to REPORT_DIR.
       Advisories already present in REPORT_DIR are skipped.
 
-  triage  <owner/repo> <GHSA-xxxx-xxxx-xxxx>
+  triage         <owner/repo> <GHSA-xxxx-xxxx-xxxx>
       Run full triage on one advisory: verify code, generate report + response draft.
 
-  respond <owner/repo> <GHSA-xxxx-xxxx-xxxx> <action>
+  respond        <owner/repo> <GHSA-xxxx-xxxx-xxxx> <action>
       Post the response draft to GitHub. action = comment | reject | withdraw
       Requires pvr_triage to have been run first for the given GHSA.
 
-  demo    <owner/repo>
+  respond_batch  <owner/repo> <action>
+      Scan REPORT_DIR for all pending response drafts and post them in one session.
+      action = comment | reject | withdraw
+
+  demo           <owner/repo>
       Full pipeline on the given repo (batch → triage on first draft advisory → report preview).
       Does not post anything to GitHub.
 
@@ -140,6 +145,20 @@ cmd_respond() {
         -g "action=${action}"
 }
 
+cmd_respond_batch() {
+    local repo="${1:?Usage: $0 respond_batch <owner/repo> <action>}"
+    local action="${2:?Usage: $0 respond_batch <owner/repo> <action>}"
+    case "${action}" in
+        comment|reject|withdraw) ;;
+        *) echo "ERROR: action must be comment, reject, or withdraw" >&2; exit 1 ;;
+    esac
+    echo "==> Bulk respond for ${repo} (action=${action}) ..."
+    run_agent \
+        -t seclab_taskflows.taskflows.pvr_triage.pvr_respond_batch \
+        -g "repo=${repo}" \
+        -g "action=${action}"
+}
+
 cmd_demo() {
     local repo="${1:?Usage: $0 demo <owner/repo>}"
 
@@ -177,9 +196,10 @@ cmd_demo() {
 # ---------------------------------------------------------------------------
 
 case "${1:-}" in
-    batch)   shift; cmd_batch   "$@" ;;
-    triage)  shift; cmd_triage  "$@" ;;
-    respond) shift; cmd_respond "$@" ;;
-    demo)    shift; cmd_demo "$@" ;;
+    batch)          shift; cmd_batch          "$@" ;;
+    triage)         shift; cmd_triage         "$@" ;;
+    respond)        shift; cmd_respond        "$@" ;;
+    respond_batch)  shift; cmd_respond_batch  "$@" ;;
+    demo)           shift; cmd_demo           "$@" ;;
     *) echo "ERROR: unknown command '${1}'" >&2; usage; exit 1 ;;
 esac

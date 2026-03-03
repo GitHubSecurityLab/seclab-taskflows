@@ -233,6 +233,57 @@ class TestPvrGhsaTools(unittest.TestCase):
 
         self.assertIn("not found", result.lower())
 
+    # --- list_pending_responses ---
+
+    def test_list_pending_responses_empty(self):
+        """list_pending_responses returns [] when no response drafts exist."""
+        with _patch_report_dir(self.tmp):
+            result_json = self.pvr.list_pending_responses.fn()
+        results = json.loads(result_json)
+        self.assertEqual(results, [])
+
+    def test_list_pending_responses_returns_pending(self):
+        """list_pending_responses includes an entry when a draft exists but no sent marker."""
+        (self.tmp / "GHSA-1111-2222-3333_response_triage.md").write_text(
+            "Response draft.", encoding="utf-8"
+        )
+        with _patch_report_dir(self.tmp):
+            result_json = self.pvr.list_pending_responses.fn()
+        results = json.loads(result_json)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["ghsa_id"], "GHSA-1111-2222-3333")
+
+    def test_list_pending_responses_excludes_sent(self):
+        """list_pending_responses skips entries where a _response_sent.md marker exists."""
+        (self.tmp / "GHSA-1111-2222-3333_response_triage.md").write_text(
+            "Response draft.", encoding="utf-8"
+        )
+        (self.tmp / "GHSA-1111-2222-3333_response_sent.md").write_text(
+            "Response sent: 2026-03-03T00:00:00+00:00\n", encoding="utf-8"
+        )
+        with _patch_report_dir(self.tmp):
+            result_json = self.pvr.list_pending_responses.fn()
+        results = json.loads(result_json)
+        self.assertEqual(results, [])
+
+    # --- mark_response_sent ---
+
+    def test_mark_response_sent_creates_marker(self):
+        """mark_response_sent creates a _response_sent.md marker and returns its path."""
+        with _patch_report_dir(self.tmp):
+            result = self.pvr.mark_response_sent.fn(ghsa_id="GHSA-1111-2222-3333")
+        marker = self.tmp / "GHSA-1111-2222-3333_response_sent.md"
+        self.assertTrue(marker.exists())
+        self.assertTrue(result.startswith(str(self.tmp.resolve())))
+        content = marker.read_text(encoding="utf-8")
+        self.assertIn("Response sent:", content)
+
+    def test_mark_response_sent_empty_ghsa_id(self):
+        """mark_response_sent returns an error string when ghsa_id sanitizes to empty."""
+        with _patch_report_dir(self.tmp):
+            result = self.pvr.mark_response_sent.fn(ghsa_id="!@#$%")
+        self.assertIn("Error", result)
+
 
 # ---------------------------------------------------------------------------
 # TestReporterReputationBackend
@@ -404,6 +455,16 @@ class TestYamlStructure(unittest.TestCase):
         self.assertIn("reject_pvr_advisory", confirm)
         self.assertIn("withdraw_pvr_advisory", confirm)
         self.assertIn("add_pvr_advisory_comment", confirm)
+
+    def test_pvr_respond_batch_yaml_parses(self):
+        """pvr_respond_batch.yaml loads without error and declares repo + action globals."""
+        result = self.tools.get_taskflow("seclab_taskflows.taskflows.pvr_triage.pvr_respond_batch")
+        self.assertIsNotNone(result)
+        header = result["seclab-taskflow-agent"]
+        self.assertEqual(header["filetype"], "taskflow")
+        globals_keys = result.get("globals", {})
+        self.assertIn("repo", globals_keys)
+        self.assertIn("action", globals_keys)
 
     def test_pvr_triage_yaml_has_reporter_reputation_toolbox(self):
         """pvr_triage.yaml references reporter_reputation toolbox in at least one task."""

@@ -93,9 +93,10 @@ taskflow:
 
         Build a list of scored entries, each with:
           {ghsa_id, severity, summary, vuln_type, quality_signals,
-           priority_score, already_triaged, verdict, suggested_action}
+           priority_score, already_triaged, verdict, suggested_action, created_at}
 
-        Sort the list by priority_score descending.
+        Sort the list: primary key priority_score descending; ties broken by
+        created_at ascending (oldest advisory first).
 
         Split the list:
           - scored_queue: entries where already_triaged=false only
@@ -120,6 +121,11 @@ taskflow:
 
         Generate today's date in YYYY-MM-DD format.
 
+        For each entry in scored_queue compute days_pending:
+          days_pending = (today - date(created_at)).days  (integer, round down)
+          Parse created_at as an ISO 8601 date string (YYYY-MM-DD prefix is sufficient).
+          If created_at is missing or unparseable, use "?" for Age.
+
         Build a report string with this structure:
 
         # PVR Batch Triage Queue: {{ globals.repo }}
@@ -128,12 +134,13 @@ taskflow:
         **Pending triage:** [count of scored_queue entries]
         **Skipped (already triaged):** [skipped_count]
 
-        | GHSA | Severity | Vuln Type | Quality Signals | Priority | Status | Suggested Action |
-        |------|----------|-----------|-----------------|----------|--------|-----------------|
-        [one row per advisory, sorted by priority_score desc]
+        | GHSA | Age (days) | Severity | Vuln Type | Quality Signals | Priority | Status | Suggested Action |
+        |------|------------|----------|-----------|-----------------|----------|--------|-----------------|
+        [one row per advisory, sorted by priority_score desc then created_at asc]
 
         For each row:
           - GHSA: the ghsa_id as a plain string
+          - Age (days): days_pending computed above
           - Severity: severity from the advisory
           - Vuln Type: vuln_type (truncated to 30 chars if needed)
           - Quality Signals: compact representation, e.g. "PoC, Files, Lines" for all three,

@@ -1,0 +1,104 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+# PVR Bulk Respond Taskflow
+#
+# Scans REPORT_DIR for pending response drafts (advisories with a
+# *_response_triage.md but no *_response_sent.md marker) and posts
+# each response to GitHub in a single session.
+#
+# Usage:
+#   python -m seclab_taskflow_agent \
+#     -t seclab_taskflows.taskflows.pvr_triage.pvr_respond_batch \
+#     -g repo=owner/repo \
+#     -g action=comment|reject|withdraw
+#
+# Required environment variables:
+#   GH_TOKEN        - GitHub token with security_events write scope
+#   AI_API_TOKEN    - API token for the AI model provider
+#   AI_API_ENDPOINT - Model provider endpoint (default: https://api.githubcopilot.com)
+#   REPORT_DIR      - Directory where triage reports are stored
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: taskflow
+
+model_config: seclab_taskflows.configs.model_config_pvr_triage
+
+globals:
+  # GitHub repository in owner/repo format
+  repo:
+  # Action to apply to all pending responses: comment, reject, or withdraw
+  action:
+
+taskflow:
+  # -------------------------------------------------------------------------
+  # Task 1: List pending responses
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Call list_pending_responses to find all advisories with a response draft
+        that has not yet been sent.
+
+        If the result is an empty list, print "No pending responses." and stop.
+
+        Otherwise print a summary table:
+
+        | GHSA | Triage Report Exists |
+        |------|---------------------|
+        [one row per pending entry]
+
+        Store the list under memcache key "pending_responses".
+
+  # -------------------------------------------------------------------------
+  # Task 2: Send each response
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "pending_responses" from memcache.
+
+        Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
+
+        The requested action is: "{{ globals.action }}"
+
+        For each entry in pending_responses:
+          1. Call read_triage_report with ghsa_id=entry.ghsa_id to get the triage report.
+          2. Call read_triage_report with ghsa_id="{entry.ghsa_id}_response" to get the
+             response draft.
+          3. Print a per-item summary:
+               GHSA: {entry.ghsa_id}
+               Verdict: [extracted from triage report]
+               Response preview: [first 200 chars of response draft]
+          4. Execute the action:
+               If action is "reject":
+                 Call reject_pvr_advisory with owner, repo, ghsa_id=entry.ghsa_id,
+                 comment=response_draft.
+               If action is "withdraw":
+                 Call withdraw_pvr_advisory with owner, repo, ghsa_id=entry.ghsa_id,
+                 comment=response_draft.
+               If action is "comment":
+                 Call add_pvr_advisory_comment with owner, repo, ghsa_id=entry.ghsa_id,
+                 body=response_draft.
+               If action is anything else:
+                 Print: "Unknown action '{{ globals.action }}'. Skipping {entry.ghsa_id}."
+                 and continue to the next entry.
+          5. On success, call mark_response_sent with ghsa_id=entry.ghsa_id.
+             Print: "Sent: {entry.ghsa_id}"
+
+        After processing all entries, print:
+        "Sent N / M responses." where N is the count of successfully sent responses
+        and M is the total count of pending_responses entries.

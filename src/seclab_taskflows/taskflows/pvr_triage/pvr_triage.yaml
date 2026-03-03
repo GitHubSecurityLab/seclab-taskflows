@@ -113,11 +113,27 @@ taskflow:
           - vuln_type: pvr_parsed.vuln_type
           - affected_component: pvr_parsed.affected_component
 
-        Evaluate fast_close conditions (ALL must be true to trigger fast_close):
-          - pvr_parsed.quality_signals.has_file_references is false
-          - pvr_parsed.quality_signals.has_poc is false
-          - pvr_parsed.quality_signals.has_line_numbers is false
-          - At least one similar report exists with verdict UNCONFIRMED or CONFIRMED
+        Evaluate fast_close based on reporter_score.recommendation:
+
+          If reporter_score.recommendation is "high trust":
+            Set fast_close = false unconditionally.
+            Set reason = "High-trust reporter — full verification required."
+
+          Else if reporter_score.recommendation is "treat with skepticism":
+            Set fast_close = true if ALL THREE quality signals are absent:
+              - pvr_parsed.quality_signals.has_file_references is false
+              - pvr_parsed.quality_signals.has_poc is false
+              - pvr_parsed.quality_signals.has_line_numbers is false
+            (Prior similar report NOT required for skepticism reporters.)
+            Set reason accordingly.
+
+          Else (normal / no history):
+            Set fast_close = true only if ALL FOUR conditions hold:
+              - pvr_parsed.quality_signals.has_file_references is false
+              - pvr_parsed.quality_signals.has_poc is false
+              - pvr_parsed.quality_signals.has_line_numbers is false
+              - At least one similar report exists with verdict UNCONFIRMED or CONFIRMED
+            Set reason accordingly.
 
         Store under memcache key "quality_gate":
           {
