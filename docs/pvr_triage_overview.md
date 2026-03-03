@@ -57,8 +57,9 @@ OSS maintainers get flooded with low-quality vulnerability reports via GitHub's 
    │  (one at a time) │  │  (all at once)       │
    │                  │  │                      │
    │  confirm-gated:  │  │  • list_pending      │
-   │  comment         │  │  • for each:         │
-   │  reject          │  │    - confirm-gated   │
+   │  accept          │  │  • for each:         │
+   │  comment         │  │    - confirm-gated   │
+   │  reject          │  │
    │                  │  │      write-back      │
    │                  │  │    - mark as sent    │
    │  mark as sent    │  │  • "Sent N/M"        │

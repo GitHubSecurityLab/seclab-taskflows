@@ -40,6 +40,32 @@ class TestPvrGhsaTools(unittest.TestCase):
     def tearDown(self):
         self.tmp_dir.cleanup()
 
+    # --- accept_pvr_advisory ---
+
+    def test_accept_pvr_advisory_calls_correct_api(self):
+        """accept_pvr_advisory should PATCH state=draft then post a comment."""
+        calls = []
+
+        def fake_gh_api(path, method="GET", body=None):
+            calls.append({"path": path, "method": method, "body": body})
+            if method == "PATCH":
+                return {"ghsa_id": "GHSA-1234-5678-abcd", "state": "draft"}, None
+            return {}, None
+
+        with patch.object(self.pvr, "_gh_api", side_effect=fake_gh_api):
+            with patch.object(self.pvr, "_post_advisory_comment", return_value="Comment posted: https://github.com/test"):
+                result = self.pvr.accept_pvr_advisory.fn(
+                    owner="owner",
+                    repo="repo",
+                    ghsa_id="GHSA-1234-5678-abcd",
+                    comment="Confirmed. We'll publish an advisory.",
+                )
+
+        self.assertEqual(calls[0]["method"], "PATCH")
+        self.assertIn("GHSA-1234-5678-abcd", calls[0]["path"])
+        self.assertEqual(calls[0]["body"], {"state": "draft"})
+        self.assertIn("draft", result)
+
     # --- reject_pvr_advisory ---
 
     def test_reject_pvr_advisory_calls_correct_api(self):
@@ -427,6 +453,7 @@ class TestYamlStructure(unittest.TestCase):
         result = self.tools.get_toolbox("seclab_taskflows.toolboxes.pvr_ghsa")
         self.assertIsNotNone(result)
         confirm = result.get("confirm", [])
+        self.assertIn("accept_pvr_advisory", confirm)
         self.assertIn("reject_pvr_advisory", confirm)
         self.assertIn("add_pvr_advisory_comment", confirm)
 

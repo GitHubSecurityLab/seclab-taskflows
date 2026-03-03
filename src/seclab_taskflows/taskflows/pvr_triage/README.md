@@ -161,6 +161,7 @@ python -m seclab_taskflow_agent \
 
 | `action` | API call | When to use |
 |---|---|---|
+| `accept` | Sets advisory state to `draft` (triage → draft), then posts the comment | Vulnerability confirmed — maintainer intends to publish an advisory |
 | `comment` | Posts the response draft as a comment on the advisory | Default for all verdicts — sends your reply without changing state |
 | `reject` | Sets advisory state to `closed`, then posts the comment | Report is clearly invalid or low quality |
 
@@ -168,7 +169,7 @@ python -m seclab_taskflow_agent \
 
 ### Confirm gate
 
-The toolbox marks `reject_pvr_advisory` and `add_pvr_advisory_comment` as `confirm`-gated. The agent will print the verdict, quality rating, and full response draft, then ask for explicit confirmation before making any change to GitHub.
+The toolbox marks `accept_pvr_advisory`, `reject_pvr_advisory`, and `add_pvr_advisory_comment` as `confirm`-gated. The agent will print the verdict, quality rating, and full response draft, then ask for explicit confirmation before making any change to GitHub.
 
 After a successful write-back, `pvr_respond` calls `mark_response_sent` to create a `<GHSA-ID>_response_sent.md` marker so `pvr_respond_batch` will skip this advisory in future runs.
 
@@ -195,7 +196,7 @@ python -m seclab_taskflow_agent \
 **Task 2** iterates over every pending entry:
 1. Reads the triage report and response draft from disk.
 2. Prints a per-item preview (GHSA, verdict, first 200 chars of response).
-3. Executes the chosen action (`comment` / `reject`) via the confirm-gated write-back tool.
+3. Executes the chosen action (`accept` / `comment` / `reject`) via the confirm-gated write-back tool.
 4. On success, calls `mark_response_sent` to create a `*_response_sent.md` marker so the advisory is skipped in future runs.
 
 Prints a final count: `"Sent N / M responses."`
@@ -219,6 +220,7 @@ Prints a final count: `"Sent N / M responses."`
    - Edit the response draft (_response_triage.md) if needed.
 
 4a. Send responses one at a time with pvr_respond:
+    - action=accept    → move to draft (triage → draft) + post reply
     - action=comment   → post reply only (advisory stays in triage state)
     - action=reject    → close + post reply
 

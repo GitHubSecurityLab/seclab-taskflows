@@ -401,6 +401,29 @@ def reject_pvr_advisory(
 
 
 @mcp.tool()
+def accept_pvr_advisory(
+    owner: str = Field(description="Repository owner (user or org name)"),
+    repo: str = Field(description="Repository name"),
+    ghsa_id: str = Field(description="GHSA ID of the advisory, e.g. GHSA-xxxx-xxxx-xxxx"),
+    comment: str = Field(description="Acknowledgement comment to post on the advisory"),
+) -> str:
+    """
+    Accept a PVR advisory by moving it from triage to draft state, then post a comment.
+
+    Sets the advisory state to 'draft' via the GitHub API (triage → draft transition),
+    then posts a comment. Use this when the vulnerability is confirmed and the maintainer
+    intends to publish a security advisory. Requires a GH_TOKEN with security_events
+    write scope.
+    """
+    path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
+    _, err = _gh_api(path, method="PATCH", body={"state": "draft"})
+    if err:
+        return f"Error accepting advisory {ghsa_id}: {err}"
+    result = _post_advisory_comment(owner, repo, ghsa_id, comment)
+    return f"Advisory {ghsa_id} accepted (moved to draft). Comment: {result}"
+
+
+@mcp.tool()
 def add_pvr_advisory_comment(
     owner: str = Field(description="Repository owner (user or org name)"),
     repo: str = Field(description="Repository name"),

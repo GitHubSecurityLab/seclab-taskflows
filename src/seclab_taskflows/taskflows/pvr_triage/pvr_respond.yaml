@@ -12,7 +12,7 @@
 #     -t seclab_taskflows.taskflows.pvr_triage.pvr_respond \
 #     -g repo=owner/repo \
 #     -g ghsa=GHSA-xxxx-xxxx-xxxx \
-#     -g action=reject|comment
+#     -g action=accept|reject|comment
 #
 # Required environment variables:
 #   GH_TOKEN        - GitHub token with security_events write scope
@@ -31,7 +31,7 @@ globals:
   repo:
   # GHSA ID of the advisory to act on
   ghsa:
-  # Action to perform: reject or comment
+  # Action to perform: accept, reject, or comment
   action:
 
 taskflow:
@@ -87,6 +87,13 @@ taskflow:
 
         Execute the action as follows:
 
+          If action is "accept":
+            Call accept_pvr_advisory with:
+              - owner: extracted owner
+              - repo: extracted repo
+              - ghsa_id: "{{ globals.ghsa }}"
+              - comment: response_draft
+
           If action is "reject":
             Call reject_pvr_advisory with:
               - owner: extracted owner
@@ -102,7 +109,7 @@ taskflow:
               - body: response_draft
 
           If action is anything else:
-            Print: "Unknown action '{{ globals.action }}'. Valid actions: reject, comment"
+            Print: "Unknown action '{{ globals.action }}'. Valid actions: accept, reject, comment"
             and stop.
 
         Print the result returned by the API call.

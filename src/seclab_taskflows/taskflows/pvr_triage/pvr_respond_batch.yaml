@@ -11,7 +11,7 @@
 #   python -m seclab_taskflow_agent \
 #     -t seclab_taskflows.taskflows.pvr_triage.pvr_respond_batch \
 #     -g repo=owner/repo \
-#     -g action=comment|reject
+#     -g action=accept|comment|reject
 #
 # Required environment variables:
 #   GH_TOKEN        - GitHub token with security_events write scope
@@ -28,7 +28,7 @@ model_config: seclab_taskflows.configs.model_config_pvr_triage
 globals:
   # GitHub repository in owner/repo format
   repo:
-  # Action to apply to all pending responses: comment or reject
+  # Action to apply to all pending responses: accept, comment, or reject
   action:
 
 taskflow:
@@ -84,6 +84,9 @@ taskflow:
                Verdict: [extracted from triage report]
                Response preview: [first 200 chars of response draft]
           4. Execute the action:
+               If action is "accept":
+                 Call accept_pvr_advisory with owner, repo, ghsa_id=entry.ghsa_id,
+                 comment=response_draft.
                If action is "reject":
                  Call reject_pvr_advisory with owner, repo, ghsa_id=entry.ghsa_id,
                  comment=response_draft.

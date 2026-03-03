@@ -22,5 +22,6 @@ server_params:
     REPORT_DIR: "{{ env('REPORT_DIR', 'reports') }}"
 # Guard write-back tools: user must confirm before execution
 confirm:
+  - accept_pvr_advisory
   - reject_pvr_advisory
   - add_pvr_advisory_comment
