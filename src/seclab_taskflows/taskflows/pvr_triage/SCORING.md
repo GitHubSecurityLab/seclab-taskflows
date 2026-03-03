@@ -90,16 +90,45 @@ Assigned by the analyst in the report generation task.
 
 ## 3. Fast-Close Detection (`pvr_triage`)
 
-The quality gate triggers `fast_close=true` when **all four** conditions hold simultaneously:
+The quality gate evaluates `fast_close` via a three-path decision tree gated on the reporter's reputation.
+
+### Path A — High-trust reporter
+
+| Condition | Result |
+|---|---|
+| `reporter_score.recommendation == "high trust"` | `fast_close = false` unconditionally |
+
+High-trust reporters always receive full code verification regardless of quality signals.
+
+### Path B — Skepticism reporter
+
+| Condition | Result |
+|---|---|
+| `reporter_score.recommendation == "treat with skepticism"` **and** all three signals absent | `fast_close = true` |
+| `reporter_score.recommendation == "treat with skepticism"` **and** any signal present | `fast_close = false` |
+
+For skepticism reporters, a prior similar report is **not** required — the three absent quality signals alone are sufficient to trigger fast-close.
+
+### Path C — Normal / no history
+
+All four conditions must hold simultaneously:
 
 1. `has_file_references` is false
 2. `has_poc` is false
 3. `has_line_numbers` is false
 4. At least one similar report already exists in `REPORT_DIR` with verdict `UNCONFIRMED` or `CONFIRMED`
 
-When `fast_close` is true, code verification is skipped entirely. The response draft uses the fast-close template (requests specific file path, line number, and reproduction steps).
-
 Conditions 1–3 alone are not sufficient — there must also be a prior report on a similar issue. A novel low-quality report for an unseen component proceeds to full verification.
+
+### Reputation × fast-close summary matrix
+
+| Reputation | No quality signals, no prior similar | No quality signals, prior similar exists | Any quality signal present |
+|---|---|---|---|
+| high trust | full verification | full verification | full verification |
+| normal / no history | full verification | **fast-close** | full verification |
+| treat with skepticism | **fast-close** | **fast-close** | full verification |
+
+When `fast_close` is true, code verification is skipped entirely. The response draft uses the fast-close template (requests specific file path, line number, and reproduction steps).
 
 ---
 
@@ -132,4 +161,10 @@ low_share     = Low_count / total_reports
 
 ### Effect on triage
 
-The reputation score is **informational only** — it appears in the triage report under Reporter Reputation but does not automatically change the verdict or trigger fast-close. A "treat with skepticism" reporter still receives full code verification unless the fast-close conditions are independently met.
+The reputation score directly influences the fast-close decision (see Section 3):
+
+- **high trust** — always forces full code verification.
+- **treat with skepticism** — lowers the fast-close bar: only three absent quality signals are needed (no prior similar report required).
+- **normal / no history** — standard four-condition fast-close applies.
+
+The score also appears in the triage report under **Reporter Reputation** for maintainer awareness.
