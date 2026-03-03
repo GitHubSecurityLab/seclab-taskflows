@@ -43,13 +43,13 @@ class TestPvrGhsaTools(unittest.TestCase):
     # --- reject_pvr_advisory ---
 
     def test_reject_pvr_advisory_calls_correct_api(self):
-        """reject_pvr_advisory should PATCH state=rejected then post a comment."""
+        """reject_pvr_advisory should PATCH state=closed then post a comment."""
         calls = []
 
         def fake_gh_api(path, method="GET", body=None):
             calls.append({"path": path, "method": method, "body": body})
             if method == "PATCH":
-                return {"ghsa_id": "GHSA-1234-5678-abcd", "state": "rejected"}, None
+                return {"ghsa_id": "GHSA-1234-5678-abcd", "state": "closed"}, None
             return {}, None
 
         with patch.object(self.pvr, "_gh_api", side_effect=fake_gh_api):
@@ -61,36 +61,11 @@ class TestPvrGhsaTools(unittest.TestCase):
                     comment="Rejecting: not a valid report.",
                 )
 
-        # First call must be the PATCH to set state=rejected
+        # First call must be the PATCH to set state=closed
         self.assertEqual(calls[0]["method"], "PATCH")
         self.assertIn("GHSA-1234-5678-abcd", calls[0]["path"])
-        self.assertEqual(calls[0]["body"], {"state": "rejected"})
-        self.assertIn("rejected", result)
-
-    # --- withdraw_pvr_advisory ---
-
-    def test_withdraw_pvr_advisory_calls_correct_api(self):
-        """withdraw_pvr_advisory should PATCH state=withdrawn."""
-        calls = []
-
-        def fake_gh_api(path, method="GET", body=None):
-            calls.append({"path": path, "method": method, "body": body})
-            if method == "PATCH":
-                return {"ghsa_id": "GHSA-1234-5678-abcd", "state": "withdrawn"}, None
-            return {}, None
-
-        with patch.object(self.pvr, "_gh_api", side_effect=fake_gh_api):
-            with patch.object(self.pvr, "_post_advisory_comment", return_value="Comment posted: https://github.com/test"):
-                result = self.pvr.withdraw_pvr_advisory.fn(
-                    owner="owner",
-                    repo="repo",
-                    ghsa_id="GHSA-1234-5678-abcd",
-                    comment="Withdrawing self-submitted draft.",
-                )
-
-        self.assertEqual(calls[0]["method"], "PATCH")
-        self.assertEqual(calls[0]["body"], {"state": "withdrawn"})
-        self.assertIn("withdrawn", result)
+        self.assertEqual(calls[0]["body"], {"state": "closed"})
+        self.assertIn("closed", result)
 
     # --- add_pvr_advisory_comment ---
 
@@ -453,7 +428,6 @@ class TestYamlStructure(unittest.TestCase):
         self.assertIsNotNone(result)
         confirm = result.get("confirm", [])
         self.assertIn("reject_pvr_advisory", confirm)
-        self.assertIn("withdraw_pvr_advisory", confirm)
         self.assertIn("add_pvr_advisory_comment", confirm)
 
     def test_pvr_respond_batch_yaml_parses(self):

@@ -158,7 +158,7 @@ def list_pvr_advisories(
     repo: str = Field(description="Repository name"),
     state: str = Field(
         default="triage",
-        description="Advisory state to filter by: triage, published, rejected, or withdrawn. Default: triage",
+        description="Advisory state to filter by: triage, draft, published, closed, or withdrawn. Default: triage",
     ),
 ) -> str:
     """
@@ -328,7 +328,7 @@ def _post_advisory_comment(owner: str, repo: str, ghsa_id: str, body: str) -> st
     Attempts to use the GitHub advisory comments API. If that endpoint is not
     available, falls back to appending a '## Maintainer Response' section to the
     advisory description instead. Called by both the MCP tool wrapper and the
-    reject/withdraw tools so they all share the same logic without going through
+    reject_pvr_advisory so they all share the same logic without going through
     the FunctionTool wrapper.
     """
     comment_path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}/comments"
@@ -386,40 +386,18 @@ def reject_pvr_advisory(
     comment: str = Field(description="Explanation comment to post on the advisory"),
 ) -> str:
     """
-    Reject a security advisory and post a comment explaining the decision.
+    Close (reject) a security advisory and post a comment explaining the decision.
 
-    Sets the advisory state to 'rejected' via the GitHub API, then posts a
+    Sets the advisory state to 'closed' via the GitHub API, then posts a
     comment with the provided explanation. Requires a GH_TOKEN with
     security_events write scope.
     """
     path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
-    _, err = _gh_api(path, method="PATCH", body={"state": "rejected"})
+    _, err = _gh_api(path, method="PATCH", body={"state": "closed"})
     if err:
-        return f"Error rejecting advisory {ghsa_id}: {err}"
+        return f"Error closing advisory {ghsa_id}: {err}"
     result = _post_advisory_comment(owner, repo, ghsa_id, comment)
-    return f"Advisory {ghsa_id} rejected. Comment: {result}"
-
-
-@mcp.tool()
-def withdraw_pvr_advisory(
-    owner: str = Field(description="Repository owner (user or org name)"),
-    repo: str = Field(description="Repository name"),
-    ghsa_id: str = Field(description="GHSA ID of the advisory, e.g. GHSA-xxxx-xxxx-xxxx"),
-    comment: str = Field(description="Explanation comment to post on the advisory"),
-) -> str:
-    """
-    Withdraw a security advisory in triage state and post a comment.
-
-    Sets the advisory state to 'withdrawn' via the GitHub API, then posts a
-    comment with the provided explanation. Requires a GH_TOKEN with
-    security_events write scope.
-    """
-    path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
-    _, err = _gh_api(path, method="PATCH", body={"state": "withdrawn"})
-    if err:
-        return f"Error withdrawing advisory {ghsa_id}: {err}"
-    result = _post_advisory_comment(owner, repo, ghsa_id, comment)
-    return f"Advisory {ghsa_id} withdrawn. Comment: {result}"
+    return f"Advisory {ghsa_id} closed. Comment: {result}"
 
 
 @mcp.tool()

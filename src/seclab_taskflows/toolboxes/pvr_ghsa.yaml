@@ -23,5 +23,4 @@ server_params:
 # Guard write-back tools: user must confirm before execution
 confirm:
   - reject_pvr_advisory
-  - withdraw_pvr_advisory
   - add_pvr_advisory_comment

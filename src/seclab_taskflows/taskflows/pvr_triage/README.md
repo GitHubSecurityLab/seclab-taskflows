@@ -162,14 +162,13 @@ python -m seclab_taskflow_agent \
 | `action` | API call | When to use |
 |---|---|---|
 | `comment` | Posts the response draft as a comment on the advisory | Default for all verdicts — sends your reply without changing state |
-| `reject` | Sets advisory state to `rejected`, then posts the comment | Report is clearly invalid or low quality |
-| `withdraw` | Sets advisory state to `withdrawn`, then posts the comment | Your own self-submitted advisory that should be removed |
+| `reject` | Sets advisory state to `closed`, then posts the comment | Report is clearly invalid or low quality |
 
 > **Note:** `pvr_respond` requires that `pvr_triage` has already been run for the GHSA, so that both `<GHSA-ID>_triage.md` and `<GHSA-ID>_response_triage.md` exist in `REPORT_DIR`.
 
 ### Confirm gate
 
-The toolbox marks `reject_pvr_advisory`, `withdraw_pvr_advisory`, and `add_pvr_advisory_comment` as `confirm`-gated. The agent will print the verdict, quality rating, and full response draft, then ask for explicit confirmation before making any change to GitHub.
+The toolbox marks `reject_pvr_advisory` and `add_pvr_advisory_comment` as `confirm`-gated. The agent will print the verdict, quality rating, and full response draft, then ask for explicit confirmation before making any change to GitHub.
 
 After a successful write-back, `pvr_respond` calls `mark_response_sent` to create a `<GHSA-ID>_response_sent.md` marker so `pvr_respond_batch` will skip this advisory in future runs.
 
@@ -196,7 +195,7 @@ python -m seclab_taskflow_agent \
 **Task 2** iterates over every pending entry:
 1. Reads the triage report and response draft from disk.
 2. Prints a per-item preview (GHSA, verdict, first 200 chars of response).
-3. Executes the chosen action (`comment` / `reject` / `withdraw`) via the confirm-gated write-back tool.
+3. Executes the chosen action (`comment` / `reject`) via the confirm-gated write-back tool.
 4. On success, calls `mark_response_sent` to create a `*_response_sent.md` marker so the advisory is skipped in future runs.
 
 Prints a final count: `"Sent N / M responses."`
@@ -221,8 +220,7 @@ Prints a final count: `"Sent N / M responses."`
 
 4a. Send responses one at a time with pvr_respond:
     - action=comment   → post reply only (advisory stays in triage state)
-    - action=reject    → reject + post reply
-    - action=withdraw  → withdraw + post reply
+    - action=reject    → close + post reply
 
 4b. Or send all pending drafts at once with pvr_respond_batch:
     Scans REPORT_DIR for unsent drafts (no _response_sent.md marker)

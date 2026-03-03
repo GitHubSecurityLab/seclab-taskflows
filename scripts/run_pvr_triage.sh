@@ -7,8 +7,8 @@
 # Usage:
 #   ./scripts/run_pvr_triage.sh batch          <owner/repo>
 #   ./scripts/run_pvr_triage.sh triage         <owner/repo> <GHSA-xxxx-xxxx-xxxx>
-#   ./scripts/run_pvr_triage.sh respond        <owner/repo> <GHSA-xxxx-xxxx-xxxx> <comment|reject|withdraw>
-#   ./scripts/run_pvr_triage.sh respond_batch  <owner/repo> <comment|reject|withdraw>
+#   ./scripts/run_pvr_triage.sh respond        <owner/repo> <GHSA-xxxx-xxxx-xxxx> <comment|reject>
+#   ./scripts/run_pvr_triage.sh respond_batch  <owner/repo> <comment|reject>
 #   ./scripts/run_pvr_triage.sh demo           <owner/repo>
 #
 # Environment (any already-set values are respected):
@@ -40,12 +40,12 @@ Commands:
       Run full triage on one advisory: verify code, generate report + response draft.
 
   respond        <owner/repo> <GHSA-xxxx-xxxx-xxxx> <action>
-      Post the response draft to GitHub. action = comment | reject | withdraw
+      Post the response draft to GitHub. action = comment | reject
       Requires pvr_triage to have been run first for the given GHSA.
 
   respond_batch  <owner/repo> <action>
       Scan REPORT_DIR for all pending response drafts and post them in one session.
-      action = comment | reject | withdraw
+      action = comment | reject
 
   demo           <owner/repo>
       Full pipeline on the given repo (batch → triage on first triage advisory → report preview).
@@ -134,8 +134,8 @@ cmd_respond() {
     local ghsa="${2:?Usage: $0 respond <owner/repo> <GHSA> <action>}"
     local action="${3:?Usage: $0 respond <owner/repo> <GHSA> <action>}"
     case "${action}" in
-        comment|reject|withdraw) ;;
-        *) echo "ERROR: action must be comment, reject, or withdraw" >&2; exit 1 ;;
+        comment|reject) ;;
+        *) echo "ERROR: action must be comment or reject" >&2; exit 1 ;;
     esac
     echo "==> Responding to ${ghsa} in ${repo} (action=${action}) ..."
     run_agent \
@@ -149,8 +149,8 @@ cmd_respond_batch() {
     local repo="${1:?Usage: $0 respond_batch <owner/repo> <action>}"
     local action="${2:?Usage: $0 respond_batch <owner/repo> <action>}"
     case "${action}" in
-        comment|reject|withdraw) ;;
-        *) echo "ERROR: action must be comment, reject, or withdraw" >&2; exit 1 ;;
+        comment|reject) ;;
+        *) echo "ERROR: action must be comment or reject" >&2; exit 1 ;;
     esac
     echo "==> Bulk respond for ${repo} (action=${action}) ..."
     run_agent \
