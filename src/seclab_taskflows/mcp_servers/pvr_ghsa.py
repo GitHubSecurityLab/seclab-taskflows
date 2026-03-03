@@ -250,7 +250,7 @@ def fetch_file_at_ref(
     path: str = Field(description="File path within the repository"),
     ref: str = Field(description="Git ref (commit SHA, tag, or branch) to fetch the file at"),
     start_line: int = Field(default=1, description="First line to return (1-indexed)"),
-    length: int = Field(default=50, description="Number of lines to return"),
+    length: int = Field(default=100, description="Number of lines to return (max 500)"),
 ) -> str:
     """
     Fetch a range of lines from a file at a specific git ref (commit SHA or tag).
