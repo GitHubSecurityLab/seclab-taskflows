@@ -82,8 +82,7 @@ taskflow:
           4. Compute priority_score using this formula:
              severity_weight: critical=4, high=3, medium=2, low=1, unknown=1
              quality_weight: has_file_references(+1) + has_poc(+1) + has_line_numbers(+1)
-             already_triaged_penalty: -3 if already_triaged else 0
-             priority_score = severity_weight + quality_weight + already_triaged_penalty
+             priority_score = severity_weight + quality_weight
           5. Determine suggested_action:
              - If already_triaged and verdict is UNCONFIRMED or INCONCLUSIVE: "Review/Close"
              - If already_triaged and verdict is CONFIRMED: "Fix/Publish"

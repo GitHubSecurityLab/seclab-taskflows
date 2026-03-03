@@ -6,6 +6,8 @@
 # Tracks PVR reporter history and computes reputation scores based on
 # past triage outcomes. Uses a local SQLite database.
 
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -52,11 +54,12 @@ class ReporterRecord(Base):
 
 class ReporterReputationBackend:
     def __init__(self, db_dir: Path | str) -> None:
-        db_path = Path(db_dir)
-        if str(db_dir) == "sqlite://" or not db_path.exists():
-            # In-memory database (used for tests or missing dir)
+        if str(db_dir) == "sqlite://":
+            # Explicit in-memory sentinel (used in tests)
             connection_string = "sqlite://"
         else:
+            db_path = Path(db_dir)
+            db_path.mkdir(parents=True, exist_ok=True)
             connection_string = f"sqlite:///{db_path}/reporter_reputation.db"
         self.engine = create_engine(connection_string, echo=False)
         Base.metadata.create_all(self.engine)
@@ -184,11 +187,9 @@ def get_reporter_history(
     Retrieve the full triage history for a reporter.
 
     Returns a JSON list of all records for this login, newest first.
-    Returns a plain message string if no history is found.
+    Returns an empty JSON list if no history is found.
     """
     history = backend.get_reporter_history(login)
-    if not history:
-        return f"No history for {login}."
     return json.dumps(history, indent=2)
 
 

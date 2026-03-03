@@ -19,7 +19,7 @@ server_params:
   env:
     GH_TOKEN: "{{ env('GH_TOKEN') }}"
     LOG_DIR: "{{ env('LOG_DIR') }}"
-    REPORT_DIR: "{{ env('REPORT_DIR') }}"
+    REPORT_DIR: "{{ env('REPORT_DIR', 'reports') }}"
 # Guard write-back tools: user must confirm before execution
 confirm:
   - reject_pvr_advisory

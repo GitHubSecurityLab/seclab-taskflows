@@ -6,7 +6,6 @@
 # Run with: pytest tests/test_pvr_mcp.py -v
 
 import json
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,7 +18,7 @@ import pytest
 # Helpers: patch mcp_data_dir so imports don't fail in CI (no platformdirs dir)
 # ---------------------------------------------------------------------------
 
-def _patch_mcp_data_dir_pvr_ghsa(tmp_path):
+def _patch_report_dir(tmp_path):
     """Return a context manager that patches REPORT_DIR in pvr_ghsa."""
     import seclab_taskflows.mcp_servers.pvr_ghsa as pvr_mod
     return patch.object(pvr_mod, "REPORT_DIR", tmp_path)
@@ -35,7 +34,11 @@ class TestPvrGhsaTools(unittest.TestCase):
     def setUp(self):
         import seclab_taskflows.mcp_servers.pvr_ghsa as pvr_mod
         self.pvr = pvr_mod
-        self.tmp = Path(tempfile.mkdtemp())
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.tmp = Path(self.tmp_dir.name)
+
+    def tearDown(self):
+        self.tmp_dir.cleanup()
 
     # --- reject_pvr_advisory ---
 
@@ -144,7 +147,7 @@ class TestPvrGhsaTools(unittest.TestCase):
             encoding="utf-8",
         )
 
-        with _patch_mcp_data_dir_pvr_ghsa(report_dir):
+        with _patch_report_dir(report_dir):
             result_json = self.pvr.find_similar_triage_reports.fn(
                 vuln_type="path traversal",
                 affected_component="upload handler",
@@ -165,7 +168,7 @@ class TestPvrGhsaTools(unittest.TestCase):
             encoding="utf-8",
         )
 
-        with _patch_mcp_data_dir_pvr_ghsa(report_dir):
+        with _patch_report_dir(report_dir):
             result_json = self.pvr.find_similar_triage_reports.fn(
                 vuln_type="XSS",
                 affected_component="login form",
@@ -177,7 +180,7 @@ class TestPvrGhsaTools(unittest.TestCase):
     def test_find_similar_reports_empty_dir(self):
         """find_similar_triage_reports returns empty list for non-existent REPORT_DIR."""
         empty_dir = self.tmp / "nonexistent"
-        with _patch_mcp_data_dir_pvr_ghsa(empty_dir):
+        with _patch_report_dir(empty_dir):
             result_json = self.pvr.find_similar_triage_reports.fn(
                 vuln_type="IDOR",
                 affected_component="profile",
@@ -189,7 +192,7 @@ class TestPvrGhsaTools(unittest.TestCase):
 
     def test_save_triage_report_path_sanitization(self):
         """save_triage_report strips path traversal characters from the GHSA ID."""
-        with _patch_mcp_data_dir_pvr_ghsa(self.tmp):
+        with _patch_report_dir(self.tmp):
             out_path = self.pvr.save_triage_report.fn(
                 ghsa_id="../../../etc/passwd",
                 report="malicious content",
@@ -209,14 +212,14 @@ class TestPvrGhsaTools(unittest.TestCase):
         content = "## PVR Triage Analysis: GHSA-test\n\n**[CONFIRMED]**\n"
         (self.tmp / "GHSA-test_triage.md").write_text(content, encoding="utf-8")
 
-        with _patch_mcp_data_dir_pvr_ghsa(self.tmp):
+        with _patch_report_dir(self.tmp):
             result = self.pvr.read_triage_report.fn(ghsa_id="GHSA-test")
 
         self.assertEqual(result, content)
 
     def test_read_triage_report_missing_file(self):
         """read_triage_report returns an error string for a missing report."""
-        with _patch_mcp_data_dir_pvr_ghsa(self.tmp):
+        with _patch_report_dir(self.tmp):
             result = self.pvr.read_triage_report.fn(ghsa_id="GHSA-does-not-exist")
 
         self.assertIn("not found", result.lower())
@@ -231,8 +234,8 @@ class TestReporterReputationBackend(unittest.TestCase):
 
     def setUp(self):
         from seclab_taskflows.mcp_servers.reporter_reputation import ReporterReputationBackend
-        # Pass a non-existent path to trigger in-memory DB fallback
-        self.backend = ReporterReputationBackend(db_dir=Path("/nonexistent/path"))
+        # Use explicit in-memory sentinel for tests
+        self.backend = ReporterReputationBackend(db_dir="sqlite://")
 
     def test_record_and_retrieve(self):
         """record_triage_result inserts a record and get_reporter_history retrieves it."""
@@ -311,10 +314,7 @@ class TestReporterReputationBackend(unittest.TestCase):
         self.assertEqual(score["confirmed_pct"], 1.0)
 
     def test_get_reporter_history_empty(self):
-        """get_reporter_history returns 'No history' message for unknown login."""
-        from seclab_taskflows.mcp_servers.reporter_reputation import get_reporter_history
-        # Use the MCP tool wrapper to test the string return
-        # (backend method returns list; MCP tool returns string)
+        """get_reporter_history returns empty list for unknown login."""
         history = self.backend.get_reporter_history("ghost")
         self.assertEqual(history, [])
 

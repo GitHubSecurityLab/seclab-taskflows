@@ -7,6 +7,8 @@
 # submitted via Private Vulnerability Reporting (PVR).
 # Uses the gh CLI for all GitHub API calls.
 
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -18,7 +20,8 @@ from fastmcp import FastMCP
 from pydantic import Field
 from seclab_taskflow_agent.path_utils import log_file_name
 
-REPORT_DIR = Path(os.getenv("REPORT_DIR", "reports"))
+_raw_report_dir = os.getenv("REPORT_DIR")
+REPORT_DIR = Path(_raw_report_dir) if _raw_report_dir and _raw_report_dir.strip() else Path("reports")
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -160,18 +163,29 @@ def list_pvr_advisories(
     """
     List repository security advisories, defaulting to draft state.
 
-    Returns a summary list (no description text). Each entry includes
+    Returns a JSON summary list (no description text). Each entry includes
     ghsa_id, severity, summary, state, pvr_submission, and created_at.
+    Returns an empty JSON list when no advisories are found.
+    Paginates automatically through all pages (100 items per page).
     """
-    path = f"/repos/{owner}/{repo}/security-advisories?state={state}&per_page=100"
-    data, err = _gh_api(path)
-    if err:
-        return f"Error listing advisories: {err}"
-    if not isinstance(data, list):
-        return f"Unexpected response: {data}"
+    base_path = f"/repos/{owner}/{repo}/security-advisories?state={state}&per_page=100"
+    all_data: list = []
+    page = 1
+    while True:
+        data, err = _gh_api(f"{base_path}&page={page}")
+        if err:
+            return f"Error listing advisories: {err}"
+        if not isinstance(data, list):
+            return f"Unexpected response: {data}"
+        if not data:
+            break
+        all_data.extend(data)
+        if len(data) < 100:
+            break
+        page += 1
 
     results = []
-    for raw in data:
+    for raw in all_data:
         submission = raw.get("submission") or {}
         results.append({
             "ghsa_id": raw.get("ghsa_id", ""),
@@ -185,8 +199,6 @@ def list_pvr_advisories(
             "created_at": raw.get("created_at", ""),
         })
 
-    if not results:
-        return f"No {state} advisories found for {owner}/{repo}."
     return json.dumps(results, indent=2)
 
 
@@ -429,15 +441,22 @@ def find_similar_triage_reports(
     Search existing triage reports for similar vulnerability types and affected components.
 
     Scans REPORT_DIR for *_triage.md files and performs case-insensitive substring
-    matching on the header lines for vuln_type and affected_component.
+    matching across the full file content for vuln_type and/or affected_component.
+    A report matches if at least one non-empty search term is found anywhere in the file.
+    Returns an empty list if both terms are empty/whitespace.
     Returns a JSON list of matching reports with ghsa_id, verdict, quality, and path.
     """
     if not REPORT_DIR.exists():
         return json.dumps([])
 
+    vuln_lower = vuln_type.strip().lower()
+    component_lower = affected_component.strip().lower()
+
+    # Both terms empty → no meaningful search possible
+    if not vuln_lower and not component_lower:
+        return json.dumps([])
+
     matches = []
-    vuln_lower = vuln_type.lower()
-    component_lower = affected_component.lower()
 
     for report_path in sorted(REPORT_DIR.glob("*_triage.md")):
         # Skip batch queue reports and response drafts — only match individual GHSA triage reports
@@ -450,7 +469,10 @@ def find_similar_triage_reports(
             continue
 
         content_lower = content.lower()
-        if vuln_lower not in content_lower and component_lower not in content_lower:
+        matched = (vuln_lower and vuln_lower in content_lower) or (
+            component_lower and component_lower in content_lower
+        )
+        if not matched:
             continue
 
         # Extract GHSA ID from filename: {ghsa_id}_triage.md

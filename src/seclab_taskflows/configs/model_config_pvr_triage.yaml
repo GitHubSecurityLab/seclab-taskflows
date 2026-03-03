@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 # PVR triage model configuration.
-# Uses GitHub Copilot API endpoint by default (AI_API_ENDPOINT=https://api.githubcopilot.com).
+# AI_API_ENDPOINT defaults to https://api.githubcopilot.com (set in run_pvr_triage.sh).
 # Override AI_API_ENDPOINT and AI_API_TOKEN for other providers.
 
 seclab-taskflow-agent:

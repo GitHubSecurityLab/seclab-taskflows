@@ -17,7 +17,7 @@
 # Required environment variables:
 #   GH_TOKEN        - GitHub token with repo and security_events scope
 #   AI_API_TOKEN    - API token for the AI model provider
-#   AI_API_ENDPOINT - Model provider endpoint (default: GitHub Copilot API)
+#   AI_API_ENDPOINT - Model provider endpoint (default: https://api.githubcopilot.com)
 
 seclab-taskflow-agent:
   version: "1.0"

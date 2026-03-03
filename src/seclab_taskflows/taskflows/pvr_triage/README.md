@@ -26,17 +26,17 @@ Three taskflows cover the full triage lifecycle:
 |---|---|---|
 | `GH_TOKEN` | all | GitHub personal access token |
 | `AI_API_TOKEN` | all | API key for the AI provider |
-| `AI_API_ENDPOINT` | all | Model endpoint (defaults to GitHub Models: `https://models.github.ai/inference`) |
+| `AI_API_ENDPOINT` | all | Model endpoint (defaults to `https://api.githubcopilot.com`) |
 | `REPORT_DIR` | all | Directory where triage reports are written. Defaults to `./reports` |
 | `LOG_DIR` | all | Directory for MCP server logs. Auto-detected via `platformdirs` if not set |
-| `REPORTER_DB_DIR` | `pvr_triage`, `pvr_respond` | Directory for the reporter reputation SQLite database. Auto-detected if not set |
+| `REPORTER_DB_DIR` | `pvr_triage` | Directory for the reporter reputation SQLite database. Auto-detected if not set |
 
 A minimal `.env` for local use:
 
 ```
 GH_TOKEN=ghp_...
 AI_API_TOKEN=...
-AI_API_ENDPOINT=https://models.github.ai/inference
+AI_API_ENDPOINT=https://api.githubcopilot.com
 REPORT_DIR=/path/to/reports
 LOG_DIR=/path/to/logs
 ```
