@@ -17,7 +17,7 @@ from pathlib import Path
 from fastmcp import FastMCP
 from pydantic import Field
 from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
-from sqlalchemy import Text, create_engine
+from sqlalchemy import Text, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 REPORTER_DB_DIR = mcp_data_dir("seclab-taskflows", "reporter_reputation", "REPORTER_DB_DIR")
@@ -34,8 +34,13 @@ class Base(DeclarativeBase):
     pass
 
 
+VALID_VERDICTS = frozenset({"CONFIRMED", "UNCONFIRMED", "INCONCLUSIVE"})
+VALID_QUALITIES = frozenset({"High", "Medium", "Low"})
+
+
 class ReporterRecord(Base):
     __tablename__ = "reporter_records"
+    __table_args__ = (UniqueConstraint("login", "ghsa_id", name="uq_reporter_ghsa"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     login: Mapped[str]
@@ -68,6 +73,10 @@ class ReporterReputationBackend:
         self, login: str, ghsa_id: str, repo: str, verdict: str, quality: str
     ) -> str:
         """Insert or update a triage result record for a reporter."""
+        if verdict not in VALID_VERDICTS:
+            raise ValueError(f"Invalid verdict {verdict!r}. Must be one of {sorted(VALID_VERDICTS)}")
+        if quality not in VALID_QUALITIES:
+            raise ValueError(f"Invalid quality {quality!r}. Must be one of {sorted(VALID_QUALITIES)}")
         timestamp = datetime.now(timezone.utc).isoformat()
         with Session(self.engine) as session:
             existing = (
@@ -174,9 +183,12 @@ def record_triage_result(
 
     Upserts a row keyed by (login, ghsa_id). Re-running triage on the same
     GHSA advisory updates the existing record rather than creating a duplicate.
-    Returns 'recorded' on success.
+    Returns 'recorded' on success, or an error string for invalid inputs.
     """
-    return backend.record_triage_result(login, ghsa_id, repo, verdict, quality)
+    try:
+        return backend.record_triage_result(login, ghsa_id, repo, verdict, quality)
+    except ValueError as e:
+        return f"Error: {e}"
 
 
 @mcp.tool()

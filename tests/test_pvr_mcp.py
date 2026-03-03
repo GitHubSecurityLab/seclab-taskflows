@@ -205,6 +205,15 @@ class TestPvrGhsaTools(unittest.TestCase):
         self.assertFalse(".." in saved.name)
         self.assertFalse("/" in saved.name)
 
+    def test_save_triage_report_empty_after_sanitization(self):
+        """save_triage_report returns an error when ghsa_id is all special chars."""
+        with _patch_report_dir(self.tmp):
+            result = self.pvr.save_triage_report.fn(
+                ghsa_id="!@#$%^&*()",
+                report="some content",
+            )
+        self.assertIn("Error", result)
+
     # --- read_triage_report ---
 
     def test_read_triage_report_returns_content(self):
@@ -317,6 +326,16 @@ class TestReporterReputationBackend(unittest.TestCase):
         """get_reporter_history returns empty list for unknown login."""
         history = self.backend.get_reporter_history("ghost")
         self.assertEqual(history, [])
+
+    def test_record_invalid_verdict_raises(self):
+        """record_triage_result rejects unknown verdict strings."""
+        with self.assertRaises(ValueError):
+            self.backend.record_triage_result("alice", "GHSA-x", "r/r", "MAYBE", "High")
+
+    def test_record_invalid_quality_raises(self):
+        """record_triage_result rejects unknown quality strings."""
+        with self.assertRaises(ValueError):
+            self.backend.record_triage_result("alice", "GHSA-x", "r/r", "CONFIRMED", "Excellent")
 
     def test_multiple_reporters_isolated(self):
         """Records for different reporters are independent."""

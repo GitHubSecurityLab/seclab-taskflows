@@ -299,6 +299,13 @@ taskflow:
         Be factual. Do not include anything not supported by code evidence.
         Keep the report concise. Aim for under 800 words.
 
+        After generating the report, also store a structured summary under memcache
+        key "triage_outcome":
+          {
+            "verdict": "CONFIRMED" | "UNCONFIRMED" | "INCONCLUSIVE",
+            "quality": "High" | "Medium" | "Low"
+          }
+
   # -------------------------------------------------------------------------
   # Task 6: Save report to disk and print path
   # -------------------------------------------------------------------------
@@ -331,14 +338,13 @@ taskflow:
       toolboxes:
         - seclab_taskflow_agent.toolboxes.memcache
       user_prompt: |
-        Retrieve "pvr_parsed", "code_verification", "quality_gate", and "triage_report"
-        from memcache.
+        Retrieve "pvr_parsed", "code_verification", "quality_gate", "triage_report",
+        and "triage_outcome" from memcache.
 
-        Extract the verdict from triage_report: look for the line containing
-        **CONFIRMED**, **UNCONFIRMED**, or **INCONCLUSIVE** in the Verdict section.
+        Use triage_outcome.verdict as the verdict.
 
         Draft a response comment to the reporter. Tone: direct, factual, not harsh.
-        Select the template based on verdict and quality_gate.fast_close:
+        Select the template based on triage_outcome.verdict and quality_gate.fast_close:
 
           fast_close (quality_gate.fast_close=true):
             Explain that the report lacks file paths, functions, and reproduction steps
@@ -377,14 +383,10 @@ taskflow:
         - seclab_taskflow_agent.toolboxes.memcache
       user_prompt: |
         Retrieve "pvr_parsed", "code_verification", "quality_gate", "triage_report",
-        and "response_draft" from memcache.
+        "triage_outcome", and "response_draft" from memcache.
 
-        Extract verdict: find **CONFIRMED**, **UNCONFIRMED**, or **INCONCLUSIVE**
-        in the triage_report Verdict section.
-
-        Extract quality rating: find the "Rate overall quality" line in triage_report
-        Report Quality section and extract: High, Medium, or Low.
-
+        Use triage_outcome.verdict as the verdict.
+        Use triage_outcome.quality as the quality rating.
         Extract reporter login from quality_gate.reporter_login.
 
         Call record_triage_result with:

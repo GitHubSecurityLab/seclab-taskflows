@@ -171,7 +171,8 @@ def list_pvr_advisories(
     base_path = f"/repos/{owner}/{repo}/security-advisories?state={state}&per_page=100"
     all_data: list = []
     page = 1
-    while True:
+    max_pages = 50  # hard cap: 5000 advisories max
+    while page <= max_pages:
         data, err = _gh_api(f"{base_path}&page={page}")
         if err:
             return f"Error listing advisories: {err}"
@@ -279,6 +280,9 @@ def fetch_file_at_ref(
         start_line = 1
     if length < 1:
         length = 50
+    length = min(length, 500)  # cap to avoid returning enormous files
+    if start_line > len(lines):
+        return f"start_line {start_line} exceeds file length ({len(lines)} lines) in {path}@{ref}"
     chunk = lines[start_line - 1: start_line - 1 + length]
     if not chunk:
         return f"No lines in range {start_line}-{start_line + length - 1} in {path}@{ref}"
@@ -300,6 +304,8 @@ def save_triage_report(
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     # Sanitize the GHSA ID to prevent path traversal
     safe_name = "".join(c for c in ghsa_id if c.isalnum() or c in "-_")
+    if not safe_name:
+        return "Error: ghsa_id produced an empty filename after sanitization"
     out_path = REPORT_DIR / f"{safe_name}_triage.md"
     # The agent sometimes passes the report as a JSON-encoded string
     # (with outer quotes and escape sequences). Decode it if so.
@@ -484,11 +490,9 @@ def find_similar_triage_reports(
         if verdict_match:
             verdict = verdict_match.group(1)
 
-        # Extract quality rating
+        # Extract quality rating — report format: "Rate overall quality: High / Medium / Low"
         quality = "Unknown"
         quality_match = re.search(r"Rate overall quality[:\s]*\**\s*(High|Medium|Low)\b", content, re.IGNORECASE)
-        if not quality_match:
-            quality_match = re.search(r"\b(High|Medium|Low)\b.*quality", content, re.IGNORECASE)
         if quality_match:
             quality = quality_match.group(1)
 
