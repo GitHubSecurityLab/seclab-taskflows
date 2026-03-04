@@ -9,7 +9,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -43,23 +43,19 @@ class TestPvrGhsaTools(unittest.TestCase):
     # --- accept_pvr_advisory ---
 
     def test_accept_pvr_advisory_calls_correct_api(self):
-        """accept_pvr_advisory should PATCH state=draft then post a comment."""
+        """accept_pvr_advisory should PATCH state=draft."""
         calls = []
 
         def fake_gh_api(path, method="GET", body=None):
             calls.append({"path": path, "method": method, "body": body})
-            if method == "PATCH":
-                return {"ghsa_id": "GHSA-1234-5678-abcd", "state": "draft"}, None
-            return {}, None
+            return {"ghsa_id": "GHSA-1234-5678-abcd", "state": "draft"}, None
 
         with patch.object(self.pvr, "_gh_api", side_effect=fake_gh_api):
-            with patch.object(self.pvr, "_post_advisory_comment", return_value="Comment posted: https://github.com/test"):
-                result = self.pvr.accept_pvr_advisory.fn(
-                    owner="owner",
-                    repo="repo",
-                    ghsa_id="GHSA-1234-5678-abcd",
-                    comment="Confirmed. We'll publish an advisory.",
-                )
+            result = self.pvr.accept_pvr_advisory.fn(
+                owner="owner",
+                repo="repo",
+                ghsa_id="GHSA-1234-5678-abcd",
+            )
 
         self.assertEqual(calls[0]["method"], "PATCH")
         self.assertIn("GHSA-1234-5678-abcd", calls[0]["path"])
@@ -69,70 +65,24 @@ class TestPvrGhsaTools(unittest.TestCase):
     # --- reject_pvr_advisory ---
 
     def test_reject_pvr_advisory_calls_correct_api(self):
-        """reject_pvr_advisory should PATCH state=closed then post a comment."""
+        """reject_pvr_advisory should PATCH state=closed."""
         calls = []
 
         def fake_gh_api(path, method="GET", body=None):
             calls.append({"path": path, "method": method, "body": body})
-            if method == "PATCH":
-                return {"ghsa_id": "GHSA-1234-5678-abcd", "state": "closed"}, None
-            return {}, None
+            return {"ghsa_id": "GHSA-1234-5678-abcd", "state": "closed"}, None
 
         with patch.object(self.pvr, "_gh_api", side_effect=fake_gh_api):
-            with patch.object(self.pvr, "_post_advisory_comment", return_value="Comment posted: https://github.com/test"):
-                result = self.pvr.reject_pvr_advisory.fn(
-                    owner="owner",
-                    repo="repo",
-                    ghsa_id="GHSA-1234-5678-abcd",
-                    comment="Rejecting: not a valid report.",
-                )
+            result = self.pvr.reject_pvr_advisory.fn(
+                owner="owner",
+                repo="repo",
+                ghsa_id="GHSA-1234-5678-abcd",
+            )
 
-        # First call must be the PATCH to set state=closed
         self.assertEqual(calls[0]["method"], "PATCH")
         self.assertIn("GHSA-1234-5678-abcd", calls[0]["path"])
         self.assertEqual(calls[0]["body"], {"state": "closed"})
         self.assertIn("closed", result)
-
-    # --- add_pvr_advisory_comment ---
-
-    def test_add_pvr_advisory_comment_returns_url_on_success(self):
-        """add_pvr_advisory_comment returns comment URL on API success."""
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = json.dumps({"html_url": "https://github.com/comment/1"})
-        with patch("subprocess.run", return_value=mock_result):
-            result = self.pvr.add_pvr_advisory_comment.fn(
-                owner="owner",
-                repo="repo",
-                ghsa_id="GHSA-1234-5678-abcd",
-                body="Thank you for the report.",
-            )
-        self.assertIn("https://github.com/comment/1", result)
-
-    def test_add_pvr_advisory_comment_fallback_on_api_failure(self):
-        """add_pvr_advisory_comment falls back to description update when comments API unavailable."""
-        # First subprocess call (comments POST) fails
-        mock_fail = MagicMock()
-        mock_fail.returncode = 1
-        mock_fail.stderr = "Not Found"
-        mock_fail.stdout = ""
-
-        def fake_gh_api(path, method="GET", body=None):
-            if method == "GET":
-                return {"description": "Original description.", "ghsa_id": "GHSA-x"}, None
-            if method == "PATCH":
-                return {"description": "updated"}, None
-            return {}, None
-
-        with patch("subprocess.run", return_value=mock_fail):
-            with patch.object(self.pvr, "_gh_api", side_effect=fake_gh_api):
-                result = self.pvr.add_pvr_advisory_comment.fn(
-                    owner="owner",
-                    repo="repo",
-                    ghsa_id="GHSA-1234-5678-abcd",
-                    body="Maintainer note.",
-                )
-        self.assertIn("description", result.lower())
 
     # --- find_similar_triage_reports ---
 
@@ -455,7 +405,7 @@ class TestYamlStructure(unittest.TestCase):
         confirm = result.get("confirm", [])
         self.assertIn("accept_pvr_advisory", confirm)
         self.assertIn("reject_pvr_advisory", confirm)
-        self.assertIn("add_pvr_advisory_comment", confirm)
+        self.assertNotIn("add_pvr_advisory_comment", confirm)
 
     def test_pvr_respond_batch_yaml_parses(self):
         """pvr_respond_batch.yaml loads without error and declares repo + action globals."""

@@ -12,7 +12,7 @@
 #     -t seclab_taskflows.taskflows.pvr_triage.pvr_respond \
 #     -g repo=owner/repo \
 #     -g ghsa=GHSA-xxxx-xxxx-xxxx \
-#     -g action=accept|reject|comment
+#     -g action=accept|reject
 #
 # Required environment variables:
 #   GH_TOKEN        - GitHub token with security_events write scope
@@ -31,7 +31,7 @@ globals:
   repo:
   # GHSA ID of the advisory to act on
   ghsa:
-  # Action to perform: accept, reject, or comment
+  # Action to perform: accept or reject
   action:
 
 taskflow:
@@ -92,27 +92,21 @@ taskflow:
               - owner: extracted owner
               - repo: extracted repo
               - ghsa_id: "{{ globals.ghsa }}"
-              - comment: response_draft
 
           If action is "reject":
             Call reject_pvr_advisory with:
               - owner: extracted owner
               - repo: extracted repo
               - ghsa_id: "{{ globals.ghsa }}"
-              - comment: response_draft
-
-          If action is "comment":
-            Call add_pvr_advisory_comment with:
-              - owner: extracted owner
-              - repo: extracted repo
-              - ghsa_id: "{{ globals.ghsa }}"
-              - body: response_draft
 
           If action is anything else:
-            Print: "Unknown action '{{ globals.action }}'. Valid actions: accept, reject, comment"
+            Print: "Unknown action '{{ globals.action }}'. Valid actions: accept, reject"
             and stop.
 
         Print the result returned by the API call.
 
-        On success (action was not "anything else"), call mark_response_sent with
-        ghsa_id="{{ globals.ghsa }}" to record that this response has been sent.
+        On success, call mark_response_sent with ghsa_id="{{ globals.ghsa }}" to record
+        that the state transition has been applied.
+
+        Then print: "Response draft saved at REPORT_DIR/{{ globals.ghsa }}_response_triage.md
+        — post it to the reporter manually via the advisory URL."

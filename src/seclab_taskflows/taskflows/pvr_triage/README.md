@@ -147,63 +147,64 @@ quality_weight:   has_file_references(+1) + has_poc(+1) + has_line_numbers(+1)
 
 ## Taskflow 3 — Write-back (`pvr_respond`)
 
-Loads an existing triage report and response draft from disk and executes the chosen action against the GitHub advisory API. All write-back calls are confirm-gated — the agent will prompt for confirmation before making any change.
+Loads an existing triage report and applies the chosen state transition to the GitHub advisory. All write-back calls are confirm-gated — the agent will prompt for confirmation before making any change.
 
 ```bash
 python -m seclab_taskflow_agent \
   -t seclab_taskflows.taskflows.pvr_triage.pvr_respond \
   -g repo=owner/repo \
   -g ghsa=GHSA-xxxx-xxxx-xxxx \
-  -g action=comment
+  -g action=accept
 ```
 
 ### Actions
 
 | `action` | API call | When to use |
 |---|---|---|
-| `accept` | Sets advisory state to `draft` (triage → draft), then posts the comment | Vulnerability confirmed — maintainer intends to publish an advisory |
-| `comment` | Posts the response draft as a comment on the advisory | Default for all verdicts — sends your reply without changing state |
-| `reject` | Sets advisory state to `closed`, then posts the comment | Report is clearly invalid or low quality |
+| `accept` | Sets advisory state to `draft` (triage → draft) | Vulnerability confirmed — maintainer intends to publish an advisory |
+| `reject` | Sets advisory state to `closed` | Report is clearly invalid or low quality |
 
-> **Note:** `pvr_respond` requires that `pvr_triage` has already been run for the GHSA, so that both `<GHSA-ID>_triage.md` and `<GHSA-ID>_response_triage.md` exist in `REPORT_DIR`.
+> **Note:** `pvr_respond` requires that `pvr_triage` has already been run for the GHSA so that `<GHSA-ID>_triage.md` and `<GHSA-ID>_response_triage.md` exist in `REPORT_DIR`.
+
+> **Posting the response:** The GitHub REST API has no comments endpoint for security advisories. After running `pvr_respond`, post the response draft manually via the advisory URL. See [`MANUAL_RESPONSE.md`](MANUAL_RESPONSE.md) for instructions and language.
 
 ### Confirm gate
 
-The toolbox marks `accept_pvr_advisory`, `reject_pvr_advisory`, and `add_pvr_advisory_comment` as `confirm`-gated. The agent will print the verdict, quality rating, and full response draft, then ask for explicit confirmation before making any change to GitHub.
+The toolbox marks `accept_pvr_advisory` and `reject_pvr_advisory` as `confirm`-gated. The agent will print the verdict and summary, then ask for explicit confirmation before making any change to GitHub.
 
-After a successful write-back, `pvr_respond` calls `mark_response_sent` to create a `<GHSA-ID>_response_sent.md` marker so `pvr_respond_batch` will skip this advisory in future runs.
+After a successful state transition, `pvr_respond` calls `mark_response_sent` to create a `<GHSA-ID>_response_sent.md` marker so `pvr_respond_batch` will skip this advisory in future runs.
 
 ---
 
 ## Taskflow 4 — Bulk respond (`pvr_respond_batch`)
 
-Scans `REPORT_DIR` for advisories that have a response draft (`*_response_triage.md`) but no sent marker (`*_response_sent.md`), then posts each response to GitHub in a single session.
+Scans `REPORT_DIR` for advisories that have a response draft (`*_response_triage.md`) but no applied marker (`*_response_sent.md`), and applies the chosen state transition to each in a single session.
 
 ```bash
 python -m seclab_taskflow_agent \
   -t seclab_taskflows.taskflows.pvr_triage.pvr_respond_batch \
   -g repo=owner/repo \
-  -g action=comment
+  -g action=reject
 
 # or via the helper script:
-./scripts/run_pvr_triage.sh respond_batch owner/repo comment
+./scripts/run_pvr_triage.sh respond_batch owner/repo reject
 ```
 
 ### How it works
 
-**Task 1** calls `list_pending_responses` (local read-only, no confirm gate) to find all unsent drafts and prints a summary table. If there are no pending drafts it stops immediately.
+**Task 1** calls `list_pending_responses` (local read-only, no confirm gate) to find all pending advisories and prints a summary table. If there are none it stops immediately.
 
 **Task 2** iterates over every pending entry:
-1. Reads the triage report and response draft from disk.
-2. Prints a per-item preview (GHSA, verdict, first 200 chars of response).
-3. Executes the chosen action (`accept` / `comment` / `reject`) via the confirm-gated write-back tool.
+1. Reads the triage report from disk.
+2. Prints a per-item summary (GHSA, verdict).
+3. Executes the chosen action (`accept` / `reject`) via the confirm-gated write-back tool.
 4. On success, calls `mark_response_sent` to create a `*_response_sent.md` marker so the advisory is skipped in future runs.
 
-Prints a final count: `"Sent N / M responses."`
+Prints a final count and a reminder to post each response draft manually.
 
-### Sent markers
+### Applied markers
 
-`pvr_respond` also calls `mark_response_sent` after a successful write-back, keeping single-advisory and bulk responds in sync. Once a marker exists, neither `pvr_respond` nor `pvr_respond_batch` will attempt to re-send.
+`pvr_respond` also calls `mark_response_sent` after a successful state transition, keeping single-advisory and bulk runs in sync. Once a marker exists, neither `pvr_respond` nor `pvr_respond_batch` will re-process it.
 
 ---
 
@@ -219,15 +220,15 @@ Prints a final count: `"Sent N / M responses."`
    - Check the Verdict and Code Verification sections.
    - Edit the response draft (_response_triage.md) if needed.
 
-4a. Send responses one at a time with pvr_respond:
-    - action=accept    → move to draft (triage → draft) + post reply
-    - action=comment   → post reply only (advisory stays in triage state)
-    - action=reject    → close + post reply
+4a. Apply a state transition with pvr_respond:
+    - action=accept    → move to draft (triage → draft)
+    - action=reject    → close (triage → closed)
+    Then post the response draft manually via the advisory URL.
 
-4b. Or send all pending drafts at once with pvr_respond_batch:
-    Scans REPORT_DIR for unsent drafts (no _response_sent.md marker)
-    and posts them all in one session.
-    Useful after triaging a batch in step 2.
+4b. Or apply state transitions to all pending advisories at once with pvr_respond_batch:
+    Scans REPORT_DIR for pending entries (no _response_sent.md marker)
+    and applies the chosen action to all of them in one session.
+    Then post each response draft manually via the advisory URL.
 ```
 
 ### Example session
@@ -248,25 +249,28 @@ python -m seclab_taskflow_agent \
 cat reports/GHSA-1234-5678-abcd_triage.md
 cat reports/GHSA-1234-5678-abcd_response_triage.md
 
-# Step 4a: send a comment for one advisory (doesn't change advisory state)
+# Step 4a: accept (triage → draft) — vulnerability confirmed
 python -m seclab_taskflow_agent \
   -t seclab_taskflows.taskflows.pvr_triage.pvr_respond \
   -g repo=acme/widget \
   -g ghsa=GHSA-1234-5678-abcd \
-  -g action=comment
+  -g action=accept
 
-# Step 4b: or reject outright
+# Step 4b: or reject (triage → closed) — invalid or low-quality report
 python -m seclab_taskflow_agent \
   -t seclab_taskflows.taskflows.pvr_triage.pvr_respond \
   -g repo=acme/widget \
   -g ghsa=GHSA-1234-5678-abcd \
   -g action=reject
 
-# Step 4c: or post all pending drafts at once (after triaging several advisories)
+# Step 4c: or apply state transitions to all pending advisories at once
 python -m seclab_taskflow_agent \
   -t seclab_taskflows.taskflows.pvr_triage.pvr_respond_batch \
   -g repo=acme/widget \
-  -g action=comment
+  -g action=reject
+
+# Step 5: post each response draft manually via the advisory URL
+# See taskflows/pvr_triage/MANUAL_RESPONSE.md for instructions
 ```
 
 ---
@@ -310,5 +314,5 @@ All files are written to `REPORT_DIR` (default: `./reports`).
 |---|---|---|
 | `<GHSA-ID>_triage.md` | `pvr_triage` task 6 | Full triage analysis report |
 | `<GHSA-ID>_response_triage.md` | `pvr_triage` task 8 | Plain-text response draft for the reporter |
-| `<GHSA-ID>_response_sent.md` | `pvr_respond` / `pvr_respond_batch` | Marker: response has been sent (contains ISO timestamp) |
+| `<GHSA-ID>_response_sent.md` | `pvr_respond` / `pvr_respond_batch` | Marker: state transition applied (contains ISO timestamp); post draft manually |
 | `batch_queue_<repo>_<date>.md` | `pvr_triage_batch` task 3 | Ranked inbox table with Age column |

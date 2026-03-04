@@ -4,14 +4,14 @@
 # PVR Bulk Respond Taskflow
 #
 # Scans REPORT_DIR for pending response drafts (advisories with a
-# *_response_triage.md but no *_response_sent.md marker) and posts
-# each response to GitHub in a single session.
+# *_response_triage.md but no *_response_sent.md marker) and applies
+# the chosen state transition to each in a single session.
 #
 # Usage:
 #   python -m seclab_taskflow_agent \
 #     -t seclab_taskflows.taskflows.pvr_triage.pvr_respond_batch \
 #     -g repo=owner/repo \
-#     -g action=accept|comment|reject
+#     -g action=accept|reject
 #
 # Required environment variables:
 #   GH_TOKEN        - GitHub token with security_events write scope
@@ -28,7 +28,7 @@ model_config: seclab_taskflows.configs.model_config_pvr_triage
 globals:
   # GitHub repository in owner/repo format
   repo:
-  # Action to apply to all pending responses: accept, comment, or reject
+  # Action to apply to all pending responses: accept or reject
   action:
 
 taskflow:
@@ -77,28 +77,19 @@ taskflow:
 
         For each entry in pending_responses:
           1. Call read_triage_report with ghsa_id=entry.ghsa_id to get the triage report.
-          2. Call read_triage_report with ghsa_id="{entry.ghsa_id}_response" to get the
-             response draft.
-          3. Print a per-item summary:
+          2. Print a per-item summary:
                GHSA: {entry.ghsa_id}
                Verdict: [extracted from triage report]
-               Response preview: [first 200 chars of response draft]
-          4. Execute the action:
+          3. Execute the action:
                If action is "accept":
-                 Call accept_pvr_advisory with owner, repo, ghsa_id=entry.ghsa_id,
-                 comment=response_draft.
+                 Call accept_pvr_advisory with owner, repo, ghsa_id=entry.ghsa_id.
                If action is "reject":
-                 Call reject_pvr_advisory with owner, repo, ghsa_id=entry.ghsa_id,
-                 comment=response_draft.
-               If action is "comment":
-                 Call add_pvr_advisory_comment with owner, repo, ghsa_id=entry.ghsa_id,
-                 body=response_draft.
+                 Call reject_pvr_advisory with owner, repo, ghsa_id=entry.ghsa_id.
                If action is anything else:
                  Print: "Unknown action '{{ globals.action }}'. Skipping {entry.ghsa_id}."
                  and continue to the next entry.
-          5. On success, call mark_response_sent with ghsa_id=entry.ghsa_id.
-             Print: "Sent: {entry.ghsa_id}"
+          4. On success, call mark_response_sent with ghsa_id=entry.ghsa_id.
+             Print: "Applied: {entry.ghsa_id} — post response draft manually via advisory URL."
 
         After processing all entries, print:
-        "Sent N / M responses." where N is the count of successfully sent responses
-        and M is the total count of pending_responses entries.
+        "Applied N / M state transitions. Post response drafts manually via each advisory URL."

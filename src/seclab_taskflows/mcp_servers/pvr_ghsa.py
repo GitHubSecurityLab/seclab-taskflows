@@ -321,83 +321,26 @@ def save_triage_report(
     return str(out_path.resolve())
 
 
-def _post_advisory_comment(owner: str, repo: str, ghsa_id: str, body: str) -> str:
-    """
-    Internal helper: post a comment on a security advisory.
-
-    Attempts to use the GitHub advisory comments API. If that endpoint is not
-    available, falls back to appending a '## Maintainer Response' section to the
-    advisory description instead. Called by both the MCP tool wrapper and the
-    reject_pvr_advisory so they all share the same logic without going through
-    the FunctionTool wrapper.
-    """
-    comment_path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}/comments"
-    cmd = [
-        "gh", "api",
-        "--method", "POST",
-        comment_path,
-        "--input", "-",
-    ]
-    env = os.environ.copy()
-    try:
-        result = subprocess.run(
-            cmd,
-            input=json.dumps({"body": body}),
-            capture_output=True,
-            text=True,
-            env=env,
-            timeout=30,
-        )
-    except subprocess.TimeoutExpired:
-        return "Error: gh api call timed out"
-    except FileNotFoundError:
-        return "Error: gh CLI not found in PATH"
-
-    if result.returncode == 0:
-        try:
-            data = json.loads(result.stdout)
-            url = data.get("html_url", data.get("url", "posted"))
-            return f"Comment posted: {url}"
-        except json.JSONDecodeError:
-            return "Comment posted."
-
-    # Fall back: append maintainer response to advisory description
-    logging.warning(
-        "Advisory comments API unavailable (%s); falling back to description update",
-        result.stderr.strip(),
-    )
-    adv_path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
-    adv_data, adv_err = _gh_api(adv_path)
-    if adv_err:
-        return f"Error fetching advisory for fallback comment: {adv_err}"
-    existing_desc = adv_data.get("description", "") or ""
-    updated_desc = existing_desc + f"\n\n## Maintainer Response\n\n{body}"
-    _, patch_err = _gh_api(adv_path, method="PATCH", body={"description": updated_desc})
-    if patch_err:
-        return f"Error updating advisory description: {patch_err}"
-    return "Comment appended to advisory description (comments API unavailable)."
-
-
 @mcp.tool()
 def reject_pvr_advisory(
     owner: str = Field(description="Repository owner (user or org name)"),
     repo: str = Field(description="Repository name"),
     ghsa_id: str = Field(description="GHSA ID of the advisory, e.g. GHSA-xxxx-xxxx-xxxx"),
-    comment: str = Field(description="Explanation comment to post on the advisory"),
 ) -> str:
     """
-    Close (reject) a security advisory and post a comment explaining the decision.
+    Close (reject) a security advisory.
 
-    Sets the advisory state to 'closed' via the GitHub API, then posts a
-    comment with the provided explanation. Requires a GH_TOKEN with
-    security_events write scope.
+    Sets the advisory state to 'closed' via the GitHub API. Requires a GH_TOKEN
+    with security_events write scope.
+
+    Note: the GitHub REST API has no comments endpoint for security advisories.
+    Post the response draft to the reporter manually via the advisory URL.
     """
     path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
     _, err = _gh_api(path, method="PATCH", body={"state": "closed"})
     if err:
         return f"Error closing advisory {ghsa_id}: {err}"
-    result = _post_advisory_comment(owner, repo, ghsa_id, comment)
-    return f"Advisory {ghsa_id} closed. Comment: {result}"
+    return f"Advisory {ghsa_id} closed (state: closed)."
 
 
 @mcp.tool()
@@ -405,39 +348,22 @@ def accept_pvr_advisory(
     owner: str = Field(description="Repository owner (user or org name)"),
     repo: str = Field(description="Repository name"),
     ghsa_id: str = Field(description="GHSA ID of the advisory, e.g. GHSA-xxxx-xxxx-xxxx"),
-    comment: str = Field(description="Acknowledgement comment to post on the advisory"),
 ) -> str:
     """
-    Accept a PVR advisory by moving it from triage to draft state, then post a comment.
+    Accept a PVR advisory by moving it from triage to draft state.
 
-    Sets the advisory state to 'draft' via the GitHub API (triage → draft transition),
-    then posts a comment. Use this when the vulnerability is confirmed and the maintainer
-    intends to publish a security advisory. Requires a GH_TOKEN with security_events
-    write scope.
+    Sets the advisory state to 'draft' via the GitHub API (triage → draft transition).
+    Use this when the vulnerability is confirmed and the maintainer intends to publish
+    a security advisory. Requires a GH_TOKEN with security_events write scope.
+
+    Note: the GitHub REST API has no comments endpoint for security advisories.
+    Post the response draft to the reporter manually via the advisory URL.
     """
     path = f"/repos/{owner}/{repo}/security-advisories/{ghsa_id}"
     _, err = _gh_api(path, method="PATCH", body={"state": "draft"})
     if err:
         return f"Error accepting advisory {ghsa_id}: {err}"
-    result = _post_advisory_comment(owner, repo, ghsa_id, comment)
-    return f"Advisory {ghsa_id} accepted (moved to draft). Comment: {result}"
-
-
-@mcp.tool()
-def add_pvr_advisory_comment(
-    owner: str = Field(description="Repository owner (user or org name)"),
-    repo: str = Field(description="Repository name"),
-    ghsa_id: str = Field(description="GHSA ID of the advisory, e.g. GHSA-xxxx-xxxx-xxxx"),
-    body: str = Field(description="Comment text to post on the advisory"),
-) -> str:
-    """
-    Post a comment on a security advisory.
-
-    Attempts to use the GitHub advisory comments API. If that endpoint is not
-    available, falls back to appending a '## Maintainer Response' section to the
-    advisory description instead.
-    """
-    return _post_advisory_comment(owner, repo, ghsa_id, body)
+    return f"Advisory {ghsa_id} accepted (state: draft)."
 
 
 @mcp.tool()

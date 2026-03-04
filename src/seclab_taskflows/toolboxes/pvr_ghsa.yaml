@@ -24,4 +24,3 @@ server_params:
 confirm:
   - accept_pvr_advisory
   - reject_pvr_advisory
-  - add_pvr_advisory_comment

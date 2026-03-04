@@ -58,10 +58,11 @@ OSS maintainers get flooded with low-quality vulnerability reports via GitHub's 
    │                  │  │                      │
    │  confirm-gated:  │  │  • list_pending      │
    │  accept (→draft) │  │  • for each:         │
-   │  comment         │  │    - confirm-gated   │
-   │  reject (→closed)│  │      write-back      │
-   │                  │  │    - mark as sent    │
-   │  mark as sent    │  │  • "Sent N/M"        │
+   │  reject (→closed)│  │    - confirm-gated   │
+   │                  │  │      state change    │
+   │  mark as applied │  │    - mark as applied │
+   │  post draft      │  │  • post drafts       │
+   │  manually via UI │  │    manually via UI   │
    └──────────────────┘  └──────────────────────┘
 ```
 
@@ -111,7 +112,7 @@ quality:   +1 per signal (files, PoC, lines)  →  max +3
 |---|---|---|
 | `GHSA-xxxx_triage.md` | pvr_triage | Full analysis report |
 | `GHSA-xxxx_response_triage.md` | pvr_triage | Draft reply to reporter |
-| `GHSA-xxxx_response_sent.md` | pvr_respond / batch | Sent marker (idempotent) |
+| `GHSA-xxxx_response_sent.md` | pvr_respond / batch | State-transition applied marker (idempotent) |
 | `batch_queue_<repo>_<date>.md` | pvr_triage_batch | Ranked inbox table |
 
 ---
@@ -125,10 +126,12 @@ Every completed triage records **verdict + quality** against the reporter's GitH
 ## One-liner workflow
 
 ```bash
-./scripts/run_pvr_triage.sh batch          owner/repo            # see inbox
-./scripts/run_pvr_triage.sh triage         owner/repo GHSA-xxx   # analyse one
-./scripts/run_pvr_triage.sh respond        owner/repo GHSA-xxx accept   # accept one
-./scripts/run_pvr_triage.sh respond_batch  owner/repo comment           # send all drafts
+./scripts/run_pvr_triage.sh batch          owner/repo                   # see inbox
+./scripts/run_pvr_triage.sh triage         owner/repo GHSA-xxx          # analyse one
+./scripts/run_pvr_triage.sh respond        owner/repo GHSA-xxx accept   # accept one (triage→draft)
+./scripts/run_pvr_triage.sh respond        owner/repo GHSA-xxx reject   # reject one (triage→closed)
+./scripts/run_pvr_triage.sh respond_batch  owner/repo reject            # bulk state transition
+# Then post each *_response_triage.md manually via the advisory URL
 ```
 
 ---

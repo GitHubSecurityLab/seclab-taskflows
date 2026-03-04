@@ -40,12 +40,13 @@ Commands:
       Run full triage on one advisory: verify code, generate report + response draft.
 
   respond        <owner/repo> <GHSA-xxxx-xxxx-xxxx> <action>
-      Post the response draft to GitHub. action = accept | comment | reject
+      Apply a state transition to a GitHub advisory. action = accept | reject
       Requires pvr_triage to have been run first for the given GHSA.
+      Post the response draft manually via the advisory URL after running.
 
   respond_batch  <owner/repo> <action>
-      Scan REPORT_DIR for all pending response drafts and post them in one session.
-      action = accept | comment | reject
+      Scan REPORT_DIR and apply state transitions to all pending advisories.
+      action = accept | reject
 
   demo           <owner/repo>
       Full pipeline on the given repo (batch → triage on first triage advisory → report preview).
@@ -134,8 +135,8 @@ cmd_respond() {
     local ghsa="${2:?Usage: $0 respond <owner/repo> <GHSA> <action>}"
     local action="${3:?Usage: $0 respond <owner/repo> <GHSA> <action>}"
     case "${action}" in
-        accept|comment|reject) ;;
-        *) echo "ERROR: action must be accept, comment, or reject" >&2; exit 1 ;;
+        accept|reject) ;;
+        *) echo "ERROR: action must be accept or reject" >&2; exit 1 ;;
     esac
     echo "==> Responding to ${ghsa} in ${repo} (action=${action}) ..."
     run_agent \
@@ -149,8 +150,8 @@ cmd_respond_batch() {
     local repo="${1:?Usage: $0 respond_batch <owner/repo> <action>}"
     local action="${2:?Usage: $0 respond_batch <owner/repo> <action>}"
     case "${action}" in
-        accept|comment|reject) ;;
-        *) echo "ERROR: action must be accept, comment, or reject" >&2; exit 1 ;;
+        accept|reject) ;;
+        *) echo "ERROR: action must be accept or reject" >&2; exit 1 ;;
     esac
     echo "==> Bulk respond for ${repo} (action=${action}) ..."
     run_agent \
@@ -187,8 +188,10 @@ cmd_demo() {
     echo "--- Reports written to ${REPORT_DIR} ---"
     ls -1 "${REPORT_DIR}"/*.md 2>/dev/null || true
     echo
-    echo "To post the response draft (comment only, does not reject):"
-    echo "  $0 respond ${repo} ${ghsa} comment"
+    echo "To accept (triage → draft) or reject (triage → closed):"
+    echo "  $0 respond ${repo} ${ghsa} accept"
+    echo "  $0 respond ${repo} ${ghsa} reject"
+    echo "Then post the response draft manually via the advisory URL."
 }
 
 # ---------------------------------------------------------------------------
