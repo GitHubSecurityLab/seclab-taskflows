@@ -7,7 +7,7 @@ Quick guide for running seclab-taskflows locally without Codespaces.
 - Python 3.10-3.13 (required by seclab-taskflow-agent; Python 3.14 not yet supported)
 - GitHub CLI (`gh`) - [install here](https://cli.github.com/)
 - GitHub authentication via `gh auth login`
-- `passage` password manager with Copilot API token stored at `github/capi-token`
+- A Copilot API token set in `AI_API_TOKEN`
 
 ## Setup
 
@@ -17,11 +17,10 @@ Quick guide for running seclab-taskflows locally without Codespaces.
 gh auth login
 ```
 
-2. **Store Copilot API token in passage:**
+2. **Set your Copilot API token:**
 
 ```bash
-# If not already stored
-passage insert github/capi-token
+export AI_API_TOKEN=<your-copilot-api-token>
 ```
 
 3. **Run setup script:**
@@ -30,9 +29,7 @@ passage insert github/capi-token
 ./scripts/setup_local.sh
 ```
 
-This creates a `.venv` and installs all dependencies. Tokens are automatically configured:
-- `GH_TOKEN` from `passage show github/capi-token` (for GitHub API access)
-- `AI_API_TOKEN` from `passage show github/capi-token` (for Copilot API access)
+This creates a `.venv` and installs all dependencies.
 
 **Optional:** Set custom AI endpoint (defaults to GitHub Copilot):
 ```bash
@@ -93,8 +90,8 @@ pip install -e .
 
 **Token issues:**
 ```bash
-# Verify passage has the token
-passage show github/capi-token
+# Verify AI_API_TOKEN is set
+echo $AI_API_TOKEN
 
 # Verify gh CLI is authenticated
 gh auth status
