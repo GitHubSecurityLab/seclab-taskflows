@@ -11,17 +11,34 @@ fi
 
 # Check for required argument
 if [ -z "$1" ]; then
-    echo "Usage: $0 <repo>"
+    echo "Usage: $0 <repo1> [repo2 ...]"
     echo "Example: $0 juice-shop/juice-shop"
+    echo "Example: $0 org/service-a org/service-b org/service-c"
     exit 1
 fi
 
-REPO="$1"
+REPOS=("$@")
+
+# Build workspace name from all repos
+WORKSPACE_NAME=""
+for REPO in "${REPOS[@]}"; do
+    PROJECT=$(echo "$REPO" | sed 's/\//_/g')
+    if [ -z "$WORKSPACE_NAME" ]; then
+        WORKSPACE_NAME="$PROJECT"
+    else
+        WORKSPACE_NAME="${WORKSPACE_NAME}+${PROJECT}"
+    fi
+done
+
+# Truncate workspace name if too long
+if [ ${#WORKSPACE_NAME} -gt 60 ]; then
+    FIRST_PROJECT=$(echo "${REPOS[0]}" | sed 's/\//_/g')
+    WORKSPACE_NAME="${FIRST_PROJECT}+${#REPOS[@]}repos"
+fi
 
 # Create timestamped and project-named directories
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-PROJECT_NAME=$(echo "$REPO" | sed 's/\//_/g')
-AUDIT_DIR="$HOME/.local/share/seclab-taskflow-agent/audits/${PROJECT_NAME}_${TIMESTAMP}"
+AUDIT_DIR="$HOME/.local/share/seclab-taskflow-agent/audits/${WORKSPACE_NAME}_${TIMESTAMP}"
 DATA_DIR="${AUDIT_DIR}/data"
 LOG_FILE="${AUDIT_DIR}/audit.log"
 
@@ -40,27 +57,16 @@ if ! command -v gh &> /dev/null; then
     exit 1
 fi
 
-# Get Copilot API token from passage
-if ! command -v passage &> /dev/null; then
-    echo "Error: passage command not found"
-    echo "Install passage or ensure your Copilot API token is available"
-    exit 1
-fi
-
-CAPI_TOKEN=$(passage show github/capi-token 2>/dev/null)
-if [ -z "$CAPI_TOKEN" ]; then
-    echo "Error: Unable to retrieve github/capi-token from passage"
-    echo "Please ensure your Copilot API token is stored with: passage insert github/capi-token"
-    exit 1
-fi
-
-# Export tokens if not already set
-if [ -z "$GH_TOKEN" ]; then
-    export GH_TOKEN="$CAPI_TOKEN"
-fi
-
+# Require AI_API_TOKEN to be set in the environment
 if [ -z "$AI_API_TOKEN" ]; then
-    export AI_API_TOKEN="$CAPI_TOKEN"
+    echo "Error: AI_API_TOKEN is not set"
+    echo "Please set AI_API_TOKEN in your environment"
+    exit 1
+fi
+
+# Export GH_TOKEN if not already set
+if [ -z "$GH_TOKEN" ]; then
+    export GH_TOKEN="$AI_API_TOKEN"
 fi
 
 # Set default AI endpoint if not provided
@@ -83,7 +89,7 @@ source .venv/bin/activate
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
 echo "========================================"
-echo "Starting audit of $REPO"
+echo "Starting audit of ${REPOS[*]}"
 echo "========================================"
 echo "Audit directory: ${AUDIT_DIR}"
 echo "Timestamp: ${TIMESTAMP}"
@@ -94,23 +100,35 @@ echo ""
 
 # Run the audit taskflows
 echo "Step 1/5: Fetching source code..."
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.fetch_source_code -g repo="$REPO"
+for REPO in "${REPOS[@]}"; do
+    echo "  -> $REPO"
+    python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.fetch_source_code -g repo="$REPO"
+done
 
 echo ""
 echo "Step 2/5: Identifying applications..."
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.identify_applications -g repo="$REPO"
+for REPO in "${REPOS[@]}"; do
+    echo "  -> $REPO"
+    python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.identify_applications -g repo="$REPO"
+done
 
 echo ""
 echo "Step 3/5: Gathering web entry point info..."
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.gather_web_entry_point_info -g repo="$REPO"
+for REPO in "${REPOS[@]}"; do
+    echo "  -> $REPO"
+    python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.gather_web_entry_point_info -g repo="$REPO"
+done
 
 echo ""
 echo "Step 4/5: Classifying applications..."
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.classify_application_local -g repo="$REPO"
+for REPO in "${REPOS[@]}"; do
+    echo "  -> $REPO"
+    python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.classify_application_local -g repo="$REPO"
+done
 
 echo ""
-echo "Step 5/5: Running audit..."
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.audit_issue_local_iter -g repo="$REPO"
+echo "Step 5/5: Running cross-repo audit..."
+python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.cross_repo_audit_issue_local_iter
 
 # Locate and display results
 # The repo_context MCP server creates the database at ${DATA_DIR}/repo_context.db

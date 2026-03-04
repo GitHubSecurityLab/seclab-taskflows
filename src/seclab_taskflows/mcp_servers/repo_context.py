@@ -399,6 +399,34 @@ class RepoContextBackend:
             uas = [user_action_to_dict(ua) for app, ua in results]
         return uas
 
+    def get_workspace_repos(self):
+        with Session(self.engine) as session:
+            rows = session.query(Application.repo).distinct().all()
+        return [{"repo": row.repo} for row in rows]
+
+    def get_workspace_components(self):
+        with Session(self.engine) as session:
+            apps = session.query(Application).all()
+        return [app_to_dict(app) for app in apps]
+
+    def get_workspace_app_issues(self):
+        with Session(self.engine) as session:
+            issues = session.query(Application, ApplicationIssue).filter(
+                Application.id == ApplicationIssue.component_id
+            ).all()
+        return [
+            {
+                "component_id": app.id,
+                "location": app.location,
+                "repo": app.repo,
+                "component_notes": app.notes,
+                "issue_type": issue.issue_type,
+                "issue_notes": issue.notes,
+                "issue_id": issue.id,
+            }
+            for app, issue in issues
+        ]
+
     def clear_repo(self, repo):
         with Session(self.engine) as session:
             session.query(Application).filter_by(repo=repo).delete()
@@ -814,6 +842,30 @@ def store_low_severity_reason(
     """
     repo = process_repo(owner, repo)
     return backend.store_low_severity_reason(repo, component_id, result_id, reason)
+
+@mcp.tool()
+def get_workspace_repos():
+    """
+    Get all distinct repos in the workspace database.
+    """
+    return json.dumps(backend.get_workspace_repos())
+
+
+@mcp.tool()
+def get_workspace_components():
+    """
+    Get all components across all repos in the workspace.
+    """
+    return json.dumps(backend.get_workspace_components())
+
+
+@mcp.tool()
+def get_workspace_component_issues():
+    """
+    Get all component issues across all repos in the workspace.
+    """
+    return json.dumps(backend.get_workspace_app_issues())
+
 
 @mcp.tool()
 def clear_repo(
