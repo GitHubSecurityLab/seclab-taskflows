@@ -45,14 +45,26 @@ export AI_API_ENDPOINT="https://models.github.ai/inference"
 
 ## Running Audits
 
+### Single repo
+
 ```bash
 ./scripts/run_audit_local.sh owner/repo
 ```
 
 Example:
 ```bash
-./scripts/run_audit_local.sh juice-shop/juice-shop
+./scripts/run_audit_local.sh owner/repo
 ```
+
+### Multiple repos (cross-repo audit)
+
+Pass multiple repos as positional arguments. Steps 1–4 run per repo, then a single cross-repo audit step (step 5) audits all issues across the workspace simultaneously, enabling the agent to trace inter-service data flows and assess exploitability in a multi-repo context.
+
+```bash
+./scripts/run_audit_local.sh owner/repo-a owner/repo-b
+```
+
+The workspace name is derived by joining repo names with `+` (e.g. `owner_repo-a+owner_repo-b`). If the combined name exceeds 60 characters it is truncated to `<first_repo>+<N>repos`.
 
 **Note:** Audits can take several hours and make many AI requests. Uses Claude Opus 4.6 (1M context window) for code analysis and GPT-5-mini for general tasks and triage. A GitHub Copilot Pro account is recommended.
 
