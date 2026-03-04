@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo: 
+# Taskflow to analyze existing entry points and enrich them with mobile-specific information
+taskflow:
+  - task:
+      model: code_analysis
+      must_complete: true
+      headless: true
+      max_steps: 100
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      user_prompt: |
+        For the repo {{ globals.repo }} iterate over all entry points and check if they represent
+        a mobile application entry point. Mobile entry points include:
+
+        ## Android
+        - Exported Activities, Services, BroadcastReceivers, and ContentProviders declared in AndroidManifest.xml
+        - Intent filters that make components reachable via implicit intents
+        - Deep links and App Links (intent filters with ACTION_VIEW, BROWSABLE category, and data URI schemes)
+        - JavaScript bridges exposed in WebViews (addJavascriptInterface)
+
+        ## iOS
+        - Custom URL schemes registered in Info.plist (CFBundleURLSchemes)
+        - Universal Links (Associated Domains entitlement and apple-app-site-association)
+        - App Extensions (share extensions, action extensions, etc.)
+        - JavaScript bridges in WKWebView (WKScriptMessageHandler)
+
+        For each entry point, check the noted `file` and its line using the file viewer. Then determine:
+        - The entry type (deep_link, intent, url_scheme, content_provider, broadcast_receiver, js_bridge,
+          universal_link, app_extension, etc.)
+        - The URL scheme or intent action that triggers it
+        - Whether the component is exported / accessible to other apps
+        - Any permissions required to access this entry point
+        - Any data filters (host, path patterns, MIME types) that restrict what data is accepted
+
+        For each entry point identified as a mobile entry point, create a new mobile entry point using
+        the information gathered.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.gh_file_viewer

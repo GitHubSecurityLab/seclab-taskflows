@@ -52,7 +52,8 @@ taskflow:
         or an already compromised system.
 
         Base your decision on:
-        - Is this component likely to take untrusted user input? For example, remote web requests or IPC, RPC calls?
+        - Is this component likely to take untrusted user input? For example, remote web requests, IPC, RPC calls,
+        deep links, intents, or data from other apps?
         - What is the intended purpose of this component and its functionality? Does it allow high privileged actions?
         Is it intended to provide such functionalities for all users? Or is there complex access control logic involved?
         - The component itself may also have its own `README.md` (or a subdirectory of it may have a `README.md`). Take
@@ -64,6 +65,25 @@ taskflow:
         ownership checks. For example,
         a web frontend may allow users to access their own content and admins to access all content, but users should not
         be able to access another users' content in general.
+
+        For mobile applications, consider the following types of risks:
+        - Deep link / URL scheme handling: Can a malicious app or web page craft a deep link that triggers
+        sensitive actions without proper validation (e.g., navigating to arbitrary URLs in a WebView,
+        triggering payments, or modifying account settings)?
+        - Intent / IPC handling (Android): Are exported components (Activities, Services, BroadcastReceivers,
+        ContentProviders) properly restricted? Can a malicious app send crafted intents to trigger
+        privileged operations or extract sensitive data?
+        - WebView security: Does the app use WebViews that load untrusted content? Are JavaScript bridges
+        exposed that could allow untrusted web content to invoke native functionality?
+        - Insecure data storage: Does the app store sensitive data (tokens, credentials, PII) in locations
+        accessible to other apps (external storage, world-readable files, unencrypted databases)?
+        - Insecure network communication: Does the app communicate with backends without proper TLS
+        validation, or does it accept user-controlled URLs that could lead to SSRF or data exfiltration?
+        - Content Provider exposure (Android): Are ContentProviders exported without proper permissions,
+        potentially allowing other apps to read or modify sensitive data?
+        - Path traversal via file handling: Does the app handle files from untrusted sources (downloads,
+        shared content, zip archives) without validating paths, potentially allowing writes outside
+        intended directories?
 
         We're looking for more concrete and serious security issues that affects system integrity or
         lead to information leak, so please do not include issues like brute force, Dos, log injection etc.

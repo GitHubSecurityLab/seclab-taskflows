@@ -30,9 +30,13 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
         Inspect {{ globals.repo }} and determine its function. Determine whether the repo is a framework library,
-        or a web application etc. For repos that may contain multiple applications, determine the purpose of each
+        web application, mobile application etc. For repos that may contain multiple applications, determine the purpose of each
         application and the directories of each application. Repos can also be libraries but contain actual applications, for
         example, a web server and admin UI etc. that are not for testing or examples.
+
+        Mobile applications include Android apps (Java/Kotlin with Android SDK, Gradle-based), iOS apps 
+        (Swift/Objective-C with Xcode), React Native, Flutter, Xamarin, or other cross-platform mobile frameworks.
+        Mark these as mobile applications when storing the component.
         
         Apart from source code, it is also useful to look at the README.md and documentations in 
         the repo.
@@ -79,6 +83,7 @@ taskflow:
 
         is_application ? {{ result.is_app }}
         is_library ? {{ result.is_library }}
+        is_mobile_app ? {{ result.is_mobile_app }}
         
         ## Application
 
@@ -92,6 +97,20 @@ taskflow:
         However, if user arguments are pointing to some untrusted resources, then they can be considered as 
         untrusted input. For example, a parser may take a user argument that points to a file, and in this case,
         the file is still considered untrusted even though it is supplied via user argument.
+
+        ## Mobile Application
+
+        For mobile application components, consider the following sources of untrusted input:
+
+        - Deep links and custom URL schemes that can be invoked by other apps or web pages
+        - Intent data received from other applications (Android) or URL schemes / Universal Links (iOS)
+        - Data received from external services via network requests (API responses, push notifications)
+        - Content shared from other apps via share intents or extensions
+        - Data read from external storage, clipboard, or other IPC mechanisms
+        - User input from UI elements (text fields, file pickers, camera/gallery input)
+
+        Note that locally stored data (SharedPreferences, UserDefaults, local databases) is generally 
+        considered trusted unless it can be modified by other apps. Focus on inputs that cross trust boundaries.
 
         ## Library
 
@@ -176,6 +195,7 @@ taskflow:
 
         is_application ? {{ result.is_app }}
         is_library ? {{ result.is_library }}
+        is_mobile_app ? {{ result.is_mobile_app }}
 
         ## Application
         
@@ -187,6 +207,20 @@ taskflow:
         when using the application.
 
         You should also state clearly the actions and privileges that a user can have when using the application.
+
+        ## Mobile Application
+
+        For mobile application components, consider the following:
+
+        What actions can an external entity (another app, a web page, a remote server) trigger in this 
+        mobile application? Consider:
+        - Actions triggered via deep links or custom URL schemes
+        - Actions triggered via intents from other apps (Android) or app extensions (iOS)
+        - Data that the app processes from untrusted network responses
+        - Actions triggered by push notifications or shared content
+
+        Focus on what the mobile app is designed to do with external input, not on security bypasses.
+        State clearly what an external entity is allowed to trigger and what restrictions exist.
 
         ## Library
 

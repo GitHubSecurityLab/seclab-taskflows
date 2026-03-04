@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
 
-from .repo_context_models import Application, EntryPoint, UserAction, WebEntryPoint, ApplicationIssue, AuditResult, Base
+from .repo_context_models import Application, EntryPoint, UserAction, WebEntryPoint, MobileEntryPoint, ApplicationIssue, AuditResult, Base
 from .repo_context_models import LowSeverityAuditResult
 from .utils import process_repo
 
@@ -35,6 +35,7 @@ def app_to_dict(result):
         "notes": result.notes,
         "is_app": result.is_app,
         "is_library": result.is_library,
+        "is_mobile_app": result.is_mobile_app,
     }
 
 
@@ -76,6 +77,21 @@ def web_entry_point_to_dict(wep):
     }
 
 
+def mobile_entry_point_to_dict(mep):
+    return {
+        "id": mep.id,
+        "entry_point_id": mep.entry_point_id,
+        "entry_type": mep.entry_type,
+        "scheme_or_action": mep.scheme_or_action,
+        "exported": mep.exported,
+        "permissions": mep.permissions,
+        "data_filter": mep.data_filter,
+        "component": mep.component,
+        "repo": mep.repo.lower(),
+        "notes": mep.notes,
+    }
+
+
 def audit_result_to_dict(res):
     return {
         "id": res.id,
@@ -105,13 +121,31 @@ class RepoContextBackend:
                 EntryPoint.__table__,
                 UserAction.__table__,
                 WebEntryPoint.__table__,
+                MobileEntryPoint.__table__,
                 ApplicationIssue.__table__,
                 AuditResult.__table__,
                 LowSeverityAuditResult.__table__,
             ],
         )
+        self._migrate_schema()
 
-    def store_new_application(self, repo, location, is_app, is_library, notes):
+    def _migrate_schema(self):
+        """Add any missing columns to existing tables (lightweight migration for SQLite)."""
+        from sqlalchemy import text, inspect as sa_inspect
+        inspector = sa_inspect(self.engine)
+        migrations = [
+            ("application", "is_mobile_app", "BOOLEAN"),
+        ]
+        for table_name, column_name, column_type in migrations:
+            if not inspector.has_table(table_name):
+                continue
+            existing_columns = {col["name"] for col in inspector.get_columns(table_name)}
+            if column_name not in existing_columns:
+                logging.info(f"Migrating: adding column {column_name} to {table_name}")
+                with self.engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"))
+
+    def store_new_application(self, repo, location, is_app, is_library, is_mobile_app, notes):
         with Session(self.engine) as session:
             existing = session.query(Application).filter_by(repo=repo, location=location).first()
             if existing:
@@ -119,10 +153,13 @@ class RepoContextBackend:
                     existing.is_app = is_app
                 if is_library is not None:
                     existing.is_library = is_library
+                if is_mobile_app is not None:
+                    existing.is_mobile_app = is_mobile_app
                 existing.notes += notes
             else:
                 new_application = Application(
-                    repo=repo, location=location, is_app=is_app, is_library=is_library, notes=notes
+                    repo=repo, location=location, is_app=is_app, is_library=is_library,
+                    is_mobile_app=is_mobile_app, notes=notes
                 )
                 session.add(new_application)
             session.commit()
@@ -227,6 +264,53 @@ class RepoContextBackend:
                 session.add(new_web_entry_point)
             session.commit()
         return f"Updated or added web entry point for entry_point_id {entry_point_id} in {repo}."
+
+    def store_new_mobile_entry_point(
+        self, repo, entry_point_id, entry_type, scheme_or_action, exported, permissions, data_filter, component, notes, update=False
+    ):
+        with Session(self.engine) as session:
+            existing = session.query(MobileEntryPoint).filter_by(repo=repo, entry_point_id=entry_point_id).first()
+            if existing:
+                existing.notes += notes
+                if entry_type:
+                    existing.entry_type = entry_type
+                if scheme_or_action:
+                    existing.scheme_or_action = scheme_or_action
+                if exported is not None:
+                    existing.exported = exported
+                if permissions:
+                    existing.permissions = permissions
+                if data_filter:
+                    existing.data_filter = data_filter
+                if component is not None:
+                    existing.component = component
+            else:
+                if update:
+                    return f"No mobile entry point exists at repo {repo} with entry_point_id {entry_point_id}."
+                new_mobile_entry_point = MobileEntryPoint(
+                    repo=repo,
+                    entry_point_id=entry_point_id,
+                    entry_type=entry_type,
+                    scheme_or_action=scheme_or_action,
+                    exported=exported,
+                    permissions=permissions,
+                    data_filter=data_filter,
+                    component=component,
+                    notes=notes,
+                )
+                session.add(new_mobile_entry_point)
+            session.commit()
+        return f"Updated or added mobile entry point for entry_point_id {entry_point_id} in {repo}."
+
+    def get_mobile_entries(self, repo, component_id):
+        with Session(self.engine) as session:
+            results = session.query(MobileEntryPoint).filter_by(repo=repo, component=component_id).all()
+        return [mobile_entry_point_to_dict(r) for r in results]
+
+    def get_mobile_entries_for_repo(self, repo):
+        with Session(self.engine) as session:
+            results = session.query(MobileEntryPoint).filter_by(repo=repo).all()
+        return [mobile_entry_point_to_dict(r) for r in results]
 
     def store_new_user_action(self, repo, app_id, file, line, notes, update=False):
         with Session(self.engine) as session:
@@ -406,6 +490,7 @@ class RepoContextBackend:
             session.query(UserAction).filter_by(repo=repo).delete()
             session.query(ApplicationIssue).filter_by(repo=repo).delete()
             session.query(WebEntryPoint).filter_by(repo=repo).delete()
+            session.query(MobileEntryPoint).filter_by(repo=repo).delete()
             session.query(AuditResult).filter_by(repo=repo).delete()
             session.query(LowSeverityAuditResult).filter_by(repo=repo).delete()
             session.commit()
@@ -430,12 +515,13 @@ def store_new_component(
     location: str = Field(description="The directory of the component"),
     is_app: bool = Field(description="Is this an application", default=None),
     is_library: bool = Field(description="Is this a library", default=None),
+    is_mobile_app: bool = Field(description="Is this a mobile application (e.g. Android, iOS)", default=None),
     notes: str = Field(description="The notes taken for this component", default=""),
 ):
     """
     Stores a new component in the database.
     """
-    return backend.store_new_application(process_repo(owner, repo), location, is_app, is_library, notes)
+    return backend.store_new_application(process_repo(owner, repo), location, is_app, is_library, is_mobile_app, notes)
 
 
 @mcp.tool()
@@ -452,7 +538,7 @@ def add_component_notes(
     app = backend.get_app(repo, location)
     if not app:
         return f"Error: No component exists in repo: {repo} and location {location}"
-    return backend.store_new_application(repo, location, None, None, notes)
+    return backend.store_new_application(repo, location, None, None, None, notes)
 
 
 @mcp.tool()
@@ -665,6 +751,54 @@ def get_web_entry_points_for_repo(
     """
     repo = process_repo(owner, repo)
     return json.dumps(backend.get_web_entries_for_repo(repo))
+
+
+@mcp.tool()
+def store_new_mobile_entry_point(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    entry_point_id: int = Field(description="The ID of the entry point this mobile entry point refers to"),
+    location: str = Field(description="The directory of the component where the mobile entry point belongs to"),
+    entry_type: str = Field(description="Type of mobile entry point: deep_link, intent, url_scheme, content_provider, broadcast_receiver, js_bridge, app_extension, universal_link, etc.", default=""),
+    scheme_or_action: str = Field(description="URL scheme (e.g. myapp://) or intent action (e.g. android.intent.action.VIEW)", default=""),
+    exported: bool = Field(description="Whether the Android component is exported (accessible to other apps)", default=None),
+    permissions: str = Field(description="Required permissions to access this entry point, if any", default=""),
+    data_filter: str = Field(description="Intent data filter, URL path pattern, host, etc.", default=""),
+    component: int = Field(description="Component identifier", default=0),
+    notes: str = Field(description="Notes for this mobile entry point", default=""),
+):
+    """
+    Stores a new mobile entry point in a component to the database. A mobile entry point extends a regular entry point
+    with mobile-specific properties like entry type, URL scheme/intent action, export status, permissions, and data filters.
+    """
+    return backend.store_new_mobile_entry_point(
+        process_repo(owner, repo), entry_point_id, entry_type, scheme_or_action, exported, permissions, data_filter, component, notes
+    )
+
+
+@mcp.tool()
+def get_mobile_entry_points_component(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+):
+    """
+    Get all mobile entry points for a component
+    """
+    repo = process_repo(owner, repo)
+    return json.dumps(backend.get_mobile_entries(repo, component_id))
+
+
+@mcp.tool()
+def get_mobile_entry_points_for_repo(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
+    """
+    Get all mobile entry points of a repo
+    """
+    repo = process_repo(owner, repo)
+    return json.dumps(backend.get_mobile_entries_for_repo(repo))
 
 
 @mcp.tool()

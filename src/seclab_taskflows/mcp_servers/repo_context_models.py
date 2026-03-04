@@ -19,12 +19,13 @@ class Application(Base):
     notes: Mapped[str] = mapped_column(Text)
     is_app: Mapped[bool] = mapped_column(nullable=True)
     is_library: Mapped[bool] = mapped_column(nullable=True)
+    is_mobile_app: Mapped[bool] = mapped_column(nullable=True)
 
     def __repr__(self):
         return (
             f"<Application(id={self.id}, repo={self.repo}, "
-            f"location={self.location}, is_app={self.is_app}, is_library={self.is_library}"
-            f"notes={self.notes}>"
+            f"location={self.location}, is_app={self.is_app}, is_library={self.is_library}, "
+            f"is_mobile_app={self.is_mobile_app}, notes={self.notes}>"
         )
 
 
@@ -111,6 +112,31 @@ class WebEntryPoint(Base):  # an entrypoint of a web application (such as GET /i
             f"<WebEntryPoint(entry_point_id={self.entry_point_id}, "
             f"method={self.method}, path={self.path}, component={self.component}, "
             f"auth={self.auth}, middleware={self.middleware}, roles_scopes={self.roles_scopes}, "
+            f"notes={self.notes}, repo={self.repo})>"
+        )
+
+
+class MobileEntryPoint(Base):
+    """An entry point specific to mobile applications (e.g. deep links, intents, URL schemes)."""
+    __tablename__ = "mobile_entry_point"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entry_point_id = Column(Integer, ForeignKey("entry_point.id", ondelete="CASCADE"))
+    entry_type: Mapped[str]  # deep_link, intent, url_scheme, content_provider, broadcast_receiver, js_bridge, etc.
+    scheme_or_action: Mapped[str]  # URL scheme (myapp://) or intent action (android.intent.action.VIEW)
+    exported: Mapped[bool] = mapped_column(nullable=True)  # whether the component is exported (Android)
+    permissions: Mapped[str]  # required permissions, if any
+    data_filter: Mapped[str]  # intent data filter, URL path pattern, etc.
+    component: Mapped[int]  # component id
+    notes: Mapped[str] = mapped_column(Text)
+    repo: Mapped[str]
+
+    def __repr__(self):
+        return (
+            f"<MobileEntryPoint(entry_point_id={self.entry_point_id}, "
+            f"entry_type={self.entry_type}, scheme_or_action={self.scheme_or_action}, "
+            f"exported={self.exported}, permissions={self.permissions}, "
+            f"data_filter={self.data_filter}, component={self.component}, "
             f"notes={self.notes}, repo={self.repo})>"
         )
 
