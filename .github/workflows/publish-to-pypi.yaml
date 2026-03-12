@@ -21,6 +21,7 @@ jobs:
     permissions:
       contents: write
       id-token: write  # For trusted publishing
+      attestations: write  # For artifact attestation
 
     steps:
     - name: Checkout repository
@@ -39,6 +40,11 @@ jobs:
     - name: Build the wheel
       run: python3 -m hatch build
 
+    - name: Attest build provenance
+      uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+      with:
+        subject-path: ./dist/*
+
     - name: Upload artifacts
       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
@@ -49,13 +55,6 @@ jobs:
       uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
       with:
         verbose: true
-
-    - name: Sign with sigstore
-      uses: sigstore/gh-action-sigstore-python@f832326173235dcb00dd5d92cd3f353de3188e6c # v3.1.0
-      with:
-        inputs: >-
-          ./dist/*.tar.gz
-          ./dist/*.whl
 
     - name: Create GitHub Release
       env:
