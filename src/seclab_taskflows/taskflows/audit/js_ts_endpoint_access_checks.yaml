@@ -4,6 +4,14 @@
 seclab-taskflow-agent:
   filetype: taskflow
   version: "1.0"
+model_config: seclab_taskflows.configs.model_config_github_models
+
+# Required: pass the target repository on the command line, e.g.
+#   --global repo_nwo=has-ghas/juice-shop
+# An empty default produces a silently broken run (the audit personality
+# will be asked to analyse no repository).
+globals:
+  repo_nwo:
 # Taskflow to analyze the access control checks of endpoints in a JavaScript or TypeScript web project.
 # It uses a CodeQL database for the analysis. (specified by the repo_nwo input)
 taskflow:
@@ -17,15 +25,18 @@ taskflow:
       toolboxes:
         - seclab_taskflow_agent.toolboxes.memcache
   - task:
-      model: claude-sonnet-4
+      model: code_analysis
       must_complete: false
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       inputs:
-        repo_nwo: 
+        repo_nwo: "{{ globals.repo_nwo }}"
       user_prompt: |
         Fetch CodeQL database for the {{ inputs.repo_nwo }} repository for the
-        JavaScript language.
+        JavaScript language. Prefer the local CodeQL Development MCP server: call
+        `list_codeql_databases` to find a pre-built database for {{ inputs.repo_nwo }}
+        and use `register_database` if needed. Only fall back to the GitHub
+        Code Scanning APIs if no local database is available.
 
         You are auditing code using the previously fetched
         CodeQL database.
@@ -45,6 +56,13 @@ taskflow:
         not have access, or that an endpoint allows actions that should be restricted.
         For each endpoint add how it's protected, or if it's unprotected. Make a note
         of decorators or middleware that are used to protect the endpoint.
+
+        For each candidate route handler you identify, run the bundled `CallGraphTo.ql`
+        tools query against the handler to enumerate its callers (typically routing
+        registrations / middleware), and `PrintAST.ql` to inspect the structure of
+        any decorator or middleware chain. Use `read_database_source` to read the
+        exact source backing the CodeQL database rather than re-fetching files from
+        GitHub.
 
         ## IMPORTANT: General Guidance that ALWAYS applies
 
@@ -66,7 +84,7 @@ taskflow:
         5. Make small and concise single line notes while you work. Update the
         existing value for `notes` in memory as you work.
       toolboxes:
-        - seclab_taskflow_agent.toolboxes.codeql
+        - seclab_taskflow_agent.toolboxes.codeql_ql_mcp
         - seclab_taskflow_agent.toolboxes.memcache
         - seclab_taskflows.toolboxes.gh_code_scanning
   - task:

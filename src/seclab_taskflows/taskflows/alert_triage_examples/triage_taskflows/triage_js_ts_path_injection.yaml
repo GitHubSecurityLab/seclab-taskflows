@@ -4,8 +4,13 @@
 seclab-taskflow-agent:
   filetype: taskflow
   version: "1.0"
-model_config: seclab_taskflows.configs.model_config
+model_config: seclab_taskflows.configs.model_config_github_models
 
+# Required: pass the target repository on the command line, e.g.
+#   --global repo=has-ghas/juice-shop
+# An empty default fetches alerts for no repository.
+globals:
+  repo:
 taskflow:
   - task:
       must_complete: true
@@ -15,7 +20,7 @@ taskflow:
       name: create repo list
       description: create repo list to fetch alerts from.
       run: |
-        echo '[ {"repo": ""}]'
+        echo '[ {"repo": "{{ globals.repo }}"}]'
   - task:
       headless: true
       uses: seclab_taskflows.taskflows.alert_triage_examples.triage_common.fetch_code_scanning_alerts
@@ -48,6 +53,13 @@ taskflow:
         Also check if the given path fragment is checked against a whitelist of allowed paths.
         Path validation can also take place at the location where the URL is registered in the web framework, e.g. as a validator middleware in Express.js.
         Always note where the URL path is registered in the web framework and the HTTP method required to call it. Write the lines that register the URL path in the notes.
+
+        When inspecting the function that contains the alert, prefer the CodeQL Development MCP server for authoritative
+        code structure: use `list_codeql_databases` to find the database for {{ result.repo }} and run the bundled
+        `PrintAST.ql` tools query at the alert location to get the exact AST of the surrounding function (more reliable
+        than `gh_file_viewer` for distinguishing real branches/sanitizers from text). Use `CallGraphTo.ql` if you need
+        to confirm the function is actually called from a route handler.
+
         Take notes while assessing the alert.
         Update the results field of the alert result with your notes using `update_alert_result` with 
         {{ result.alert_id }} as alert_id and {{ result.repo }} as repo.
@@ -56,7 +68,7 @@ taskflow:
       toolboxes:
         - seclab_taskflows.toolboxes.gh_file_viewer
         - seclab_taskflows.toolboxes.report_alert_state
-        - seclab_taskflow_agent.toolboxes.codeql
+        - seclab_taskflow_agent.toolboxes.codeql_ql_mcp
   - task:
       must_complete: true
       repeat_prompt: true
@@ -74,5 +86,5 @@ taskflow:
       toolboxes:
         - seclab_taskflows.toolboxes.gh_file_viewer
         - seclab_taskflows.toolboxes.report_alert_state
-        - seclab_taskflow_agent.toolboxes.codeql
+        - seclab_taskflow_agent.toolboxes.codeql_ql_mcp
 
