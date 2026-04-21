@@ -4,7 +4,7 @@
 seclab-taskflow-agent:
   filetype: taskflow
   version: "1.0"
-model_config: seclab_taskflows.configs.model_config_github_models
+model_config: seclab_taskflows.configs.model_config
 
 # Required: pass the target repository on the command line, e.g.
 #   --global repo=has-ghas/juice-shop

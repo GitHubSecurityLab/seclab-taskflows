@@ -4,14 +4,6 @@
 seclab-taskflow-agent:
   filetype: taskflow
   version: "1.0"
-model_config: seclab_taskflows.configs.model_config_github_models
-
-# Required: pass the target repository on the command line, e.g.
-#   --global repo_nwo=has-ghas/juice-shop
-# An empty default produces a silently broken run (the audit personality
-# will be asked to analyse no repository).
-globals:
-  repo_nwo:
 # Taskflow to analyze the access control checks of endpoints in a JavaScript or TypeScript web project.
 # It uses a CodeQL database for the analysis. (specified by the repo_nwo input)
 taskflow:
@@ -25,12 +17,12 @@ taskflow:
       toolboxes:
         - seclab_taskflow_agent.toolboxes.memcache
   - task:
-      model: code_analysis
+      model: claude-sonnet-4
       must_complete: false
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       inputs:
-        repo_nwo: "{{ globals.repo_nwo }}"
+        repo_nwo:
       user_prompt: |
         Fetch CodeQL database for the {{ inputs.repo_nwo }} repository for the
         JavaScript language. Prefer the local CodeQL Development MCP server: call
@@ -44,7 +36,7 @@ taskflow:
         This database is built for a JavaScript web project.
 
         ## IMPORTANT: Vulnerability Pattern Details
-        
+
         Review the files specifying routes and endpoints for the security vulnerabilities
         described as follows:
 
@@ -68,7 +60,7 @@ taskflow:
 
         1. Do NOT ask the user for permission to perform next steps, continue your
         analysis autonomously until it is complete.
-        
+
         2. Reflect on your analysis for accuracy before returning it to the user.
         We are only interested in results that you can clearly explain and
         motivate as potentially vulnerable based on code examples.
