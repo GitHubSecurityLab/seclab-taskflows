@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+# Toolbox: PVR GHSA advisory fetcher
+#
+# Provides tools for fetching GitHub Security Advisories in triage state submitted
+# via Private Vulnerability Reporting. Uses the gh CLI for API calls.
+#
+# Requires GH_TOKEN with repo or security_events scope to read advisories in triage state.
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: toolbox
+
+server_params:
+  kind: stdio
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.pvr_ghsa"]
+  env:
+    GH_TOKEN: "{{ env('GH_TOKEN') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"
+    REPORT_DIR: "{{ env('REPORT_DIR', 'reports') }}"
+# Guard write-back tools: user must confirm before execution
+confirm:
+  - accept_pvr_advisory
+  - reject_pvr_advisory
