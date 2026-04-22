@@ -6,8 +6,12 @@ seclab-taskflow-agent:
   version: "1.0"
 model_config: seclab_taskflows.configs.model_config
 
+# Required: pass the target repository on the command line, e.g.
+#   --global repo=has-ghas/juice-shop
+# An empty default fetches alerts for no repository.
 globals:
   rule: js/xss
+  repo:
 taskflow:
   - task:
       must_complete: true
@@ -18,7 +22,7 @@ taskflow:
       name: create repo list
       description: create repo list to fetch alerts from.
       run: |
-        echo '[ {"repo": ""}]'
+        echo '[ {"repo": "{{ globals.repo }}"}]'
   - task:
       headless: true
       uses: seclab_taskflows.taskflows.alert_triage_examples.triage_common.fetch_code_scanning_alerts
@@ -49,6 +53,12 @@ taskflow:
 
         In this task, restrict your analysis to the function that contains the alert location only. Do not trace the calls of the function. Just
         perform a local analysis.
+
+        Use the CodeQL Development MCP server to get an authoritative view of that function: call `list_codeql_databases`
+        to find the database for {{ result.repo }}, then run the bundled `PrintAST.ql` tools query at the alert location
+        to get the exact AST of the enclosing function. This is more reliable than reading the file textually for
+        identifying real branches, sanitizer calls, and the syntactic context (HTML attribute, JS string, etc.) of the
+        sink. Fall back to `gh_file_viewer` only if the database is unavailable.
 
         Exploitable means that a remote attacker would be able to inject a malicious script into the web application that would be executed in the context of a user visiting the page.
         This could include a `javascript:` URL, a `<script>` tag, or any other way to inject JavaScript code into the page.
@@ -83,6 +93,7 @@ taskflow:
         When you are done, set the `valid` field of the alert result to `true` using alert_id {{ result.alert_id }} and repo {{ result.repo }}
         if the alert is a potential vulnerability, otherwise set it to `false`. 
       toolboxes:
+        - seclab_taskflow_agent.toolboxes.codeql_ql_mcp
         - seclab_taskflows.toolboxes.gh_file_viewer
         - seclab_taskflows.toolboxes.report_alert_state
   - task:
