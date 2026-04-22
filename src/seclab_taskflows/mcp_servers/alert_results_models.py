@@ -23,7 +23,7 @@ class AlertResults(Base):
     language: Mapped[str]
     location: Mapped[str]
     result: Mapped[str] = mapped_column(Text)
-    created: Mapped[Optional[str]]
+    created: Mapped[str | None]
     valid: Mapped[bool] = mapped_column(nullable=False, default=True)
     completed: Mapped[bool] = mapped_column(nullable=False, default=False)
 
@@ -44,8 +44,8 @@ class AlertFlowGraph(Base):
     alert_canonical_id = Column(Integer, ForeignKey("alert_results.canonical_id", ondelete="CASCADE"))
     flow_data: Mapped[str] = mapped_column(Text)
     repo: Mapped[str]
-    prev: Mapped[Optional[str]]
-    next: Mapped[Optional[str]]
+    prev: Mapped[str | None]
+    next: Mapped[str | None]
     started: Mapped[bool] = mapped_column(nullable=False, default=False)
 
     def __repr__(self):

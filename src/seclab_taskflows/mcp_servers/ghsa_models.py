@@ -16,11 +16,11 @@ class GHSA(Base):
     ghsa_id: Mapped[str]
     repo: Mapped[str]
     severity: Mapped[str]
-    cve_id: Mapped[Optional[str]] = mapped_column(nullable=True)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    published_at: Mapped[Optional[str]] = mapped_column(nullable=True)
-    state: Mapped[Optional[str]] = mapped_column(nullable=True)
+    cve_id: Mapped[str | None] = mapped_column(nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    published_at: Mapped[str | None] = mapped_column(nullable=True)
+    state: Mapped[str | None] = mapped_column(nullable=True)
 
     def __repr__(self):
         return (
@@ -38,7 +38,7 @@ class GHSASummary(Base):
     high_severity_count: Mapped[int]
     medium_severity_count: Mapped[int]
     low_severity_count: Mapped[int]
-    summary_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    summary_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     def __repr__(self):
         return (

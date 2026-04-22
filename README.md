@@ -67,7 +67,7 @@ We'd love to hear your feedback. Please [create an issue](https://github.com/Git
 
 ## Requirements
 
-Python >= 3.9 or Docker
+Python >= 3.10 or Docker
 
 ## License
 

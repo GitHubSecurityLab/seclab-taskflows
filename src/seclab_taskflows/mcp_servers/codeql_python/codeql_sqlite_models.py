@@ -18,7 +18,7 @@ class Source(Base):
     source_location: Mapped[str]
     line: Mapped[int]
     source_type: Mapped[str]
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     def __repr__(self):
         return (

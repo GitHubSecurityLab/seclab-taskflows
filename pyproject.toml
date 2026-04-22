@@ -7,7 +7,7 @@ name = "seclab-taskflows"
 dynamic = ["version"]
 description = 'Example taskflows to use with the the GitHub Security Lab Taskflow Agent Framework (https://github.com/GitHubSecurityLab/seclab-taskflow-agent)'
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 keywords = []
 authors = [
@@ -16,8 +16,6 @@ authors = [
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
