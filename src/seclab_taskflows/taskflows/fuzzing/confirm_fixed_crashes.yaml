@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+
+# F4: re-run every previously-known crash (whose verdict is not already
+# 'fixed' or 'duplicate') through the current AFL binary. If the input no
+# longer crashes, mark verdict='fixed' so it stops cluttering reports.
+#
+# Useful when a campaign is re-run against a project that has had upstream
+# fixes applied since the last campaign.
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        List crashes for {{ globals.repo }} via `get_crashes`. Filter to rows
+        whose `verdict` is NOT in {'fixed', 'duplicate', 'non_reproducible'}
+        and that have a non-empty `minimized_path`. Pass each through.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+
+  - task:
+      model: general_tasks
+      must_complete: false
+      repeat_prompt: true
+      async: true
+      max_steps: 30
+      name: confirm fix
+      description: Re-run a known crash; mark fixed if it no longer reproduces.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Crash id {{ result.id }} (harness {{ result.harness_id }}, target
+        {{ result.target_id }}) was previously classified as
+        `{{ result.verdict }}`.
+
+        Reproducer path: {{ result.minimized_path }}
+
+        ## Steps
+
+          1. Look up the harness's current `afl_binary_path` via
+             `get_harnesses({{ globals.repo }})`. If the harness no longer
+             exists (build_status != 'ok'), record verdict='non_reproducible'
+             with a note that the harness is gone, and stop.
+
+          2. Call `reproduce_crash(afl_binary_path=<above>,
+              input_path={{ result.minimized_path }})`.
+
+          3. If `crashed: false`, the upstream code has been fixed (or the
+             harness behaviour changed). Call `update_crash_verdict(
+                  crash_id={{ result.id }},
+                  verdict="fixed",
+                  bug_class="{{ result.bug_class or 'other' }}",
+                  cwe="{{ result.cwe or '' }}",
+                  severity="{{ result.severity or 'low' }}",
+                  notes="re-confirmed not reproducible on $(date) — likely fixed upstream")`.
+
+          4. If `crashed: true` AND `stack_top_hash` differs from
+             `{{ result.stack_top_hash }}`, the crash has *moved* (the bug is
+             now in a different code path). Update notes to mention the
+             new hash but keep the existing verdict.
+
+          5. If `crashed: true` and the hash matches, do nothing — the bug
+             is unchanged.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+        - seclab_taskflows.toolboxes.fuzz_runner

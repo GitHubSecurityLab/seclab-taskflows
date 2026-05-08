@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+
+# Triage every crash in fuzz_runs for this repo: minimise, replay under ASan,
+# dedupe by stack-top hash, classify and store.
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        List harnesses for {{ globals.repo }} via `get_harnesses` and pass each
+        harness row through to the next task.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+
+  - task:
+      model: code_analysis
+      must_complete: false
+      repeat_prompt: true
+      async: true
+      max_steps: 100
+      name: triage crashes
+      description: Minimise + replay + classify each unique crash for a harness.
+      agents:
+        - seclab_taskflows.personalities.fuzzing_engineer
+      user_prompt: |
+        Triage crashes for harness id {{ result.id }} (target {{ result.target_id }})
+        in {{ globals.repo }}.
+
+        Step 1: call `get_fuzz_runs(harness_id={{ result.id }})` and list the
+        runs whose `crashes_count > 0`. If there are none, write a single line
+        "no crashes for harness {{ result.id }}" and stop.
+
+        Step 2: for each such run, the crash files live under
+        `<run.output_dir>/default/crashes/`. List the directory with
+        `local_file_viewer`. Skip the AFL bookkeeping file `README.txt`.
+
+        AFL binary path: {{ result.afl_binary_path }}
+
+        {% include 'seclab_taskflows.prompts.fuzzing.triage_crash' %}
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+        - seclab_taskflows.toolboxes.fuzz_runner
+        - seclab_taskflows.toolboxes.local_file_viewer

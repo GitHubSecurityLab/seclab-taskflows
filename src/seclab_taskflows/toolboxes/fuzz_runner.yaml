@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: toolbox
+  version: "1.0"
+server_params:
+  kind: stdio
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.fuzz_runner"]
+  env:
+    FUZZ_RUNNER_DIR: "{{ env('DATA_DIR', required=False) }}"
+    FUZZ_RUNNER_TIMEOUT: "{{ env('FUZZ_RUNNER_TIMEOUT', '1200') }}"
+    LOG_DIR: "{{ env('LOG_DIR', required=False) }}"
+
+# AFL fuzz runs may exceed the 120-second default MCP request timeout — the
+# largest budget in the iterative schedule is 960 seconds. Allow ~20 minutes
+# per tool call so even the longest run_afl_for / run_coverage call returns
+# without an MCP-level timeout.
+client_session_timeout: 1200

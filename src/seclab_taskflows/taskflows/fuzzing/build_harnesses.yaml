@@ -1,0 +1,106 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+
+# Compile every harness twice: once with AFL instrumentation and once with
+# llvm-cov instrumentation. Records build_status on each harness row.
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        List harnesses for {{ globals.repo }} via `get_harnesses` and pass them
+        through to the next task. Filter to rows whose `build_status` is empty
+        or "ok" (skip already-failed builds).
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+
+  - task:
+      model: code_analysis
+      must_complete: false
+      repeat_prompt: true
+      async: true
+      max_steps: 80
+      name: build harness
+      description: Build the AFL and coverage binaries for one harness.
+      agents:
+        - seclab_taskflows.personalities.fuzzing_engineer
+      user_prompt: |
+        Build harness id {{ result.id }} for target {{ result.target_id }} in
+        repo {{ globals.repo }}.
+
+        Harness source: {{ result.harness_path }}
+        Sanitizers:    {{ result.sanitizers }}
+
+        Step-by-step:
+
+          1. Call `get_fuzz_targets({{ globals.repo }})` and find the row whose
+             `id == {{ result.target_id }}`. Read its `notes` field to discover
+             the include directories, link libraries and object files chosen by
+             `analyse build system`.
+
+          2. Call `compile_harness` directly with:
+
+               - `harness_source`  = {{ result.harness_path }}
+               - `output_basename` = `harness_{{ result.id }}`
+               - `extra_sources`   = list of object/source files from notes
+               - `extra_cflags`    = include dirs and other CFLAGS from notes
+               - `extra_ldflags`   = library dirs from notes
+               - `extra_libs`      = library names (without `-l`) from notes
+               - `sanitizers`      = {{ result.sanitizers }}
+               - `custom_mutator_source` = optional. Three options:
+                 (a) If the target's `input_kind` (look it up via
+                     `get_fuzz_targets`) clearly matches a known format
+                     (json / xml / regex / binary_tlv / png), first call
+                     `write_format_mutator(format_name=<fmt>,
+                     output_path=<harness dir>/<fmt>_mutator.c)`, then pass
+                     the returned path here.
+                 (b) If the format is unknown OR you want stronger,
+                     project-specific tokens, call
+                     `generate_smart_mutator(source_root=<unpacked repo root>,
+                     output_path=<harness dir>/smart_mutator.c,
+                     focus="combined",
+                     corpus_dir=get_persistent_corpus_dir(
+                                    harness_id={{ result.id }})['corpus_dir'])`
+                     and pass that path. It extracts string literals +
+                     numeric constants from the project's own source code
+                     and (when `corpus_dir` is given) splices known-good
+                     inputs from previous campaigns — typically 20-40%
+                     extra coverage.
+                 (c) When `harness_candidates >= 3`, the recommended pattern
+                     is to call `generate_smart_mutators(source_root=...,
+                     output_dir=<harness dir>, basename="smart")` ONCE per
+                     repo, then for the three candidate harnesses:
+                       - candidate v1 → no custom mutator (baseline)
+                       - candidate v2 → smart_strings.c
+                       - candidate v3 → smart_combined.c
+                     The qualifier round will pick the best by 60s coverage.
+
+          3. Read the returned dict. Then call `update_harness_build` with the
+             returned `afl_binary_path`, `cov_binary_path`, `afl_build_cmd`,
+             `cov_build_cmd`, and a `build_status` of either `ok` (when both
+             builds succeeded) or a short error message extracted from
+             `afl_build_log` / `cov_build_log`.
+
+          4. If the build failed because of a missing header or a compile error
+             in the harness itself, edit the harness source file to fix it,
+             call `store_harness` to bump the version, and retry `compile_harness`
+             ONCE more. Do not loop indefinitely.
+
+        Do NOT use shell_exec for inspecting source files — use the
+        `local_file_viewer` tools instead. Compilation must go through
+        `compile_harness`, never raw clang/afl-clang invocations.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+        - seclab_taskflows.toolboxes.fuzz_runner
+        - seclab_taskflows.toolboxes.local_file_viewer

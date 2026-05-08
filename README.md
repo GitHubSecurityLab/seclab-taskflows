@@ -26,6 +26,18 @@ The results of the audit are written to an SQLite database, which is opened auto
 the end of the run. The results are in the table named "audit_result". The table has a column named "has_vulnerability",
 with checkmarks in the rows that are most likely to be genuine vulnerabilities.
 
+## Fuzzing taskflow
+
+For coverage-guided fuzzing of native C/C++ projects with AFL++:
+
+```bash
+./scripts/fuzzing/run_fuzzing.sh tukaani-project/xz
+```
+
+The full reference — pipeline stages, MCP tools, structure-aware mutators,
+persistent corpus, triage taxonomy, dashboard, schema, extension points — is
+in [**FUZZING.md**](FUZZING.md).
+
 ## Running with docker script
 
 We recommend running taskflows in a sandboxed environment. [GitHub Codespaces](https://github.com/features/codespaces) are convenient, or if you prefer you can use the script [`run_seclab_agent.sh`](scripts/run_seclab_agent.sh) to run a docker container of the `seclab-taskflow-agent` as outlined [here](https://github.com/GitHubSecurityLab/seclab-taskflow-agent/tree/main?tab=readme-ov-file#deploying-from-docker). Note that this script needs to be run from the main directory of the repo, and the `.env` file with the environment variables for the custom MCP servers to store data needs to be in the same directory.

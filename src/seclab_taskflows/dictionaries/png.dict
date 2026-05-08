@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+#
+# AFL/libFuzzer dictionary for PNG decoders. Magic bytes + chunk types +
+# common pathological values.
+
+# Magic
+"signature"="\x89PNG\r\n\x1a\n"
+
+# Critical chunk types
+"IHDR"="IHDR"
+"PLTE"="PLTE"
+"IDAT"="IDAT"
+"IEND"="IEND"
+
+# Ancillary chunks
+"tRNS"="tRNS"
+"cHRM"="cHRM"
+"gAMA"="gAMA"
+"iCCP"="iCCP"
+"sBIT"="sBIT"
+"sRGB"="sRGB"
+"tEXt"="tEXt"
+"zTXt"="zTXt"
+"iTXt"="iTXt"
+"bKGD"="bKGD"
+"hIST"="hIST"
+"pHYs"="pHYs"
+"sPLT"="sPLT"
+"tIME"="tIME"
+
+# Bit depths / colour types
+"depth_1"="\x01"
+"depth_8"="\x08"
+"depth_16"="\x10"
+"colour_grey"="\x00"
+"colour_rgb"="\x02"
+"colour_palette"="\x03"
+"colour_grey_a"="\x04"
+"colour_rgba"="\x06"
+
+# Compression / filter / interlace
+"compress_0"="\x00"
+"filter_0"="\x00"
+"interlace_none"="\x00"
+"interlace_adam7"="\x01"
+
+# Sizes (1x1, 0x0, huge)
+"width_1"="\x00\x00\x00\x01"
+"width_huge"="\xff\xff\xff\xff"
+"height_zero"="\x00\x00\x00\x00"
+
+# CRC sentinels
+"crc_zero"="\x00\x00\x00\x00"
+"crc_max"="\xff\xff\xff\xff"

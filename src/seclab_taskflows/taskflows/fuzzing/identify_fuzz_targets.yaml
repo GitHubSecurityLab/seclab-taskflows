@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+
+# Identify the most promising fuzz targets in a repo: parsers, decoders,
+# deserialisers, format-string consumers, anything taking attacker-controlled
+# bytes through an API surface.
+taskflow:
+  - task:
+      must_complete: true
+      headless: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Clear any prior fuzzing state for repo {{ globals.repo }}.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.fuzz_context
+
+  - task:
+      model: code_analysis
+      must_complete: true
+      max_steps: 120
+      name: identify fuzz targets
+      description: Find C/C++ functions in the repo that are good candidates for fuzzing.
+      agents:
+        - seclab_taskflows.personalities.fuzzing_engineer
+      user_prompt: |
+        Analyse the repository {{ globals.repo }} (already fetched locally) and
+        identify the C/C++ functions that are the best candidates for fuzzing.
+
+        A good fuzz target:
+
+          - Takes attacker-controlled bytes as input (a buffer + length, a file
+            path, a string, etc.).
+          - Lives in library code or in a parser/decoder; not in main() or in
+            test fixtures.
+          - Is reachable from a public API exposed by the repo (e.g. installed
+            headers, exported symbols, a documented entry point).
+          - Has interesting failure modes — parsing format X, decoding image Y,
+            handling protocol Z.
+
+        For each candidate, call `store_fuzz_target` with:
+
+          - `repo`     = {{ globals.repo }}
+          - `file`     = relative path inside the repo
+          - `function` = function name as it appears in the source
+          - `signature`= return type and parameter types
+          - `input_kind` = short description of the bytes it consumes
+          - `notes`    = WHY this is a good target (why is it interesting? what
+                         file types / formats / protocols are involved?)
+
+        Use local_file_viewer / gh_file_viewer to inspect the source. Only
+        include functions you can actually point at a precise file and line
+        for. Do NOT speculate about functions you have not read.
+
+        Skip targets in directories named `test`, `tests`, `example`, `examples`,
+        `fuzz` (existing fuzz harnesses), `bench`, `vendor`, `third_party`.
+
+        Stop when you have between 1 and 10 promising targets. Quality over
+        quantity — a single well-chosen parser is worth more than five marginal
+        candidates.
+
+        ## CRITICAL: actually persist the targets
+
+        You MUST call `store_fuzz_target` for every target before you stop.
+        Talking about a target in your final answer is NOT enough — downstream
+        taskflows read the database, not your message. Verify with a final
+        `get_fuzz_targets({{ globals.repo }})` call: if the returned list is
+        empty, you have done nothing useful. Re-call `store_fuzz_target` for
+        every candidate you discussed.
+      toolboxes:
+        - seclab_taskflows.toolboxes.local_file_viewer
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflows.toolboxes.fuzz_context

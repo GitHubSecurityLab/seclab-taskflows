@@ -1,0 +1,94 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+#
+# AFL/libFuzzer dictionary for regex pattern compilers (PCRE, Oniguruma, RE2, ...).
+
+# Anchors / boundaries
+"start"="^"
+"end"="$"
+"word_b"="\\b"
+"non_word_b"="\\B"
+"start_input"="\\A"
+"end_input"="\\z"
+"end_or_nl"="\\Z"
+
+# Character classes (shorthand)
+"any"="."
+"digit"="\\d"
+"non_digit"="\\D"
+"word"="\\w"
+"non_word"="\\W"
+"space"="\\s"
+"non_space"="\\S"
+"hex"="\\x"
+"oct"="\\o"
+"unicode"="\\u"
+"property"="\\p{L}"
+"non_property"="\\P{L}"
+
+# Quantifiers
+"q_star"="*"
+"q_plus"="+"
+"q_opt"="?"
+"q_lazy_star"="*?"
+"q_lazy_plus"="+?"
+"q_possessive"="*+"
+"q_n"="{3}"
+"q_n_m"="{3,5}"
+"q_n_inf"="{3,}"
+"q_huge"="{1000000}"
+
+# Groups
+"group_open"="("
+"group_close"=")"
+"non_capt"="(?:"
+"named"="(?P<n>"
+"named2"="(?<n>"
+"lookahead"="(?="
+"neg_lookahead"="(?!"
+"lookbehind"="(?<="
+"neg_lookbehind"="(?<!"
+"atomic"="(?>"
+"conditional"="(?(1)"
+
+# Backreferences
+"back1"="\\1"
+"back9"="\\9"
+"back_named"="\\g<n>"
+"recurse"="(?R)"
+"recurse_n"="(?1)"
+
+# Character set
+"set_open"="["
+"set_close"="]"
+"set_neg"="[^"
+"set_alpha"="[a-z]"
+"set_alnum"="[[:alnum:]]"
+"set_punct"="[[:punct:]]"
+"posix_class"="[:alpha:]"
+
+# Alternation / escapes
+"alt"="|"
+"esc_dot"="\\."
+"esc_backslash"="\\\\"
+"esc_special"="\\Q...\\E"
+
+# Modifiers
+"flag_i"="(?i)"
+"flag_m"="(?m)"
+"flag_s"="(?s)"
+"flag_x"="(?x)"
+"flag_off"="(?-i)"
+
+# Pathological / catastrophic-backtracking patterns (real ReDoS history)
+"redos_anchor"="^(a+)+$"
+"redos_alt"="^(a|a)*$"
+"redos_nested"="^((a*)*)*$"
+"redos_evil"="^([a-zA-Z0-9])(([\\.\\-]?[a-zA-Z0-9]+)*)$"
+"redos_email"="^(a+)+@(a+)+$"
+
+# Common "interesting" inputs
+"empty"=""
+"single_space"=" "
+"unicode_emoji"="\xf0\x9f\x98\x80"
+"null_byte"="\x00"

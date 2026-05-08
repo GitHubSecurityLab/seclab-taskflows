@@ -1,0 +1,72 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+
+# Produce a markdown summary of the fuzzing campaign: targets, coverage trends,
+# unique crashes. Persisted alongside the SQLite database.
+taskflow:
+  - task:
+      model: general_tasks
+      must_complete: true
+      name: write fuzzing report
+      description: Write a markdown report summarising the fuzzing campaign.
+      agents:
+        - seclab_taskflows.personalities.fuzzing_engineer
+      user_prompt: |
+        Generate a markdown fuzzing report for {{ globals.repo }}.
+
+        Use the following tools to gather data:
+
+          - `get_fuzz_targets({{ globals.repo }})` — list of targets analysed.
+          - `get_harnesses({{ globals.repo }})` — harness build status.
+          - `get_coverage_summary(harness_id)` — per-iteration coverage for each
+            built harness.
+          - `get_crashes({{ globals.repo }})` — unique crashes across the campaign.
+
+        Then write the report file via `write_file` to:
+
+          `<workspace_dir>/repo/<owner>__<repo>/REPORT.md`
+
+        Replace `/` in `{{ globals.repo }}` with `__` for the directory name.
+        Use `workspace_paths` to discover `<workspace_dir>`.
+
+        Report structure:
+
+          # Fuzzing Report — {{ globals.repo }}
+
+          ## Targets
+          (one row per target: file:function, input_kind, notes summary, build_status)
+
+          ## Coverage trend
+          (one section per harness: a small table iteration → time_budget →
+           lines_hit/total → fns_hit/total → branches_hit/total → exec/sec)
+
+          ## Crashes
+
+          Group crashes by **verdict** in this order: `vulnerability` first
+          (real, exploitable through public API), then `library_hardening`,
+          `oom`, `timeout`, `assertion_failure`, `non_reproducible`,
+          `harness_bug`, `duplicate`, `needs_investigation`, then any with
+          empty verdict at the end.
+
+          For each crash include: id, classification, bug_class, cwe, severity,
+          stack_top_hash, minimised input path, link to vuln_report_path
+          (relative to the report file), short notes excerpt.
+
+          ## Summary
+          (1-2 paragraphs: how many targets fuzzed, total exec count, peak
+           coverage, total unique crashes, breakdown by verdict)
+
+        Keep the report concise and factual — no speculation, no attempted
+        fixes. The audit taskflow handles vulnerability assessment separately.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+        - seclab_taskflows.toolboxes.fuzz_runner
+        - seclab_taskflows.toolboxes.local_shell

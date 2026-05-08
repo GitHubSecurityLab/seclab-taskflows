@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+
+# Triage every unique crash discovered in this campaign: classify, draft a
+# patch, write a markdown vuln report, persist the verdict.
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        List all crashes for {{ globals.repo }} via `get_crashes` and pass each
+        crash row through to the next task. Skip rows that already have a
+        non-empty `verdict` (re-runs).
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+
+  - task:
+      model: code_analysis
+      must_complete: false
+      repeat_prompt: true
+      async: true
+      max_steps: 100
+      name: write vuln report
+      description: Triage one crash → verdict + patch + markdown report.
+      agents:
+        - seclab_taskflows.personalities.fuzzing_engineer
+      user_prompt: |
+        Crash id: {{ result.id }}
+        Harness id: {{ result.harness_id }}
+        Target id: {{ result.target_id }}
+        Repo: {{ globals.repo }}
+
+        Existing classification: {{ result.classification }}
+        Stack-top hash: {{ result.stack_top_hash }}
+        Minimised input: {{ result.minimized_path }}
+
+        Sanitiser output (truncated):
+        ```
+        {{ result.sanitizer_output }}
+        ```
+
+        Triage notes from earlier stage:
+        {{ result.notes }}
+
+        {% include 'seclab_taskflows.prompts.fuzzing.vuln_report' %}
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+        - seclab_taskflows.toolboxes.fuzz_runner
+        - seclab_taskflows.toolboxes.local_shell
+        - seclab_taskflows.toolboxes.local_file_viewer

@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: toolbox
+  version: "1.0"
+server_params:
+  kind: stdio
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.local_shell"]
+  env:
+    LOCAL_SHELL_CWD: "{{ env('LOCAL_SHELL_CWD', required=False) }}"
+    LOCAL_SHELL_TIMEOUT: "{{ env('LOCAL_SHELL_TIMEOUT', '180') }}"
+    LOG_DIR: "{{ env('LOG_DIR', required=False) }}"
+
+# Note: ``shell_exec`` is intentionally NOT under ``confirm`` because the
+# fuzzing taskflow is invoked autonomously via ``scripts/fuzzing/run_fuzzing.sh``
+# (no interactive stdin). Every command is logged to ``$LOG_DIR/mcp_local_shell.log``
+# for after-the-fact review. See ``src/seclab_taskflows/taskflows/fuzzing/README.md``
+# for the security caveats.

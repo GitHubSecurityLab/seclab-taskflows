@@ -1,0 +1,146 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+  harness_candidates:
+
+# Author the initial fuzz harness + seed corpus for every (buildable) target.
+# Iterates over fuzz_target rows and produces a Harness row + a small seed dir.
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        List the fuzz targets for {{ globals.repo }} using `get_fuzz_targets`.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+
+  - task:
+      model: code_analysis
+      must_complete: false
+      repeat_prompt: true
+      async: true
+      max_steps: 80
+      name: write initial harness
+      description: Write the initial AFL++ harness and seed corpus for one fuzz target.
+      agents:
+        - seclab_taskflows.personalities.fuzzing_engineer
+      user_prompt: |
+        Write the initial fuzz harness(es) for target id {{ result.id }} in repo
+        {{ result.repo }}:
+
+          - file:      {{ result.file }}
+          - function:  {{ result.function }}
+          - signature: {{ result.signature }}
+          - input_kind:{{ result.input_kind }}
+          - notes:     {{ result.notes }}
+
+        If `input_kind` starts with `BUILD_FAILED:`, skip this target entirely
+        and do not produce any harness.
+
+        First call `workspace_paths` to find out where to write artefacts. Use
+        `<workspace_dir>/repo/<owner>__<repo>/target_{{ result.id }}/` as the
+        per-target subdirectory.
+
+        ## G3: candidate harnesses
+
+        The taskflow runs with `harness_candidates = {{ globals.harness_candidates|default(1) }}`.
+
+        - If `harness_candidates == 1` (the default): write a single harness
+          named `harness.c` and a single seed corpus.
+        - If `harness_candidates >= 2`: write N **distinct** candidate
+          harnesses, named `harness_v1.c`, `harness_v2.c`, ... `harness_vN.c`.
+          Each candidate must use a meaningfully different strategy. Suggested
+          variants:
+
+            v1 — minimal: just calls the target with raw bytes / a single
+                  options struct. Fastest exec/sec, lowest depth.
+            v2 — config-byte split: first 1-2 bytes select an enum / mode,
+                  the rest is the payload. Reaches more code paths.
+            v3 — multi-API chain: calls the target plus 1-2 related public
+                  functions (e.g. parse + serialize, decode + validate). Best
+                  for catching round-trip bugs.
+
+          Write all N harnesses + a SHARED `seeds/` dir (the qualifier stage
+          will run each candidate against the same seeds for fairness).
+
+          Then call `store_harness` once per candidate, using the candidate
+          path as `harness_path`. Tag each harness's notes with `[v1]`, `[v2]`,
+          etc. so the qualifier can identify them.
+
+          The `qualify_harnesses` stage that runs after `build_harnesses` will
+          run each candidate for 60 s, rank by line coverage, and mark losers
+          with `build_status='superseded'` so they're skipped from the main
+          fuzz loop.
+
+        Write a harness source file with the standard libFuzzer entry point so
+        the same binary works under AFL++ via the `-fsanitize=fuzzer-no-link`
+        shim:
+
+        ```c
+        #include <stdint.h>
+        #include <stddef.h>
+        // include the headers identified by analyse build system
+        int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+            // bound any explosive allocations
+            if (size > 1u << 20) return 0;
+            // call the target function with `data` / `size`
+            return 0;
+        }
+        ```
+
+        Use `write_file` from local_shell to write the harness, and `write_file`
+        / `write_bytes` to write 2-5 minimal seed inputs into a `seeds/`
+        subdirectory.
+
+        ## If input_kind matches a known format, prepare structure-aware assets
+
+        Call `list_format_assets()` to see what's available. If the target's
+        `input_kind` clearly matches one of the named formats (json, xml,
+        regex, binary_tlv, png), also call:
+
+          - `get_format_dictionary(format_name=<fmt>,
+              output_path=<seeds dir>/auto.dict)` — a pre-built AFL dictionary
+              for this format.
+
+        ## ALWAYS: generate a project-aware dictionary before fuzzing
+
+        Whether or not the format is known, also call:
+
+          - `generate_project_dictionary(source_root=<unpacked repo root>,
+              output_path=<seeds dir>/auto.dict)`
+
+        This APPENDS to the dictionary (rather than replacing it), so calling
+        it after `get_format_dictionary` is safe — you'll end up with a single
+        merged dictionary that has both format keywords AND project-specific
+        tokens (string literals, magic constants, error codes) extracted
+        statically from the project's own source code.
+
+        The fuzz_iteration prompt picks `auto.dict` up automatically by
+        passing it as `dictionary=...` to `run_afl_for`, AND will call
+        `enrich_dictionary_from_uncovered` after each iteration to grow the
+        dictionary with tokens extracted from the conditional guards near
+        every still-uncovered line.
+
+        Then call:
+
+          - `store_harness(target_id, repo, harness_path, sanitizers="address,undefined")`
+          - `store_seed(target_id, path, source="fixture" or "synthesized", iteration=0)`
+            once per seed.
+
+        Be autonomous. Do NOT compile the harness here — `build_harnesses`
+        will do that next.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+        - seclab_taskflows.toolboxes.fuzz_runner
+        - seclab_taskflows.toolboxes.local_shell
+        - seclab_taskflows.toolboxes.local_file_viewer

@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+#
+# AFL/libFuzzer dictionary for XML / SAX-style parsers (libexpat, libxml2, etc).
+
+# XML declaration / processing instructions
+"xml_decl"="<?xml version=\"1.0\"?>"
+"xml_decl_enc"="<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+"xml_decl_utf16"="<?xml version=\"1.0\" encoding=\"UTF-16\"?>"
+"pi_open"="<?"
+"pi_close"="?>"
+"pi_target"="<?target ?>"
+
+# Comments / CDATA
+"comment_open"="<!--"
+"comment_close"="-->"
+"cdata_open"="<![CDATA["
+"cdata_close"="]]>"
+
+# DOCTYPE / DTD
+"doctype"="<!DOCTYPE root>"
+"doctype_pub"="<!DOCTYPE root PUBLIC \"id\" \"sys\">"
+"doctype_sys"="<!DOCTYPE root SYSTEM \"sys\">"
+"entity_decl"="<!ENTITY name \"value\">"
+"entity_external"="<!ENTITY ext SYSTEM \"file:///etc/passwd\">"
+"entity_param"="<!ENTITY % p \"v\">"
+"element_decl"="<!ELEMENT root (a)>"
+"attlist_decl"="<!ATTLIST root attr CDATA #REQUIRED>"
+
+# Element start / end
+"elem_open"="<root>"
+"elem_close"="</root>"
+"elem_self"="<root/>"
+"elem_attr"="<root attr=\"v\">"
+"elem_ns"="<ns:root xmlns:ns=\"u\">"
+"elem_default_ns"="<root xmlns=\"u\">"
+
+# Entity references
+"amp"="&amp;"
+"lt"="&lt;"
+"gt"="&gt;"
+"quot"="&quot;"
+"apos"="&apos;"
+"char_ref_dec"="&#65;"
+"char_ref_hex"="&#x41;"
+"unknown_entity"="&unknown;"
+"recursive_entity"="&a;"
+"billion_laughs"="&lol9;"
+
+# Common attack surface
+"file_uri"="file:///etc/passwd"
+"http_uri"="http://localhost/"
+"javascript_uri"="javascript:alert(1)"
+
+# Whitespace / encoding edge cases
+"bom"="\xef\xbb\xbf"
+"utf16_bom_le"="\xff\xfe"
+"utf16_bom_be"="\xfe\xff"
+"null_byte"="\x00"

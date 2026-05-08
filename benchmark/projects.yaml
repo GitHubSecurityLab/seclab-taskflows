@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+#
+# Benchmark targets for the fuzzing taskflow. Used by humans to pick repos to
+# run; not consumed automatically by run_fuzzing.sh today.
+
+projects:
+  - repo: tukaani-project/xz
+    notes: |
+      Real-world parser-heavy library. liblzma exposes many decoders
+      (lzma_stream_buffer_decode, lzma_block_buffer_decode, lzma_index_buffer_decode,
+      lzma_filter_flags_decode, lzma_properties_decode, lzma_raw_buffer_decode,
+      lzma_stream_header_decode, lzma_stream_footer_decode). Builds cleanly
+      with autotools + clang.
+
+  - repo: DaveGamble/cJSON
+    notes: |
+      Small, single-file C JSON parser. Trivial CMake build, classic
+      fuzz-friendly target. Public entry: cJSON_Parse(const char *value),
+      cJSON_ParseWithLength. Good for catching null-deref / integer-overflow
+      / OOB-read in tokenisation and number parsing.
+
+  - repo: akheron/jansson
+    notes: |
+      Compact C JSON library with a clean, documented byte-buffer entry
+      point: json_loadb(buffer, size, flags, &error). Builds with CMake.
+      Very fast exec/sec; useful as a pipeline smoke test plus a real-world
+      JSON differential against cJSON.
+
+  - repo: libexpat/libexpat
+    notes: |
+      Mature streaming SAX XML parser (XML_Parser, XML_Parse, XML_ParseBuffer).
+      Large attack surface, many historical CVEs around DTDs, entities, and
+      namespace handling. Builds with CMake or autotools. Place harnesses in
+      libexpat/expat and link against the static expat library.
+
+  - repo: kkos/oniguruma
+    notes: |
+      Regex engine: pattern compiler + matcher. Public APIs onig_new + onig_search.
+      State-machine compilation of attacker-controlled patterns is the
+      historically bug-rich hot path. Autotools build; the harness should
+      take the first byte to choose syntax/options, then split the rest into
+      pattern + subject buffer.
+

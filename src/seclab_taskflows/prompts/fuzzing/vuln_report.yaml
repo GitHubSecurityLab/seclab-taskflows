@@ -1,0 +1,164 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: "1.0"
+prompt: |
+        Triage this crash and produce a markdown vulnerability report.
+
+        ## Step-by-step
+
+        1. Look up the harness source via `local_file_viewer` (the harness path
+           is recorded on the harness row; use `get_harnesses`). Identify
+           whether the harness violates the API contract (e.g. passes NULL where
+           the library documents a non-NULL parameter, calls functions in the
+           wrong order, ignores error return values, etc.).
+
+        2. Read the crashing function in the library source (use the function
+           name from the sanitiser stack trace plus `local_file_viewer`).
+
+        3. Walk the call chain from the public API down to the crashing
+           instruction. Determine whether attacker-controlled input from a
+           realistic public entry point (e.g. `lzma_stream_decoder`,
+           `lzma_stream_buffer_decode`, `lzma_index_buffer_decode`) can reach
+           this code path WITHOUT requiring the caller to violate the API.
+
+        4. Pick exactly ONE verdict:
+
+           - `vulnerability` — attacker-controlled input through a public API
+             reaches the bug. There IS a realistic exploitation path. Use this
+             only if you can describe the input shape that triggers it from a
+             public entry point.
+           - `library_hardening` — the bug is real (the library should defend
+             itself) but no realistic public-API path reaches it. Often:
+             internal/expert-only API misuse, requires the caller to pass NULL
+             where the docs implicitly assume non-NULL, etc.
+           - `harness_bug` — the bug is purely in our harness (e.g. our harness
+             passes garbage that real callers wouldn't, or fails to call a
+             required init function).
+           - `non_reproducible` — `replay_under_asan` returns `crashed: false`
+             on the minimised input. Skip the rest; just record this verdict.
+           - `oom` — out-of-memory caused by attacker-controllable allocation.
+             Vulnerability iff the size is unbounded or grows
+             super-linearly in the input size.
+           - `timeout` — the input causes pathological algorithmic blow-up. Same
+             test as `oom` for severity.
+           - `assertion_failure` — `assert()` was hit. Security relevance varies;
+             use this verdict and explain.
+           - `duplicate` — same root cause as another already-classified crash
+             (different stack hash but same underlying bug).
+           - `fixed` — the input no longer reproduces against the current
+             build (set by the `confirm_fixed_crashes` stage; you should
+             rarely need to assign this manually).
+           - `needs_investigation` — you cannot determine the verdict from the
+             available information; explain what's missing.
+
+        5. Pick exactly ONE bug class:
+           `heap-buffer-overflow-read`, `heap-buffer-overflow-write`,
+           `heap-use-after-free`, `stack-buffer-overflow`, `stack-overflow`,
+           `global-buffer-overflow`, `null-deref`, `integer-overflow`,
+           `signed-integer-overflow`, `divide-by-zero`, `uninitialised-read`,
+           `undefined-behavior`, `assertion-failure`, `timeout`, `oom`, `other`.
+
+        6. Best-effort CWE: e.g. `CWE-125` (OOB read), `CWE-787` (OOB write),
+           `CWE-416` (UAF), `CWE-476` (NULL deref), `CWE-190` (integer
+           overflow), `CWE-617` (reachable assertion), `CWE-400`
+           (uncontrolled resource consumption). Empty string if unsure.
+
+        7. Severity: `critical`, `high`, `medium`, or `low`. Anchor on the
+           realistic impact (RCE candidate? info leak? DoS only? trivial fault?).
+           Call `suggest_severity(bug_class=<your chosen bug_class>)` for the
+           data-driven default; you may override but must justify in writing.
+
+        8. Draft a SMALL fix patch as a unified diff (output of `diff -u`).
+           Keep it minimal — add the missing NULL check, add the bounds check,
+           clamp the integer, etc. Mark the patch as "review required" — these
+           are sketches, not commit-ready code.
+
+        8b. Bundle a reproducer artefact:
+
+            ```
+            package_reproducer(
+              output_path = "<workspace>/repo/<owner>__<repo>/repro_<crash_id>.tgz",
+              minimised_input = result.minimized_path,
+              harness_source = <harness_path from get_harnesses>,
+              afl_binary_path = <harness.afl_binary_path>,
+              build_cmd_afl = <harness.build_cmd_afl>,
+              sanitizer_output = result.sanitizer_output,
+              classification = result.classification,
+            )
+            ```
+
+            This produces a single .tgz with the minimised input, the harness
+            source, and a README explaining how to reproduce. Maintainers love
+            these. Pass the resulting path to `update_crash_verdict` below.
+
+        9. Write the markdown report via `write_file` to:
+
+           `<workspace>/repo/<owner>__<repo>/vuln_<crash_id>.md`
+
+           Replace `/` in the repo name with `__`. Use `workspace_paths` to
+           discover the workspace root.
+
+           Report sections (in this exact order):
+
+             # Crash <id> — <one-line summary>
+
+             - **Verdict**: <verdict>
+             - **Bug class**: <bug_class>
+             - **CWE**: <cwe>
+             - **Severity**: <severity>
+             - **Confidence**: high | medium | low (your confidence in the verdict)
+             - **Stack-top hash**: <hash>
+             - **Reproducer (minimised)**: <minimized_path>
+             - **Reproducer artefact**: <reproducer .tgz path from package_reproducer>
+
+             ## Stack trace
+             ```
+             <first 20 lines of sanitiser_output>
+             ```
+
+             ## Root cause
+             <prose, with file:line references to the library source>
+
+             ## Reachability from public API
+             <prose: which public API can attackers use to reach this? Or:
+              "none — caller must violate API contract X". Be concrete: name
+              the function chain from public API → crash site.>
+
+             ## Exploitability
+             <For verdict=vulnerability or library_hardening only:
+              - Is it a read or write? OOB read → likely info-leak; OOB write
+                → potential RCE candidate.
+              - Is the corruption attacker-controlled in size/value?
+              - Are there typical mitigations (ASLR, stack canaries) that
+                materially change the picture for this codebase?
+              For other verdicts, write a single line: "N/A — not a
+              vulnerability".>
+
+             ## Suggested fix (review required)
+
+             ```diff
+             <minimal unified diff>
+             ```
+
+             ## Regression test sketch
+
+             <A short prose description of how a unit test would catch this
+              regression. If the input is small, paste the bytes (hex). If
+              the project has an existing test harness, name the file the test
+              should go in. This is NOT a full patch — it's a hint for the
+              maintainer.>
+
+             ## Notes
+
+             <anything else the next reader should know — flakiness, related
+              crashes by hash, hypotheses you couldn't confirm>
+
+        10. Persist the verdict to `fuzz_context` via `update_crash_verdict`,
+            with the absolute path of the report you just wrote AND the
+            `reproducer_path` from step 8b.
+
+        Be honest. If a crash is a harness bug, say so plainly. The audit
+        taskflow handles deeper vulnerability analysis separately.

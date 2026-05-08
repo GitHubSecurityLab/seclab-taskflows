@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+
+# Determine how to build the repo with AFL++ instrumentation.
+# Outputs:
+#   - Notes (in fuzz_context.target.notes / harness.notes) on the build system,
+#     library entry points, header paths, and link requirements per target.
+taskflow:
+  - task:
+      model: code_analysis
+      must_complete: true
+      max_steps: 100
+      name: analyse build system
+      description: Detect the repo's build system and confirm we can compile it with clang and AFL++.
+      agents:
+        - seclab_taskflows.personalities.fuzzing_engineer
+      user_prompt: |
+        For repo {{ globals.repo }}, determine the build system (CMake,
+        autotools/configure, Meson, plain Makefile, single-file headers, etc.)
+        and figure out how to produce a static library or object files we can
+        link our fuzz harnesses against.
+
+        Use the `shell_exec` tool from local_shell to:
+
+          1. Inspect the top-level files (`ls`, `cat README.md`, `cat configure.ac`,
+             `cat CMakeLists.txt`, etc.).
+          2. Run `./configure` / `cmake -B build` / `meson setup` as appropriate
+             with `CC=clang CFLAGS="-g -O1"` so the resulting object files are
+             link-compatible with both the AFL build (afl-clang-lto) and the
+             coverage build (clang -fprofile-instr-generate -fcoverage-mapping).
+          3. Build the static library / object files.
+
+        Once built, for each fuzz target previously stored, append to its `notes`
+        (via `store_fuzz_target` again) the precise:
+
+          - Header file(s) needed (`#include` lines).
+          - Static library or `.o` files to link against (absolute paths).
+          - Any `-I` include directories.
+          - Any `-l` libraries or `-L` library directories.
+          - Any required initialisation calls before the target function.
+          - Any teardown/reset calls between iterations.
+
+        If the build fails after a reasonable attempt, record what went wrong in
+        the target notes and mark `input_kind` with the prefix `BUILD_FAILED:`
+        so downstream steps can skip the target.
+
+        Be autonomous. Make decisions, don't ask.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+        - seclab_taskflows.toolboxes.local_shell
+        - seclab_taskflows.toolboxes.local_file_viewer

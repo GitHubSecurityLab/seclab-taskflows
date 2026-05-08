@@ -1,0 +1,138 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+
+# E3: build a static call graph for the repo, cross-reference with the union
+# of all coverage_reports, and persist a CallGraph snapshot + a markdown
+# `untouched_api_surface.md` listing public-API functions never reached by
+# any fuzzing run. Runs after triage, before vuln-report writing.
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the harnesses for {{ globals.repo }} via `get_harnesses`. We need
+        the list to find the source root (any harness's directory's parent
+        contains the unpacked repo).
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+
+  - task:
+      model: code_analysis
+      must_complete: false
+      max_steps: 80
+      name: build call graph
+      description: Static call graph + reachability + untouched API surface.
+      agents:
+        - seclab_taskflows.personalities.fuzzing_engineer
+      user_prompt: |
+        Build a Fuzz-Introspector-style call graph + untouched-API-surface
+        report for repo {{ globals.repo }}.
+
+        Step-by-step:
+
+          1. Find the unpacked source root. Use the local_gh_resources data
+             dir (typically
+             `~/.local/share/seclab-taskflow-agent/seclab-taskflows/local_gh_resources/<owner>/<repo>/`),
+             or the path reported by any harness's `harness_path` parent (the
+             harness lives next to the unpacked source under the workspace).
+             Use `local_file_viewer.list_directory` to confirm the path is
+             real and contains C/C++ source.
+
+          2. Call `get_repo_reached_functions(repo={{ globals.repo }})` to get
+             the union of all function names hit across every iteration of
+             every harness in this campaign.
+
+          3. Call `build_call_graph(source_root=<path>,
+                                     cov_lcov_path="",
+                                     output_dot=<workspace>/repo/<owner>__<repo>/call_graph.dot,
+                                     output_svg=<workspace>/repo/<owner>__<repo>/call_graph.svg,
+                                     max_nodes=200)`.
+
+             We pass cov_lcov_path="" because we'd rather use the unioned
+             reached set (step 2). The tool's coloring will then use a single
+             LCOV file's reached set; we patch the colours by computing the
+             true reached set in step 4.
+
+          4. Call `untouched_api_surface(source_root=<path>,
+                                          reached_function_names=<list from step 2>,
+                                          extern_only_headers=<best guess for
+                                          public-API headers, e.g.
+                                          ['include/**/*.h', 'src/api/**/*.h']
+                                          if those exist; pass an empty list if
+                                          you're not sure>,
+                                          max_results=200)`.
+
+          5. Persist via `store_call_graph(repo={{ globals.repo }},
+                                            dot_path=..., svg_path=...,
+                                            functions_total=...,
+                                            functions_in_graph=...,
+                                            functions_reached=...,
+                                            functions_unreached=...,
+                                            untouched_surface_json=<JSON-encoded
+                                            list from step 4's "untouched">)`.
+
+          6. Write a markdown summary `<workspace>/repo/<owner>__<repo>/call_graph.md`
+             via `write_file` with sections:
+
+                # Call graph & API surface — {{ globals.repo }}
+
+                ## Call graph
+
+                ![Call graph](call_graph.svg) (file://...) — green = reached,
+                red = defined but never reached, grey = external.
+
+                Stats: <functions_total> total, <functions_in_graph> in graph,
+                <functions_reached> reached, <functions_unreached> unreached.
+
+                ## Untouched public-API surface (top 30)
+
+                | Function | Hint for next campaign |
+                |----------|------------------------|
+                | <name>   | <one-line: parser? decoder? high-leverage entry?> |
+                | ...      | ... |
+
+                ## Recommendations
+
+                <2-3 sentences: which untouched functions look most worth
+                writing a harness for, with brief rationale>
+
+          7. **G1-lite: persist machine-readable harness suggestions.**
+             For each of the top 5-8 candidates from step 4's "untouched"
+             list, call:
+
+               `store_harness_suggestion(
+                    repo={{ globals.repo }},
+                    function_name=<C symbol name>,
+                    file=<source path if known, else "">,
+                    rationale=<one short sentence: why fuzz this?>,
+                    input_kind=<"bytes"|"string"|"json"|"binary"|"other">,
+                    priority=<integer 1-10; 1 = highest priority>)`
+
+             Pick candidates that look like parsers/decoders/validators
+             (names mentioning `parse`, `decode`, `read`, `load`, `verify`,
+             `validate`, `unpack`, `from_`, `lex`, `scan`). Skip getters,
+             setters, free/init/cleanup, and anything that takes only
+             integers/enums (not interesting to fuzz).
+
+             These suggestions show up in the dashboard and inform future
+             `write_initial_harnesses` runs.
+
+        Be autonomous. If `build_call_graph` fails (e.g. no ctags/cscope on
+        PATH, source root mis-detected), record the failure in the markdown
+        report and skip steps 5-7; downstream stages should still work.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+        - seclab_taskflows.toolboxes.fuzz_runner
+        - seclab_taskflows.toolboxes.local_shell
+        - seclab_taskflows.toolboxes.local_file_viewer

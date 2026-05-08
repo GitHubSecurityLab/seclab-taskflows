@@ -1,0 +1,118 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo:
+  qualifier_seconds:    # default 60s, override via -g qualifier_seconds=120
+
+# G3: OSS-Fuzz-Gen-style multi-candidate harness qualifier.
+#
+# When write_initial_harnesses produced multiple candidate harnesses per
+# fuzz_target (controlled by harness_candidates), this stage:
+#   1. Runs each `build_status="ok"` harness for `qualifier_seconds` seconds.
+#   2. Measures line coverage via run_coverage.
+#   3. For each fuzz_target, finds the harness with the HIGHEST line %.
+#   4. Marks every other harness for the same target with
+#      build_status="superseded" so the main fuzz_iteration loop skips them.
+#
+# When only one candidate exists per target, this stage is a no-op (a single
+# harness "wins by default") but still provides a free 60s warm-up run that
+# the main loop's later iterations build on.
+taskflow:
+  - task:
+      must_complete: true
+      exclude_from_context: true
+      model: general_tasks
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        List harnesses for {{ globals.repo }} via `get_harnesses`. Filter to
+        rows whose `build_status == "ok"` and pass them through.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+
+  - task:
+      model: code_analysis
+      must_complete: false
+      repeat_prompt: true
+      async: true
+      max_steps: 60
+      name: qualify harness
+      description: Run a single candidate harness for the qualifier budget and record coverage.
+      agents:
+        - seclab_taskflows.personalities.fuzzing_engineer
+      user_prompt: |
+        Qualify candidate harness id {{ result.id }} (target {{ result.target_id }})
+        in {{ globals.repo }}.
+
+        Budget: {{ globals.qualifier_seconds|default(60) }} seconds.
+
+        ## Steps
+
+          1. `start_fuzz_run(harness_id={{ result.id }}, iteration_number=0,
+                              time_budget_seconds={{ globals.qualifier_seconds|default(60) }},
+                              output_dir=<workspace runs_dir>/qualify_h{{ result.id }})`.
+             Iteration number 0 is reserved for the qualifier; the main loop
+             starts from iteration 1.
+
+          2. `run_afl_for(afl_binary_path={{ result.afl_binary_path }},
+                           seed_dir=<seeds dir for this target>,
+                           output_dir=<run output dir>,
+                           seconds={{ globals.qualifier_seconds|default(60) }},
+                           memory_limit_mb=1024,
+                           timeout_ms=2000)`.
+
+          3. `finish_fuzz_run(run_id, ...)` with the AFL stats.
+
+          4. `run_coverage(cov_binary_path={{ result.cov_binary_path }},
+                            inputs_dir=<run output dir>/default/queue,
+                            output_dir=<run output dir>/coverage)`.
+
+          5. `store_coverage_from_lcov(run_id, lcov_path, html_path=...)`.
+
+        That's it for one candidate. The next task picks the winner per target.
+
+        Be autonomous and minimal — no harness/seed improvements at this stage.
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context
+        - seclab_taskflows.toolboxes.fuzz_runner
+        - seclab_taskflows.toolboxes.local_shell
+        - seclab_taskflows.toolboxes.local_file_viewer
+
+  - task:
+      model: general_tasks
+      must_complete: true
+      name: pick best candidate per target
+      description: Mark losing candidates with build_status='superseded'.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        For each fuzz_target in {{ globals.repo }}, find the candidate harness
+        with the highest qualifier line coverage and mark every other ok-built
+        candidate for the same target as `superseded`.
+
+        Concrete steps:
+
+          1. `get_fuzz_targets({{ globals.repo }})` → list of target ids.
+          2. `get_harnesses({{ globals.repo }})` → list of harnesses with their
+              build_status.
+          3. For each target_id with **2+ harnesses** whose build_status is
+              "ok":
+              - Use `get_coverage_summary(harness_id)` for each candidate.
+              - The "qualifier" coverage is the row whose iteration_number == 0.
+              - Pick the harness with the highest line_pct at iteration 0.
+              - For every other ok candidate of the same target_id, call
+                `update_harness_build(harness_id=<loser>, build_status="superseded")`.
+              - Leave the winner's build_status as "ok".
+          4. For targets with only one ok candidate, no action — that one wins
+              by default.
+
+        Be deterministic. If two candidates tie on line_pct, prefer the lower
+        harness id (oldest).
+      toolboxes:
+        - seclab_taskflows.toolboxes.fuzz_context

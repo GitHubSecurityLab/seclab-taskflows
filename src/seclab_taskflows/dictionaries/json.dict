@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+#
+# AFL/libFuzzer dictionary for JSON. Tokens that are easy for the mutator
+# to splice into the input but hard for it to discover from random bytes:
+# string delimiters, escape sequences, structural punctuation, common keys,
+# numeric edge cases.
+
+# Punctuation / structure
+"obj_open"="{"
+"obj_close"="}"
+"arr_open"="["
+"arr_close"="]"
+"colon"=":"
+"comma"=","
+"quote"="\""
+
+# Literals
+"null"="null"
+"true"="true"
+"false"="false"
+
+# Numeric edge cases
+"zero"="0"
+"neg_zero"="-0"
+"max_safe"="9007199254740991"
+"min_safe"="-9007199254740991"
+"big_exp"="1e308"
+"small_exp"="1e-308"
+"scientific"="1.0e10"
+"hex_like"="0x1234"
+"infinity"="Infinity"
+"neg_infinity"="-Infinity"
+"nan"="NaN"
+
+# String escapes
+"esc_quote"="\\\""
+"esc_backslash"="\\\\"
+"esc_slash"="\\/"
+"esc_b"="\\b"
+"esc_f"="\\f"
+"esc_n"="\\n"
+"esc_r"="\\r"
+"esc_t"="\\t"
+"unicode_4"="\\u0000"
+"unicode_high"="\\uFFFF"
+"unicode_surrogate_high"="\\uD800"
+"unicode_surrogate_low"="\\uDC00"
+"unicode_invalid"="\\uXYZW"
+
+# Common JSON keys (catches API-shaped fuzzing)
+"key_id"="\"id\""
+"key_type"="\"type\""
+"key_name"="\"name\""
+"key_value"="\"value\""
+"key_data"="\"data\""
+"key_error"="\"error\""
+"key_status"="\"status\""
+
+# Empty / minimal documents
+"empty_obj"="{}"
+"empty_arr"="[]"
+"empty_str"="\"\""
+"single_pair"="{\"a\":1}"
+
+# Whitespace tricks
+"bom"="\xef\xbb\xbf"
+"tab_only"="\t"
+"vertical_tab"="\x0b"

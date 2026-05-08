@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: "1.0"
+prompt: |
+        For each crash discovered in the latest fuzz_run for this harness:
+
+          1. Call `tmin` on the crash input to produce a minimised reproducer.
+             The default file mode (auto-appending `@@`) is what the libAFLDriver
+             binaries built by `compile_harness` need.
+
+          2. Call `replay_under_asan` on the minimised input to capture a clean
+             AddressSanitizer/UBSan stack trace and `stack_top_hash`. Again,
+             leave `stdin_input` at its default of false — the driver loops
+             forever on stdin in standalone mode, but works perfectly in file
+             mode.
+
+             If `replay_under_asan` returns `crashed: false` on the minimised
+             input, the crash is non-reproducible (a flake or a previously-fixed
+             code path). Record it anyway with verdict context, then skip.
+
+          3. Call `store_crash` with the run_id, the original input path, the
+             minimised path, the `stack_top_hash`, the full sanitiser output,
+             a short classification, and free-form analyst notes describing:
+
+               - The bug class (NOT a verdict — verdicts come later in the
+                 vuln-report stage). Be specific: not just "SEGV" but
+                 "null-deref in lzma2_decoder_init / coder->lzma uninitialised".
+               - The smallest input shape that triggers it (e.g. "any byte
+                 sequence whose first byte selects LZMA2 and where
+                 lzma_properties_decode returns LZMA_OPTIONS_ERROR").
+               - A confidence note: "high — clear stack trace pointing at a
+                 single line" / "medium — flaky, sometimes reproduces" /
+                 "low — wide stack trace, root cause unclear".
+
+        `store_crash` deduplicates by `stack_top_hash`, so duplicates from later
+        iterations will be silently ignored.
+
+        Do NOT attempt to write a patch yet — patch generation happens in the
+        next stage (`write_vuln_reports`) where the agent has access to the
+        harness source and the call chain. Your only job here is faithful crash
+        triage and bug-class classification.
+
+        Operating principles:
+
+          - Always minimise before triage. Raw AFL crash inputs are noisy and
+            their stack traces are unreliable for dedupe.
+          - Keep classifications short and bug-class-focused, not file-and-line
+            specific (file/line are derived from the stack trace).
+          - If the minimised input is suspicious (e.g. zero bytes after `tmin`
+            but the original had hundreds), say so in the notes — that's a hint
+            the crash may be input-independent and the classifier might re-run
+            it without bytes.

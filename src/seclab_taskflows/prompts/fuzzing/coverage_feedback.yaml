@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: "1.0"
+prompt: |
+        Coverage feedback for harness id {{ result.id }} (target {{ result.target_id }}):
+
+        Use the `get_coverage_summary` tool to see how line/function/branch
+        coverage has evolved across iterations, then `get_coverage_gaps` to list
+        the most actionable uncovered functions and branches from the latest run.
+
+        For each significant coverage gap, decide whether to:
+
+          (a) Add or modify a seed input that would reach the gap.
+          (b) Edit the harness source to exercise an additional API.
+          (c) Add a dictionary entry (AFL `-x`) for a magic value or token.
+          (d) Skip — the gap is unreachable error-handling code or vendor code.
+
+        ## Always (cheap): grow the dictionary from uncovered guards
+
+        Before deciding whether to add seeds or edit the harness, run:
+
+          - `gaps = get_coverage_gaps(harness_id={{ result.id }},
+                                       kind='line', limit=200)` — pull the
+            most-recent uncovered LINES (not just functions; line gaps
+            usually sit RIGHT after a guard).
+          - `enrich_dictionary_from_uncovered(source_root=<repo root>,
+              dictionary_path=<seeds dir>/auto.dict,
+              uncovered_locations=[{'file': g['file'], 'line': g['line']} for g in gaps])`
+
+        This scans the source code around every uncovered line for
+        `strncmp(..., "TOK")`, `memcmp(..., "MAGIC")`, `case 0xN:`,
+        `== 0xN`, etc. and APPENDS any new tokens to `auto.dict` so the
+        next `run_afl_for` can splice them. It's idempotent (won't re-add
+        existing entries) and cheap (typically <1 s).
+
+        After making changes:
+
+          - For (a): write the new seed file with `write_file` or `write_bytes`
+            (via local_shell), then call `store_seed` with `source="coverage_feedback"`
+            and `iteration` set to the current iteration number.
+          - For (b): modify the harness source file in place, then call
+            `store_harness` again so the version is bumped, then `compile_harness`
+            again to rebuild both the AFL and coverage binaries.
+          - For (c): manually-discovered dictionary entries can be appended
+            with `extract_dictionary` or `enrich_dictionary_from_uncovered`;
+            the next `run_afl_for` call will pick them up automatically since
+            the dictionary path is the same.
+
+        ## Optional housekeeping (use sparingly to stay within step budget)
+
+          - **Corpus minimisation**: if the AFL queue has hundreds of inputs and
+            exec/sec is dropping, run `cmin(afl_binary_path, input_dir=queue,
+            output_dir=<seeds dir>)` to drop redundant inputs before the next
+            iteration. Only worth doing once the queue exceeds ~50 entries.
+          - **Auto-extract dictionary**: if no dictionary exists for this target
+            and coverage gaps mention magic constants (e.g. file format magic
+            bytes, protocol opcodes), call `extract_dictionary(binary_path=
+            cov_binary_path, output_path=<seeds dir>/auto.dict)` once and pass
+            it as `dictionary=...` to the next `run_afl_for`.
+
+        Be surgical. Do NOT rewrite the whole harness; only make the minimum
+        change motivated by an actual coverage gap.
+
+        If the latest two iterations both gained < 1 % line coverage, do not
+        attempt further changes — the wrapper script will detect the plateau and
+        stop the loop early.
