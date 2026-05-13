@@ -1,0 +1,16 @@
+name: GHCR cleanup
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"  # Sunday 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    uses: Ai-road-4-You/enterprise-ci-cd/.github/workflows/ghcr-cleanup.yml@v1
+    with:
+      keep-latest-tagged: 2
+      keep-latest: 10
