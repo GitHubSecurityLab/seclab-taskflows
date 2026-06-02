@@ -107,7 +107,7 @@ class TestShellExec:
             patch("subprocess.run", side_effect=[start_proc, exec_proc]),
         ):
             assert cs_mod._container_name is None
-            result = cs_mod.shell_exec.fn(command="echo hello")
+            result = cs_mod.shell_exec(command="echo hello")
             assert cs_mod._container_name is not None
             assert "hello" in result
 
@@ -115,7 +115,7 @@ class TestShellExec:
         cs_mod._container_name = "seclab-shell-testtest"
         exec_proc = _make_proc(returncode=0, stdout="output\n")
         with patch("subprocess.run", return_value=exec_proc) as mock_run:
-            result = cs_mod.shell_exec.fn(command="echo output", workdir="/workspace")
+            result = cs_mod.shell_exec(command="echo output", workdir="/workspace")
             cmd = mock_run.call_args[0][0]
             assert "docker" in cmd
             assert "exec" in cmd
@@ -129,21 +129,21 @@ class TestShellExec:
         cs_mod._container_name = "seclab-shell-testtest"
         exec_proc = _make_proc(returncode=0, stdout="done\n")
         with patch("subprocess.run", return_value=exec_proc):
-            result = cs_mod.shell_exec.fn(command="true")
+            result = cs_mod.shell_exec(command="true")
             assert "[exit code: 0]" in result
 
     def test_shell_exec_nonzero_exit(self):
         cs_mod._container_name = "seclab-shell-testtest"
         exec_proc = _make_proc(returncode=1, stdout="", stderr="error\n")
         with patch("subprocess.run", return_value=exec_proc):
-            result = cs_mod.shell_exec.fn(command="false")
+            result = cs_mod.shell_exec(command="false")
             assert "[exit code: 1]" in result
             assert "error" in result
 
     def test_shell_exec_timeout(self):
         cs_mod._container_name = "seclab-shell-testtest"
         with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=5)):
-            result = cs_mod.shell_exec.fn(command="sleep 999", timeout=5)
+            result = cs_mod.shell_exec(command="sleep 999", timeout=5)
             assert "timeout" in result
 
     def test_shell_exec_start_failure_returns_error(self):
@@ -153,7 +153,7 @@ class TestShellExec:
             patch.object(cs_mod, "CONTAINER_WORKSPACE", ""),
             patch("subprocess.run", return_value=_make_proc(returncode=1, stderr="image not found")),
         ):
-            result = cs_mod.shell_exec.fn(command="echo hi")
+            result = cs_mod.shell_exec(command="echo hi")
             assert "Failed to start container" in result
             assert cs_mod._container_name is None
 
