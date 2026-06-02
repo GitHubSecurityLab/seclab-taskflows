@@ -67,7 +67,7 @@ class TestFetchFileFromGh:
     async def test_fetch_file_success(self):
         resp = _make_response(text=SAMPLE_FILE_CONTENT)
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.fetch_file_from_gh.fn(owner="Owner", repo="Repo", path="src/main.py")
+            result = await gfv_mod.fetch_file_from_gh(owner="Owner", repo="Repo", path="src/main.py")
             assert "1: import os" in result
             assert "5:     print(\"Setec Astronomy\")" in result
 
@@ -75,14 +75,14 @@ class TestFetchFileFromGh:
     async def test_fetch_file_lowercases_owner_repo(self):
         resp = _make_response(text="line1\nline2\n")
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp) as mock_api:
-            await gfv_mod.fetch_file_from_gh.fn(owner="OWNER", repo="REPO", path="file.py")
+            await gfv_mod.fetch_file_from_gh(owner="OWNER", repo="REPO", path="file.py")
             url = mock_api.call_args[1]["url"]
             assert "/owner/repo/" in url
 
     @pytest.mark.asyncio
     async def test_fetch_file_api_error(self):
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value="HTTP error: 404"):
-            result = await gfv_mod.fetch_file_from_gh.fn(owner="owner", repo="repo", path="missing.py")
+            result = await gfv_mod.fetch_file_from_gh(owner="owner", repo="repo", path="missing.py")
             assert result == "HTTP error: 404"
 
 
@@ -95,7 +95,7 @@ class TestGetFileLinesFromGh:
     async def test_get_lines_range(self):
         resp = _make_response(text=SAMPLE_FILE_CONTENT)
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.get_file_lines_from_gh.fn(
+            result = await gfv_mod.get_file_lines_from_gh(
                 owner="owner", repo="repo", path="main.py", start_line=4, length=2
             )
             lines = result.strip().splitlines()
@@ -106,7 +106,7 @@ class TestGetFileLinesFromGh:
     async def test_get_lines_clamps_start(self):
         resp = _make_response(text=SAMPLE_FILE_CONTENT)
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.get_file_lines_from_gh.fn(
+            result = await gfv_mod.get_file_lines_from_gh(
                 owner="owner", repo="repo", path="main.py", start_line=-5, length=2
             )
             assert "1: import os" in result
@@ -115,7 +115,7 @@ class TestGetFileLinesFromGh:
     async def test_get_lines_out_of_range(self):
         resp = _make_response(text="one\ntwo\n")
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.get_file_lines_from_gh.fn(
+            result = await gfv_mod.get_file_lines_from_gh(
                 owner="owner", repo="repo", path="main.py", start_line=100, length=10
             )
             assert "No lines found" in result
@@ -123,7 +123,7 @@ class TestGetFileLinesFromGh:
     @pytest.mark.asyncio
     async def test_get_lines_api_error(self):
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value="Request error: timeout"):
-            result = await gfv_mod.get_file_lines_from_gh.fn(
+            result = await gfv_mod.get_file_lines_from_gh(
                 owner="owner", repo="repo", path="main.py", start_line=1, length=5
             )
             assert result == "Request error: timeout"
@@ -138,7 +138,7 @@ class TestSearchFileFromGh:
     async def test_search_file_finds_matches(self):
         resp = _make_response(text=SAMPLE_FILE_CONTENT)
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.search_file_from_gh.fn(
+            result = await gfv_mod.search_file_from_gh(
                 owner="owner", repo="repo", path="main.py", search_term="import"
             )
             assert "1: import os" in result
@@ -148,7 +148,7 @@ class TestSearchFileFromGh:
     async def test_search_file_no_matches(self):
         resp = _make_response(text=SAMPLE_FILE_CONTENT)
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.search_file_from_gh.fn(
+            result = await gfv_mod.search_file_from_gh(
                 owner="owner", repo="repo", path="main.py", search_term="nonexistent_term"
             )
             assert "No matches found" in result
@@ -156,7 +156,7 @@ class TestSearchFileFromGh:
     @pytest.mark.asyncio
     async def test_search_file_api_error(self):
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value="HTTP error: 500"):
-            result = await gfv_mod.search_file_from_gh.fn(
+            result = await gfv_mod.search_file_from_gh(
                 owner="owner", repo="repo", path="main.py", search_term="import"
             )
             assert result == "HTTP error: 500"
@@ -171,7 +171,7 @@ class TestSearchFilesFromGh:
     async def test_search_files_multiple_paths(self):
         resp = _make_response(text=SAMPLE_FILE_CONTENT)
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.search_files_from_gh.fn(
+            result = await gfv_mod.search_files_from_gh(
                 owner="owner", repo="repo", paths="main.py, utils.py", search_term="import",
                 save_to_db=False,
             )
@@ -183,7 +183,7 @@ class TestSearchFilesFromGh:
     async def test_search_files_no_paths(self):
         resp = _make_response(text="")
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.search_files_from_gh.fn(
+            result = await gfv_mod.search_files_from_gh(
                 owner="owner", repo="repo", paths="", search_term="import", save_to_db=False,
             )
             # empty string split yields [""], which hits the API for an empty path
@@ -193,7 +193,7 @@ class TestSearchFilesFromGh:
     async def test_search_files_no_matches(self):
         resp = _make_response(text="nothing here\n")
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.search_files_from_gh.fn(
+            result = await gfv_mod.search_files_from_gh(
                 owner="owner", repo="repo", paths="main.py", search_term="zzzzz"
             )
             assert "No matches found" in result
@@ -208,7 +208,7 @@ class TestSearchFilesFromGh:
             mock_session = MagicMock()
             mock_session_cls.return_value.__enter__ = MagicMock(return_value=mock_session)
             mock_session_cls.return_value.__exit__ = MagicMock(return_value=False)
-            result = await gfv_mod.search_files_from_gh.fn(
+            result = await gfv_mod.search_files_from_gh(
                 owner="owner", repo="repo", paths="main.py", search_term="import", save_to_db=True
             )
             assert "saved to database" in result
@@ -218,7 +218,7 @@ class TestSearchFilesFromGh:
     @pytest.mark.asyncio
     async def test_search_files_api_error(self):
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value="Request error: timeout"):
-            result = await gfv_mod.search_files_from_gh.fn(
+            result = await gfv_mod.search_files_from_gh(
                 owner="owner", repo="repo", paths="main.py", search_term="import"
             )
             assert result == "Request error: timeout"
@@ -244,7 +244,7 @@ class TestFetchLastSearchResults:
             mock_session.query.return_value.all.return_value = [mock_result]
             mock_session.query.return_value.delete.return_value = None
 
-            result = gfv_mod.fetch_last_search_results.fn()
+            result = gfv_mod.fetch_last_search_results()
             data = json.loads(result)
             assert len(data) == 1
             assert data[0]["path"] == "src/main.py"
@@ -258,7 +258,7 @@ class TestFetchLastSearchResults:
             mock_session.query.return_value.all.return_value = []
             mock_session.query.return_value.delete.return_value = None
 
-            result = gfv_mod.fetch_last_search_results.fn()
+            result = gfv_mod.fetch_last_search_results()
             assert json.loads(result) == []
 
 
@@ -271,7 +271,7 @@ class TestListDirectoryFromGh:
     async def test_list_directory_success(self):
         resp = _make_response(json_data=SAMPLE_DIR_JSON)
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.list_directory_from_gh.fn(owner="Owner", repo="Repo", path="src")
+            result = await gfv_mod.list_directory_from_gh(owner="Owner", repo="Repo", path="src")
             data = json.loads(result)
             assert "src/main.py" in data
             assert "src/utils.py" in data
@@ -281,13 +281,13 @@ class TestListDirectoryFromGh:
     async def test_list_directory_empty(self):
         resp = _make_response(json_data=[])
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.list_directory_from_gh.fn(owner="owner", repo="repo", path="empty")
+            result = await gfv_mod.list_directory_from_gh(owner="owner", repo="repo", path="empty")
             assert json.loads(result) == []
 
     @pytest.mark.asyncio
     async def test_list_directory_api_error(self):
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value="HTTP error: 404"):
-            result = await gfv_mod.list_directory_from_gh.fn(owner="owner", repo="repo", path="missing")
+            result = await gfv_mod.list_directory_from_gh(owner="owner", repo="repo", path="missing")
             assert result == "HTTP error: 404"
 
     @pytest.mark.asyncio
@@ -296,7 +296,7 @@ class TestListDirectoryFromGh:
         file_obj = {"path": "src/main.py", "type": "file", "size": 123, "sha": "abc"}
         resp = _make_response(json_data=file_obj)
         with patch.object(gfv_mod, "call_api", new_callable=AsyncMock, return_value=resp):
-            result = await gfv_mod.list_directory_from_gh.fn(owner="owner", repo="repo", path="src/main.py")
+            result = await gfv_mod.list_directory_from_gh(owner="owner", repo="repo", path="src/main.py")
             assert "not a directory" in result
 
 
@@ -318,7 +318,7 @@ class TestSearchRepoFromGh:
             return "source code fetched"
 
         with patch.object(gfv_mod, "_fetch_source_zip", side_effect=fake_fetch_source_zip):
-            result = await gfv_mod.search_repo_from_gh.fn(
+            result = await gfv_mod.search_repo_from_gh(
                 owner="Owner", repo="Repo", search_term="import"
             )
             data = json.loads(result)
@@ -337,7 +337,7 @@ class TestSearchRepoFromGh:
             return "source code fetched"
 
         with patch.object(gfv_mod, "_fetch_source_zip", side_effect=fake_fetch_source_zip):
-            result = await gfv_mod.search_repo_from_gh.fn(
+            result = await gfv_mod.search_repo_from_gh(
                 owner="owner", repo="repo", search_term="nonexistent"
             )
             assert json.loads(result) == []
@@ -348,7 +348,7 @@ class TestSearchRepoFromGh:
             return "Error: HTTP error: 404"
 
         with patch.object(gfv_mod, "_fetch_source_zip", side_effect=fake_fetch_source_zip):
-            result = await gfv_mod.search_repo_from_gh.fn(
+            result = await gfv_mod.search_repo_from_gh(
                 owner="owner", repo="repo", search_term="import"
             )
             data = json.loads(result)
