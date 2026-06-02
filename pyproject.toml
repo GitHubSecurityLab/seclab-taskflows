@@ -23,7 +23,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "seclab-taskflow-agent==0.3.1",
+  "seclab-taskflow-agent==0.4.0",
 ]
 
 [project.urls]
