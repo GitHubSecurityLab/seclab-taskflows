@@ -19,8 +19,9 @@ Here, we're using the [OWASP Juice Shop](https://github.com/juice-shop/juice-sho
 ./scripts/audit/run_audit.sh juice-shop/juice-shop
 ```
 
-> ⚠️ Note: the auditing taskflows can take several hours to run, especially on larger projects, and make a _lot_ of AI requests.
-> You will almost certainly need a [Copilot Pro](https://github.com/github-copilot/pro) account to run them.
+> ⚠️ Note: the auditing taskflows can take several hours to run, especially on larger projects, and make a _lot_ of AI requests, which can cost a non-trivial amount of money.
+> By default, the taskflows use the Copilot API. You can find out more information about Copilot Billing [here](https://docs.github.com/en/copilot/concepts/billing).
+> Alternatively, you could use a different AI API by setting the `AI_API_ENDPOINT` environment variable, as explained [here](https://github.com/GitHubSecurityLab/seclab-taskflow-agent#configuration).
 
 The results of the audit are written to an SQLite database, which is opened automatically in an SQLite viewer at
 the end of the run. The results are in the table named "audit_result". The table has a column named "has_vulnerability",
