@@ -23,7 +23,7 @@ taskflow:
         - seclab_taskflows.toolboxes.repo_context
   - task:
       must_complete: false
-      max_steps: 300
+      max_steps: 100
       repeat_prompt: true
       async: true
       agents:
@@ -45,15 +45,9 @@ taskflow:
         {% if globals.use_advisory == 'true' %}
         {% include 'seclab_taskflows.prompts.audit.known_security_advisories' %}
         {% endif %}
-      
-        {% include 'seclab_taskflows.prompts.audit.record_library_dependency' %}
 
-        {% if result.is_library %}
         {% include 'seclab_taskflows.prompts.audit.audit_library_issue' %}
-        {% else %}
-        {% include 'seclab_taskflows.prompts.audit.audit_issue' %}
-        {% endif %}
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
         - seclab_taskflows.toolboxes.local_file_viewer
-        - seclab_taskflows.toolboxes.ghsa
+        - seclab_taskflow_agent.toolboxes.memcache

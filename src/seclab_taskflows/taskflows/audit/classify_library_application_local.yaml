@@ -34,7 +34,7 @@ taskflow:
 
         {{ result.notes }}
 
-        Fetch the entry points and web entry points of the component, then the user actions of this component.
+        Fetch the entry points, web entry points of the component, then the user actions of this component.
         Based on the entry points, web entry points, components, user actions and README.md and if available, SECURITY.md in the {{ globals.repo }},
         can you tell me what type of application this repo is and what kind of security boundary it has.
         Based on this, determine whether the component is likely to have security problems.
@@ -43,11 +43,41 @@ taskflow:
         {% include 'seclab_taskflows.prompts.audit.known_security_advisories' %}
         {% endif %}
 
-        {% if result.is_library %}
-        {% include 'seclab_taskflows.prompts.audit.classify_library_component' %}
-        {% else %}
-        {% include 'seclab_taskflows.prompts.audit.classify_application_component' %}
-        {% endif %}
+        Identify the most likely security problems in the component. Your task is not to carry out a full audit, but to
+        identify the main risk in the component so that further analysis can be carried out.
+        Do not be too specific about an issue, but rather craft your report based on the general functionality and type of
+        the component and state the most likely risk, instead of risk specific to the implementation of the component.
+        However, you should still
+        take care not to include issues that are of low severity or require unrealistic attack scenarios such as misconfiguration
+        or an already compromised system.
+
+        Base your decision on:
+        - Is this component likely to take untrusted user input? For example, remote web requests or IPC, RPC calls?
+        - What is the intended purpose of this component and its functionality? Does it allow high privileged actions?
+        Is it intended to provide such functionalities for all users? Or is there complex access control logic involved?
+        - The component itself may also have its own `README.md` (or a subdirectory of it may have a `README.md`). Take
+        a look at those files to help understand the functionality of the component.
+
+        For example, an Admin UI/dashboard may be susceptible to client side Javascript vulnerabilities such as XSS, CSRF.
+        An authentication/authorization component may be susceptible to IDOR, bypasses etc.
+        Components that grant user access to data may require access control or authentication. It may also require
+        ownership checks. For example,
+        a web frontend may allow users to access their own content and admins to access all content, but users should not
+        be able to access another users' content in general.
+
+        We're looking for more concrete and serious security issues that affects system integrity or
+        lead to information leak, so please do not include issues like brute force, Dos, log injection etc.
+
+        Also do not include issues that require the system to be already compromised, such as issues that rely on malicious
+        configurations, stolen credentials, misconfiguration etc.
+
+        For each scenario, consider what privilege and access the attacker needs to gain and do not include issues that
+        require high privilege or access to the system.
+
+        Your task is to identify risk rather than properly audit and find security issues. Do not look too much into
+        the implementation or scrutinize the security measures such as access control and sanitizers at this stage.
+        Instead, report more general risks that are associated with the type of component
+        that you are looking at.
 
         It is not your task to audit the security measures, but rather just to identify the risks and suggest some issues
         that is worth auditing.
@@ -60,7 +90,7 @@ taskflow:
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
         - seclab_taskflows.toolboxes.local_file_viewer
-        - seclab_taskflows.toolboxes.ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
   - task:
       must_complete: true
       exclude_from_context: true
@@ -75,7 +105,6 @@ taskflow:
       must_complete: true
       repeat_prompt: true
       async: true
-      max_steps: 100
       name: analyze_security_entry_points
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
@@ -113,4 +142,4 @@ taskflow:
       toolboxes:
         - seclab_taskflows.toolboxes.repo_context
         - seclab_taskflows.toolboxes.local_file_viewer
-        - seclab_taskflows.toolboxes.ghsa
+        - seclab_taskflow_agent.toolboxes.memcache

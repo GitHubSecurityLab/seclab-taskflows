@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: "1.0"
+prompt: |
+        This component is an application component, you should consider the following:
+
+        Does this application consume untrusted input, for example, web requests? Or does it interact with
+        other applications and can take input from them? User supplied arguments,
+        configuration files, web requests from hardcoded URLs or environment variables are not considered untrusted
+        input. 
+        
+        However, if user arguments are pointing to some untrusted resources, then they can be considered as 
+        untrusted input. For example, a parser may take a user argument that points to a file, and in this case,
+        the file is still considered untrusted even though it is supplied via user argument.

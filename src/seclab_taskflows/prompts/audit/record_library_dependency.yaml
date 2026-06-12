@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: "1.0"
+prompt: |
+  While auditing the issue, there may be functions from external library that are used for processing 
+  an untrusted input or for security related operations such as validation. Note any such usage of external 
+  library functions, except builtin library functions, and store a new external dependency entry in the database. 
+  You should include the 
+  function name, file and line. In the notes, you should specify how the library function is used, what untrusted 
+  input is passed into the function and how a potential vulnerability in the function may impact the 
+  application. For example, if the library function is responsible for validating a url, then a potential 
+  vulnerability in the parsing logic for the function may lead to incorrect validation results, 
+  potentially allowing malicious input to bypass security checks.
+
+  Note that in some cases, a function that handles untrusted input or security-related operations may be invoked indirectly through other functions or callbacks, 
+  and it may not be clear what function is called via the code path. In such cases, you need to examine the 
+  dependencies used in the callback and identify potential libraries functions that may be used in the 
+  these situations. You should include such function if it may be called in such context (handling untrusted input or 
+  performing security related operations)

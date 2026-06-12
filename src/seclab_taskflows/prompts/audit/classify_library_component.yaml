@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: "1.0"
+prompt: |
+        For each security entry point, identify the type of the security entry point and its functionality. 
+        These entry points should be performing some kind of security sensitive operations, such as authentication, authorization, input validation, sanitization, escaping etc.
+        Identify the functionality of the entry point and what kind of issue may arise if the implementation is flawed. 
+        For example, an authentication entry point may be susceptible to authentication bypass, 
+        an input validation entry point may be susceptible to injection issues if the input is not properly sanitized, 
+        an authorization entry point may be susceptible to IDOR or access control bypass if there are no proper access control checks.
+        This task is only to identify the potential risks and issues that may arise from the type of the security entry point, 
+        rather than auditing the implementation of the entry point, so do not be too specific about the issue, and do not 
+        audit the implementation, just identify the potential risks based on the type and functionality of the security entry point.
+        However, you should still take care not to include issues that are of low severity or require
+        unrealistic attack scenarios such as misconfiguration or an already compromised system, or issues that requires 
+        attacker control of trusted inputs such as whitelist or blacklist bypass that requires the attacker 
+        to be able to modify the whitelist or blacklist.

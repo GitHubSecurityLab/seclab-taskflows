@@ -24,32 +24,27 @@ taskflow:
   - task:
       model: code_analysis
       must_complete: true
-      max_steps: 100
       name: identify components
       description: Identify different components and purpose of the repo
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
-        Inspect {{ globals.repo }} and determine its function. Determine whether the repo is a framework library,
-        or a web application etc. For repos that may contain multiple applications, determine the purpose of each
-        application and the directories of each application. Repos can also be libraries but contain actual applications, for
-        example, a web server and admin UI etc. that are not for testing or examples.
-        
-        Apart from source code, it is also useful to look at the README.md and documentations in 
-        the repo.
+        The repo {{ globals.repo }} is a software library. Determine its functionality and its likely 
+        use case. For example, is it a library for building web applications, or is it a library for 
+        processing and transforming data, framework for running unit tests, etc.
 
-        Note that even a software library may contain application components. 
-        For example, a web application framework may contain a default web application as an example or demo, 
-        or it may contain an admin UI, which are meant to be used for production.
+        Use the source code, documentation and README.md to determine the likely use case of the library.
 
         Separate the components of the library based on their functionality. For example, full stack web framework may 
         have components for handling http requests, components for database access, components for rendering UI, etc.
 
-        For each application identified, store a new component entry in the database. Provide some brief notes about the 
-        functionality of the component with the entry.
-
+        Note that even a software library may contain application components. 
+        For example, a web application framework may contain a default web application as an example or demo, 
+        or it may contain an admin UI, which are meant to be used for production.
         
-        Identify example, demo or test code in the repo. Skip analyzing these code and do not create a component entry for these.
+        Identify example, demo or test code in the repo. Use these to further your understanding of how the 
+        library is meant to be used and the potential risks of the library, but do not analyze these components
+        and do not create a component entry for these.
       toolboxes:
         - seclab_taskflows.toolboxes.gh_file_viewer
         - seclab_taskflows.toolboxes.repo_context
@@ -81,12 +76,49 @@ taskflow:
         {{ result.notes }}
 
         Analyze the entry points of this application. First check whether this component is a library or 
-        an application. 
-        {% if result.is_library %}
-        {% include 'seclab_taskflows.prompts.audit.entry_point_library' %}
-        {% else %}
-        {% include 'seclab_taskflows.prompts.audit.entry_point_application' %}
-        {% endif %}
+        an application. From previous analysis stated that:
+
+        is_application ? {{ result.is_app }}
+        is_library ? {{ result.is_library }}
+        
+        ## Application
+
+        For application components, you should consider the following:
+
+        Does this application consume untrusted input, for example, web requests? Or does it interact with
+        other applications and can take input from them? User supplied arguments,
+        configuration files, web requests from hardcoded URLs or environment variables are not considered untrusted
+        input. 
+        
+        However, if user arguments are pointing to some untrusted resources, then they can be considered as 
+        untrusted input. For example, a parser may take a user argument that points to a file, and in this case,
+        the file is still considered untrusted even though it is supplied via user argument.
+
+        ## Library
+
+        For library code, identify the functions that are exposed to a library user. 
+        Use the component notes, documentation, source code and examples to 
+        identify these functions and determine how they are meant to be used and whether 
+        they are meant to consume untrusted input.
+        
+        Consider the library user
+        as trusted and instead focus on functionalities that consume untrusted input when they are used for 
+        building applications. 
+    
+        For example, a web application framework may expose functionalities such as http request handlers and middleware, which 
+        are typically used for handling http requests when used for building web applications. In this case, the 
+        http requests handled by these handlers and middleware are considered untrusted.
+
+        Sometimes it may not be clear whether a function is consuming untrusted input. In this case, 
+        use hints from documentation, comments and usage examples to determine whether the 
+        function is meant to consume untrusted input. 
+        For example, a function may perform string formatting or processing URL, but the function 
+        name and documentation strongly suggests that it is typically used for processing input 
+        that comes from web requests. In this case, you can consider the function as consuming untrusted input.
+        
+        For library code, there may be functions that are not directly taking untrusted input, but are used as security 
+        checks or sanitization. Make use of documentation, code comments, function names and usage examples to identify 
+        these functions, and consider them to be entry points as well.
 
         Only identify the untrusted inputs and entry points, do not analyze the security risks of the component or the 
         entry point.
@@ -152,13 +184,39 @@ taskflow:
 
         Do not consider security risk or potential bypasses or any potential privilege escalations that is outside of the 
         intended use. Focus only on the intended use here.
-
-        {% if result.is_library %}
-        {% include 'seclab_taskflows.prompts.audit.user_action_library' %}
-        {% else %}
-        {% include 'seclab_taskflows.prompts.audit.user_action_application' %}
-        {% endif %}
         
+        First check whether this component is a library or 
+        an application. From previous analysis stated that:
+
+        is_application ? {{ result.is_app }}
+        is_library ? {{ result.is_library }}
+
+        ## Application
+        
+        For application components, you should consider the following:
+
+        What actions can a user perform using the application? Can they exectue arbitrary code? Can they 
+        make arbitrary web request? Can they read any local file? Consider restrictions that are placed on the actions 
+        that a user can perform using the application, and what actions the user should not be allowed to do
+        when using the application.
+
+        You should also state clearly the actions and privileges that a user can have when using the application.
+
+        ## Library
+
+        For library component, do the following instead:
+        When considering user privileges, consider the library user as trusted and focus on the 
+        functionalities that are exposed to untrusted users when the library is used. For example, a web 
+        application library may provide functionalities for the library user to run arbitrary script to configure 
+        the application. These are not considered "allowed actions" from an untrusted user point of view.
+
+        However, if a library exposes a REST api that allows arbitrary files to be read by unauthenticated users, 
+        then it reading arbitrary files is consider an "allowed" activity. Note any "allow" activity and how 
+        they are exposed to untrusted users, referencing the file and function in detail.
+
+        Ignore applications within the library such as default UI, etc. as these are going 
+        to be analyzed separately. Focus on the library code.
+
         Store an user_action entry stating precising the file and line number where the allowed action is performed, and
         provide notes about the action.
 

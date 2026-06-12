@@ -74,6 +74,22 @@ class LowSeverityAuditResult(Base):
             f"component_id={self.component_id}, result_id={self.result_id}, reason={self.reason})>"
         )
 
+class AuditResultEvidence(Base):
+    __tablename__ = "audit_result_evidence"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    repo: Mapped[str]
+    component_id = Column(Integer, ForeignKey("application.id", ondelete="CASCADE"))
+    result_id = Column(Integer, ForeignKey("audit_result.id", ondelete="CASCADE"))
+    has_evidence: Mapped[bool]
+    evidence_notes: Mapped[str] = mapped_column(Text)
+
+    def __repr__(self):
+        return (
+            f"<AuditResultEvidence(id={self.id}, repo={self.repo}, "
+            f"component_id={self.component_id}, result_id={self.result_id}, has_evidence={self.has_evidence}, "
+            f"evidence_notes={self.evidence_notes})>"
+        )
+
 class EntryPoint(Base):
     __tablename__ = "entry_point"
 
@@ -114,6 +130,23 @@ class WebEntryPoint(Base):  # an entrypoint of a web application (such as GET /i
             f"notes={self.notes}, repo={self.repo})>"
         )
 
+class SecurityEntryPoint(Base):
+    __tablename__ = "security_entry_point"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entry_point_id = Column(Integer, ForeignKey("entry_point.id", ondelete="CASCADE"))
+    type: Mapped[str]
+    component: Mapped[int]
+    untrusted_input: Mapped[str]
+    notes: Mapped[str] = mapped_column(Text)
+    repo: Mapped[str]
+
+    def __repr__(self):
+        return (
+            f"<SecurityEntryPoint(entry_point_id={self.entry_point_id}, "
+            f"type={self.type}, component={self.component}, "
+            f"untrusted_input={self.untrusted_input}, notes={self.notes}, repo={self.repo})>"
+        )
 
 class UserAction(Base):
     __tablename__ = "user_action"
@@ -123,4 +156,15 @@ class UserAction(Base):
     app_id = Column(Integer, ForeignKey("application.id", ondelete="CASCADE"))
     file: Mapped[str]
     line: Mapped[int]
+    notes: Mapped[str] = mapped_column(Text)
+
+class ExternalDependency(Base):
+    __tablename__ = "external_dependency"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    repo: Mapped[str]
+    app_id = Column(Integer, ForeignKey("application.id", ondelete="CASCADE"))
+    name: Mapped[str]
+    function_used: Mapped[str]
+    file: Mapped[str]
+    line: Mapped[str]
     notes: Mapped[str] = mapped_column(Text)

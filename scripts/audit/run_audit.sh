@@ -5,13 +5,18 @@
 set -e
 
 USE_ADVISORY=false
+MODEL_CONFIG_FLAG=""
 
 # Parse flags
-while [[ "$1" == --* ]]; do
+while [[ "$1" == -* ]]; do
   case "$1" in
     --advisory)
       USE_ADVISORY=true
       shift
+      ;;
+    -m)
+      MODEL_CONFIG_FLAG="-m $2"
+      shift 2
       ;;
     *)
       echo "Unknown option: $1"
@@ -21,20 +26,21 @@ while [[ "$1" == --* ]]; do
 done
 
 if [ -z "$1" ]; then 
-  echo "Usage: $0 [--advisory] <repo>"; 
+  echo "Usage: $0 [--advisory] [-m model_config] <repo>"; 
   exit 1; 
 fi
 
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.fetch_source_code -g repo="$1"
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.identify_applications -g repo="$1"
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.gather_web_entry_point_info -g repo="$1"
+python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.fetch_source_code -g repo="$1"
+python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.identify_applications -g repo="$1"
+python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.gather_web_entry_point_info -g repo="$1"
+python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.gather_security_entry_point_info -g repo="$1"
 
 if [ "$USE_ADVISORY" = true ]; then
-  python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.fetch_security_advisories -g repo="$1"
+  python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.fetch_security_advisories -g repo="$1"
 fi
 
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.classify_application_local -g repo="$1" -g use_advisory="$USE_ADVISORY"
-python -m seclab_taskflow_agent -t seclab_taskflows.taskflows.audit.audit_issue_local_iter -g repo="$1" -g use_advisory="$USE_ADVISORY"
+python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.classify_application_local -g repo="$1" -g use_advisory="$USE_ADVISORY"
+python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.audit_issue_local_iter -g repo="$1" -g use_advisory="$USE_ADVISORY"
 
 set +e
 

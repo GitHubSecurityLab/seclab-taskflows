@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config
+
+globals:
+  repo: 
+# Taskflow to analyze the existing information
+taskflow:
+  - task:
+      model: code_analysis
+      must_complete: true
+      headless: true
+      max_steps: 100
+      agents:
+        - seclab_taskflows.personalities.web_application_security_expert
+      user_prompt: |
+        For the repo {{ globals.repo }} iterate over all entry points and check if they are
+        functions that are used for security purposes, 
+        such as authentication, authorization, input validation, sanitization, escaping etc.
+        Identify potential inputs that these functions are likely to check or sanitize. Store these as 
+        the "type" of the security entry point, and the potential untrusted input that it is processing.
+        Some functions 
+        may have inputs that are related to configurations, such as a blacklist of disallowed inputs, or a list of allowed users or roles.
+        These inputs are typically supplied by developers and should not be treated as untrusted inputs.
+        For this check the noted `file` and its line using the file viewer.
+        For each entry point identified as a security endpoint create a new security entry point using
+        the information gathered.
+      toolboxes:
+        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.gh_file_viewer
+  
