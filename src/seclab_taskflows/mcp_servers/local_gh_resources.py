@@ -75,8 +75,8 @@ def _parse_content_disposition_filename(header: str | None) -> str | None:
     """Extract the filename from a Content-Disposition header value."""
     if not header:
         return None
-    for part in header.split(";"):
-        part = part.strip()
+    for raw_part in header.split(";"):
+        part = raw_part.strip()
         if part.lower().startswith("filename="):
             filename = part.split("=", 1)[1].strip().strip('"')
             return filename

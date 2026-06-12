@@ -33,8 +33,8 @@ def app_to_dict(result):
         "repo": result.repo.lower(),
         "location": result.location,
         "notes": result.notes,
-        "is_app": True if result.is_app else False,
-        "is_library": True if result.is_library else False,
+        "is_app": bool(result.is_app),
+        "is_library": bool(result.is_library),
     }
 
 
@@ -365,8 +365,8 @@ class RepoContextBackend:
                 "issue_type": issue.issue_type,
                 "issue_notes": issue.notes,
                 "issue_id": issue.id,
-                "is_library": True if app.is_library else False,
-                "is_app": True if app.is_app else False,
+                "is_library": bool(app.is_library),
+                "is_app": bool(app.is_app),
             }
             for app, issue in issues
         ]
