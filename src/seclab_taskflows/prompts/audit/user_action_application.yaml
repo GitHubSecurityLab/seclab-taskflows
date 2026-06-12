@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: "1.0"
+prompt: |
+        This is an application components, you should consider the following:
+
+        What actions can a user perform using the application? Can they exectue arbitrary code? Can they 
+        make arbitrary web request? Can they read any local file? Consider restrictions that are placed on the actions 
+        that a user can perform using the application, and what actions the user should not be allowed to do
+        when using the application.
+
+        You should also state clearly the actions and privileges that a user can have when using the application.

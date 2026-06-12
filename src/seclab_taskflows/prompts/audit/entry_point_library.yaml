@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: "1.0"
+prompt: |
+        This component is a library, identify the functions that are exposed to a library user. 
+        Use the component notes, documentation, source code and examples to 
+        identify these functions and determine how they are meant to be used and whether 
+        they are meant to consume untrusted input.
+        
+        Consider the library user
+        as trusted and instead focus on functionalities that consume untrusted input when they are used for 
+        building applications. 
+    
+        For example, a web application framework may expose functionalities such as http request handlers and middleware, which 
+        are typically used for handling http requests when used for building web applications. In this case, the 
+        http requests handled by these handlers and middleware are considered untrusted.
+
+        Sometimes it may not be clear whether a function is consuming untrusted input. In this case, 
+        use hints from documentation, comments and usage examples to determine whether the 
+        function is meant to consume untrusted input. 
+        For example, a function may perform string formatting or processing URL, but the function 
+        name and documentation strongly suggests that it is typically used for processing input 
+        that comes from web requests. In this case, you can consider the function as consuming untrusted input.
+        
+        For library code, there may be functions that are not directly taking untrusted input, but are used as security 
+        checks or sanitization. Make use of documentation, code comments, function names and usage examples to identify 
+        these functions, and consider them to be entry points as well.

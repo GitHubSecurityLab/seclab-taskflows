@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 from seclab_taskflow_agent.path_utils import mcp_data_dir, log_file_name
 
-from .repo_context_models import Application, EntryPoint, UserAction, WebEntryPoint, ApplicationIssue, AuditResult, Base
-from .repo_context_models import LowSeverityAuditResult
+from .repo_context_models import Application, EntryPoint, UserAction, WebEntryPoint, ApplicationIssue, AuditResult, SecurityEntryPoint, Base
+from .repo_context_models import LowSeverityAuditResult, AuditResultEvidence, ExternalDependency
 from .utils import process_repo
 
 logging.basicConfig(
@@ -33,8 +33,8 @@ def app_to_dict(result):
         "repo": result.repo.lower(),
         "location": result.location,
         "notes": result.notes,
-        "is_app": result.is_app,
-        "is_library": result.is_library,
+        "is_app": bool(result.is_app),
+        "is_library": bool(result.is_library),
     }
 
 
@@ -75,6 +75,16 @@ def web_entry_point_to_dict(wep):
         "notes": wep.notes,
     }
 
+def security_entry_point_to_dict(sep):
+    return {
+        "id": sep.id,
+        "entry_point_id": sep.entry_point_id,
+        "type": sep.type,
+        "component": sep.component,
+        "untrusted_input": sep.untrusted_input,
+        "repo": sep.repo.lower(),
+        "notes": sep.notes,
+    }
 
 def audit_result_to_dict(res):
     return {
@@ -108,6 +118,9 @@ class RepoContextBackend:
                 ApplicationIssue.__table__,
                 AuditResult.__table__,
                 LowSeverityAuditResult.__table__,
+                SecurityEntryPoint.__table__,
+                AuditResultEvidence.__table__,
+                ExternalDependency.__table__,
             ],
         )
 
@@ -227,6 +240,32 @@ class RepoContextBackend:
                 session.add(new_web_entry_point)
             session.commit()
         return f"Updated or added web entry point for entry_point_id {entry_point_id} in {repo}."
+    
+    def store_new_security_entry_point(self, repo, entry_point_id, type, component, untrusted_input, notes, update=False):
+        with Session(self.engine) as session:
+            existing = session.query(SecurityEntryPoint).filter_by(repo=repo, entry_point_id=entry_point_id).first()
+            if existing:
+                existing.notes += notes
+                if type:
+                    existing.type = type
+                if component is not None:
+                    existing.component = component
+                if untrusted_input:
+                    existing.untrusted_input = untrusted_input
+            else:
+                if update:
+                    return f"No security entry point exists at repo {repo} with entry_point_id {entry_point_id}."
+                new_security_entry_point = SecurityEntryPoint(
+                    repo=repo,
+                    entry_point_id=entry_point_id,
+                    type=type,
+                    component=component,
+                    untrusted_input=untrusted_input,
+                    notes=notes,
+                )
+                session.add(new_security_entry_point)
+            session.commit()
+        return f"Updated or added security entry point for entry_point_id {entry_point_id} in {repo}."
 
     def store_new_user_action(self, repo, app_id, file, line, notes, update=False):
         with Session(self.engine) as session:
@@ -256,6 +295,46 @@ class RepoContextBackend:
                 session.add(new_low_severity_result)
             session.commit()
         return f"Updated or added low severity result for {repo} and result id {result_id}"
+    
+    def store_audit_result_evidence(self, repo, component_id, result_id, has_evidence, evidence_notes):
+        with Session(self.engine) as session:
+            existing = session.query(AuditResultEvidence).filter_by(repo=repo, result_id=result_id).first()
+            if existing:
+                existing.evidence_notes += evidence_notes
+                existing.has_evidence = has_evidence
+            else:
+                new_evidence_result = AuditResultEvidence(
+                    repo=repo,
+                    component_id=component_id,
+                    result_id=result_id,
+                    has_evidence=has_evidence,
+                    evidence_notes=evidence_notes,
+                )
+                session.add(new_evidence_result)
+            session.commit()
+        return f"Updated or added audit result evidence for {repo} and result id {result_id}"
+
+    def store_new_external_dependency(self, repo, app_id, name, function_used, file, line, notes, update=False):
+        with Session(self.engine) as session:
+            existing = session.query(ExternalDependency).filter_by(repo=repo, name=name, function_used=function_used, 
+                                                                   file=file, line=line).first()
+            if existing:
+                existing.notes += notes
+            else:
+                if update:
+                    return f"No external dependency exists at repo {repo}, name {name} and function {function_used}."
+                new_external_dependency = ExternalDependency(
+                    repo=repo,
+                    app_id=app_id,
+                    name=name,
+                    function_used=function_used,
+                    file=file,
+                    line=line,
+                    notes=notes,
+                )
+                session.add(new_external_dependency)
+            session.commit()
+        return f"Updated or added external dependency for {name} in {repo}."
 
     def get_app(self, repo, location):
         with Session(self.engine) as session:
@@ -286,6 +365,8 @@ class RepoContextBackend:
                 "issue_type": issue.issue_type,
                 "issue_notes": issue.notes,
                 "issue_id": issue.id,
+                "is_library": bool(app.is_library),
+                "is_app": bool(app.is_app),
             }
             for app, issue in issues
         ]
@@ -359,6 +440,21 @@ class RepoContextBackend:
             for r in results
         ]
 
+    def get_security_entries_for_repo(self, repo):
+        with Session(self.engine) as session:
+            results = session.query(SecurityEntryPoint).filter_by(repo=repo).all()
+        return [
+            {
+                "repo": r.repo,
+                "entry_point_id": r.entry_point_id,
+                "type": r.type,
+                "component": r.component,
+                "untrusted_input": r.untrusted_input,
+                "notes": r.notes,
+            }
+            for r in results
+        ]
+
     def get_web_entries(self, repo, component_id):
         with Session(self.engine) as session:
             results = session.query(WebEntryPoint).filter_by(repo=repo, component=component_id).all()
@@ -372,6 +468,21 @@ class RepoContextBackend:
                 "auth": r.auth,
                 "middleware": r.middleware,
                 "roles_scopes": r.roles_scopes,
+                "notes": r.notes,
+            }
+            for r in results
+        ]
+    
+    def get_security_entries(self, repo, component_id):
+        with Session(self.engine) as session:
+            results = session.query(SecurityEntryPoint).filter_by(repo=repo, component=component_id).all()
+        return [
+            {
+                "repo": r.repo,
+                "entry_point_id": r.entry_point_id,
+                "type": r.type,
+                "component": r.component,
+                "untrusted_input": r.untrusted_input,
                 "notes": r.notes,
             }
             for r in results
@@ -408,6 +519,8 @@ class RepoContextBackend:
             session.query(WebEntryPoint).filter_by(repo=repo).delete()
             session.query(AuditResult).filter_by(repo=repo).delete()
             session.query(LowSeverityAuditResult).filter_by(repo=repo).delete()
+            session.query(SecurityEntryPoint).filter_by(repo=repo).delete()
+            session.query(AuditResultEvidence).filter_by(repo=repo).delete()
             session.commit()
         return f"Cleared results for repo {repo}"
 
@@ -517,7 +630,6 @@ def store_new_web_entry_point(
     owner: str = Field(description="The owner of the GitHub repository"),
     repo: str = Field(description="The name of the GitHub repository"),
     entry_point_id: int = Field(description="The ID of the entry point this web entry point refers to"),
-    location: str = Field(description="The directory of the component where the web entry point belongs to"),
     method: str = Field(description="HTTP method (GET, POST, etc)", default=""),
     path: str = Field(description="URL path (e.g., /info)", default=""),
     component: int = Field(description="Component identifier", default=0),
@@ -534,6 +646,23 @@ def store_new_web_entry_point(
         process_repo(owner, repo), entry_point_id, method, path, component, auth, middleware, roles_scopes, notes
     )
 
+@mcp.tool()
+def store_new_security_entry_point(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    entry_point_id: int = Field(description="The ID of the entry point this security entry point refers to"),
+    type: str = Field(description="The type of the security entry point, e.g., SQL injection, XSS, etc.", default=""),
+    component: int = Field(description="Component identifier", default=0),
+    untrusted_input: str = Field(description="Untrusted input information", default=""),
+    notes: str = Field(description="Notes for this security entry point", default=""),
+):
+    """
+    Stores a new security entry point in a component to the database. A security entry point extends a regular entry point
+    with security-specific properties like type of vulnerability and untrusted input information.
+    """
+    return backend.store_new_security_entry_point(
+        process_repo(owner, repo), entry_point_id, type, component, untrusted_input, notes
+    )
 
 @mcp.tool()
 def add_entry_point_notes(
@@ -588,6 +717,23 @@ def add_user_action_notes(
         return f"Error: No component exists in repo: {repo} and location {location}"
     return backend.store_new_user_action(repo, app.id, file, line, notes, True)
 
+@mcp.tool()
+def store_new_external_dependency(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component where the external dependency belongs to"),
+    name: str = Field(description="The name of the external dependency"),
+    function_used: str = Field(description="The function used from the external dependency"),
+    file: str = Field(description="The file that contains the external dependency"),
+    line: int = Field(description="The file line that contains the external dependency"),
+    notes: str = Field(description="New notes for this external dependency", default=""),
+):
+    """
+    Stores a new external dependency in a component to the database.
+    """
+    repo = process_repo(owner, repo)
+    return backend.store_new_external_dependency(repo, component_id, name, function_used, file, line, notes)
+
 
 @mcp.tool()
 def get_component(
@@ -616,6 +762,21 @@ def get_components(
     repo = process_repo(owner, repo)
     return json.dumps(backend.get_apps(repo))
 
+@mcp.tool()
+def get_component_by_id(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+):
+    """
+    Get a component by id.
+    """
+    repo = process_repo(owner, repo)
+    with Session(backend.engine) as session:
+        app = session.query(Application).filter_by(repo=repo, id=component_id).first()
+        if not app:
+            return f"Error: No component exists in repo: {repo} with id {component_id}"
+        return json.dumps(app_to_dict(app))
 
 @mcp.tool()
 def get_entry_points(
@@ -654,6 +815,17 @@ def get_web_entry_points_component(
     repo = process_repo(owner, repo)
     return json.dumps(backend.get_web_entries(repo, component_id))
 
+@mcp.tool()
+def get_security_entry_points_component(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+):
+    """
+    Get all security entry points for a component
+    """
+    repo = process_repo(owner, repo)
+    return json.dumps(backend.get_security_entries(repo, component_id))
 
 @mcp.tool()
 def get_web_entry_points_for_repo(
@@ -666,6 +838,16 @@ def get_web_entry_points_for_repo(
     repo = process_repo(owner, repo)
     return json.dumps(backend.get_web_entries_for_repo(repo))
 
+@mcp.tool()
+def get_security_entry_points_for_repo(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+):
+    """
+    Get all security entry points of an repo
+    """
+    repo = process_repo(owner, repo)
+    return json.dumps(backend.get_security_entries_for_repo(repo))
 
 @mcp.tool()
 def get_user_actions(
@@ -814,6 +996,21 @@ def store_low_severity_reason(
     """
     repo = process_repo(owner, repo)
     return backend.store_low_severity_reason(repo, component_id, result_id, reason)
+
+@mcp.tool()
+def store_audit_result_evidence(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    component_id: int = Field(description="The ID of the component"),
+    result_id: int = Field(description="The ID of the audit result"),
+    has_evidence: bool = Field(description="Whether there is evidence for this audit result"),
+    evidence_notes: str = Field(description="Notes about the evidence for this audit result"),
+):
+    """
+    Store evidence information for an audit result.
+    """
+    repo = process_repo(owner, repo)
+    return backend.store_audit_result_evidence(repo, component_id, result_id, has_evidence, evidence_notes)
 
 @mcp.tool()
 def clear_repo(

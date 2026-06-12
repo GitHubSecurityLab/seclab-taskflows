@@ -71,6 +71,18 @@ async def call_api(url: str, params: dict) -> str:
     return await _fetch_file(url, headers=headers, params=params)
 
 
+def _parse_content_disposition_filename(header: str | None) -> str | None:
+    """Extract the filename from a Content-Disposition header value."""
+    if not header:
+        return None
+    for raw_part in header.split(";"):
+        part = raw_part.strip()
+        if part.lower().startswith("filename="):
+            filename = part.split("=", 1)[1].strip().strip('"')
+            return filename
+    return None
+
+
 async def _fetch_source_zip(owner: str, repo: str, tmp_dir):
     """Fetch the source code."""
     url = f"https://api.github.com/repos/{owner}/{repo}/zipball"
@@ -83,6 +95,8 @@ async def _fetch_source_zip(owner: str, repo: str, tmp_dir):
         async with httpx.AsyncClient() as client:
             async with client.stream("GET", url, headers=headers, follow_redirects=True) as response:
                 response.raise_for_status()
+                content_disposition = response.headers.get("content-disposition")
+                source_filename = _parse_content_disposition_filename(content_disposition)
                 expected_path = Path(tmp_dir) / owner / f"{repo}.zip"
                 resolved_path = expected_path.resolve()
                 if os.path.commonpath([resolved_path, Path(tmp_dir).resolve()]) != str(Path(tmp_dir).resolve()):
@@ -92,6 +106,11 @@ async def _fetch_source_zip(owner: str, repo: str, tmp_dir):
                 async with aiofiles.open(f"{tmp_dir}/{owner}/{repo}.zip", "wb") as f:
                     async for chunk in response.aiter_bytes():
                         await f.write(chunk)
+        metadata = {"source_filename": source_filename}
+        metadata_path = Path(tmp_dir) / owner / f"{repo}_source_metadata.json"
+        async with aiofiles.open(metadata_path, "w") as f:
+            await f.write(json.dumps(metadata, indent=2))
+
         return f"source code for {repo} fetched successfully."
     except httpx.RequestError as e:
         return f"Error: Request error: {e}"
@@ -113,6 +132,7 @@ async def fetch_repo_from_gh(owner: str, repo: str):
     source_path = Path(f"{LOCAL_GH_DIR}/{owner}/{repo}.zip")
     if not source_path.exists():
         return result
+
     return f"Downloaded source code to {owner}/{repo}.zip"
 
 

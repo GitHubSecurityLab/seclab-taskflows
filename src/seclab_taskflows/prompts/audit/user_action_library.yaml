@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: prompt
+  version: "1.0"
+prompt: |
+        This is a library component, do the following:
+        When considering user privileges, consider the library user as trusted and focus on the 
+        functionalities that are exposed to untrusted users when the library is used. For example, a web 
+        application library may provide functionalities for the library user to run arbitrary script to configure 
+        the application. These are not considered "allowed actions" from an untrusted user point of view.
+
+        However, if a library exposes a REST api that allows arbitrary files to be read by unauthenticated users, 
+        then it reading arbitrary files is consider an "allowed" activity. Note any "allow" activity and how 
+        they are exposed to untrusted users, referencing the file and function in detail.
+
+        Ignore applications within the library such as default UI, etc. as these are going 
+        to be analyzed separately. Focus on the library code.
