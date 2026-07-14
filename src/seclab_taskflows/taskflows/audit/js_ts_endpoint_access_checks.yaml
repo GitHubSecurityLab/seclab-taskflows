@@ -22,10 +22,13 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.web_application_security_expert
       inputs:
-        repo_nwo: 
+        repo_nwo:
       user_prompt: |
         Fetch CodeQL database for the {{ inputs.repo_nwo }} repository for the
-        JavaScript language.
+        JavaScript language. Prefer the local CodeQL Development MCP server: call
+        `list_codeql_databases` to find a pre-built database for {{ inputs.repo_nwo }}
+        and use `register_database` if needed. Only fall back to the GitHub
+        Code Scanning APIs if no local database is available.
 
         You are auditing code using the previously fetched
         CodeQL database.
@@ -33,7 +36,7 @@ taskflow:
         This database is built for a JavaScript web project.
 
         ## IMPORTANT: Vulnerability Pattern Details
-        
+
         Review the files specifying routes and endpoints for the security vulnerabilities
         described as follows:
 
@@ -46,11 +49,18 @@ taskflow:
         For each endpoint add how it's protected, or if it's unprotected. Make a note
         of decorators or middleware that are used to protect the endpoint.
 
+        For each candidate route handler you identify, run the bundled `CallGraphTo.ql`
+        tools query against the handler to enumerate its callers (typically routing
+        registrations / middleware), and `PrintAST.ql` to inspect the structure of
+        any decorator or middleware chain. Use `read_database_source` to read the
+        exact source backing the CodeQL database rather than re-fetching files from
+        GitHub.
+
         ## IMPORTANT: General Guidance that ALWAYS applies
 
         1. Do NOT ask the user for permission to perform next steps, continue your
         analysis autonomously until it is complete.
-        
+
         2. Reflect on your analysis for accuracy before returning it to the user.
         We are only interested in results that you can clearly explain and
         motivate as potentially vulnerable based on code examples.
@@ -66,7 +76,7 @@ taskflow:
         5. Make small and concise single line notes while you work. Update the
         existing value for `notes` in memory as you work.
       toolboxes:
-        - seclab_taskflow_agent.toolboxes.codeql
+        - seclab_taskflow_agent.toolboxes.codeql_ql_mcp
         - seclab_taskflow_agent.toolboxes.memcache
         - seclab_taskflows.toolboxes.gh_code_scanning
   - task:

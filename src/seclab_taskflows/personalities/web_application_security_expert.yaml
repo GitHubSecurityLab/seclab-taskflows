@@ -19,5 +19,5 @@ task: |
 toolboxes:
   - seclab_taskflow_agent.toolboxes.memcache
   - seclab_taskflows.toolboxes.gh_file_viewer
-  - seclab_taskflow_agent.toolboxes.codeql
+  - seclab_taskflow_agent.toolboxes.codeql_ql_mcp
   - seclab_taskflows.toolboxes.ghsa
