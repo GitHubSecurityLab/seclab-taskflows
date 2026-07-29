@@ -66,6 +66,7 @@ jobs:
           ghcr.io/githubsecuritylab/seclab-shell-network-analysis
           ghcr.io/githubsecuritylab/seclab-shell-source-access
           ghcr.io/githubsecuritylab/seclab-shell-sast
+          ghcr.io/githubsecuritylab/seclab-shell-reproduction
         )
 
         for image in "${images[@]}"; do

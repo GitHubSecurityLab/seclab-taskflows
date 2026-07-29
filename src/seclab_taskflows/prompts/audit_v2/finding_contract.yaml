@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: prompt
+
+prompt: |
+  ## What a finding is
+
+  A finding is a concrete, attacker-reachable path from untrusted input to a
+  dangerous operation. It is not a code smell, a missing best practice, or a
+  hardening opportunity. If nothing an attacker controls reaches the dangerous
+  operation, it is not a finding.
+
+  Every finding you file must name all three parts of the path:
+
+  - **source**  — where the untrusted data enters, with a file and line. Say
+    who controls it and why they are untrusted.
+  - **sink**    — the dangerous operation reached, with a file and line.
+  - **flow**    — how the data actually gets from source to sink: the calls it
+    passes through, and every check it does or does not survive on the way.
+
+  A finding whose flow is "the value is eventually used unsafely" is not a
+  finding, it is a guess. Trace the real path.
+
+  `locations` must list the file and line of each hop that matters, as
+  `path/to/file.ext:line` strings, starting at the source and ending at the
+  sink.
+
+  `hypothesis` states what an attacker gains: read arbitrary files, execute
+  commands as the service user, bypass authentication, and so on. Be specific
+  about the impact, and about what the attacker must already have in order to
+  reach the source.
+
+  ## Filing findings
+
+  Before filing, call `find_similar_findings` for the same component and
+  vulnerability class. If your path is the same as an existing finding, do not
+  file a duplicate.
+
+  Call `store_finding` once per distinct path. Set `proposed_by` to the label
+  you were given for this hunt, so the ledger records which model proposed it.
+
+  Findings enter the ledger as `candidate`. That is all they are at this point:
+  you are proposing a hypothesis for adversarial review, not declaring a
+  vulnerability. Do not describe your own candidates as confirmed.

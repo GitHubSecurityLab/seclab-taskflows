@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+# Lower-cost model assignment for the audit v2 pipeline.
+#
+# Same stage names as model_config_audit_v2, so it is a drop-in replacement via
+# `-c seclab_taskflows.configs.model_config_audit_v2_lowercost`. Cross-family
+# diversity is preserved where it matters most (hunt breadth and an
+# independent adjudicator), but every slot uses a cheaper model.
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: model_config
+models:
+  general_tasks: gpt-5.4-nano
+  survey: gpt-5-mini
+  hunt_gpt: gpt-5.4
+  hunt_claude: claude-haiku-4.5
+  hunt_gemini: gemini-3.6-flash
+  prosecution: gpt-5.4
+  defense: claude-haiku-4.5
+  adjudication: gemini-3.6-flash
+  reproduction: claude-sonnet-4.6
+  reporting: gpt-5-mini
+model_settings:
+  general_tasks:
+    api_type: responses
+  survey:
+    api_type: responses
+  hunt_gpt:
+    api_type: responses
+    reasoning:
+      effort: medium
+  prosecution:
+    api_type: responses
+    reasoning:
+      effort: medium
+  reporting:
+    api_type: responses

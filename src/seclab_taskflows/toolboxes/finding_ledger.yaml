@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: toolbox
+  version: "1.0"
+server_params:
+  kind: stdio
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.finding_ledger"]
+  env:
+    FINDING_LEDGER_DIR: "{{ env('DATA_DIR') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"
+
+server_prompt: |
+  ## Finding Ledger
+
+  The finding ledger is the shared, durable record of every vulnerability
+  candidate in this audit. Stages communicate through it rather than by passing
+  findings in prose, so always read the ledger for context and always write your
+  conclusions back to it.
+
+  Each finding moves through an explicit lifecycle:
+
+      candidate --(adversarial contest)--> confirmed | rejected
+      confirmed --(dynamic reproduction)--> reproduced
+      candidate --(deduplication)--> duplicate
+
+  You cannot set a finding's state directly. The ledger derives it:
+  - `store_finding` always creates a `candidate`.
+  - `store_contest_verdict` records a prosecution or defense position and never
+    changes state.
+  - `adjudicate_finding` is the only way a finding becomes `confirmed` or
+    `rejected`.
+  - `store_reproduction_attempt` with outcome `reproduced` only promotes a
+    finding that is already `confirmed`.
+  - `merge_duplicate_finding` folds one candidate into another and carries its
+    `proposed_by` label across, so the surviving finding records every model
+    that independently proposed it.
+
+  This means a finding can never claim more certainty than its recorded
+  evidence supports. Do not describe a finding as confirmed or reproduced in
+  prose unless the ledger says it is.
+
+  Before storing a new finding, call `find_similar_findings` for the same
+  component and vulnerability class so you do not file duplicates.

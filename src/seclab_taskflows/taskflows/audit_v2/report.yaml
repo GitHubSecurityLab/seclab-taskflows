@@ -1,0 +1,162 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config_audit_v2
+
+globals:
+  repo:
+
+# Stage 5 of the audit v2 pipeline: write up what the ledger actually supports.
+#
+# The report is drafted with `capture: response`, which stores the model's prose
+# rather than its last tool result, and then a second model reads that draft
+# back out of `outputs.draft` and checks every claim in it against the ledger.
+# Overclaiming is the failure mode that costs an audit its credibility, and it
+# is the one failure a reader cannot detect on their own, so it gets its own
+# check.
+taskflow:
+  - task:
+      id: findings
+      must_complete: true
+      exclude_from_context: true
+      max_steps: 5
+      model: general_tasks
+      name: fetch findings
+      description: Publish every finding for this repo as a typed output.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Call `get_findings` once for the repo {{ globals.repo }} with no state
+        filter, and return its result. Make no other tool calls.
+      outputs:
+        type: array
+        items:
+          type: object
+          properties:
+            finding_id: {type: integer}
+            component: {type: string}
+            title: {type: string}
+            vuln_class: {type: string}
+            state: {type: string}
+            severity: {type: string}
+            proposed_by: {type: string}
+          required: [finding_id, component, title, vuln_class, state]
+      toolboxes:
+        - seclab_taskflows.toolboxes.finding_ledger
+
+  - task:
+      id: draft
+      if: "outputs.findings | length > 0"
+      must_complete: false
+      capture: response
+      model: reporting
+      max_steps: 60
+      name: draft report
+      description: Write the audit report from the ledger.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Write the security audit report for {{ globals.repo }}.
+
+        The ledger holds these findings:
+
+        {% for f in outputs.findings %}
+        - id {{ f.finding_id }} [{{ f.state }}] {{ f.severity | default('') }}
+          ({{ f.component }}, {{ f.vuln_class }}): {{ f.title }}
+        {% endfor %}
+
+        Call `get_finding` for every finding in state `reproduced` or
+        `confirmed` to get its flow, locations, contest verdicts and
+        reproduction attempts. Do not write about a finding you have not read.
+
+        Structure the report as Markdown:
+
+        ## Summary
+        What was audited, how many findings reached each state, and the
+        headline result in two or three sentences.
+
+        ## Reproduced findings
+        The strongest results: findings that were argued, confirmed, and then
+        actually triggered in a container. For each one give the title,
+        severity, component, the source-to-sink path with its locations, the
+        impact, and the exact reproduction: the commands from `harness` and the
+        observed output from `observed`. State the preconditions an attacker
+        needs.
+
+        ## Confirmed but not reproduced
+        Findings that survived adversarial review but were not triggered. For
+        each one, say what the adjudicator concluded and exactly why
+        reproduction did not succeed: whether the attempt showed the finding
+        does not hold, or whether it was inconclusive because the target could
+        not be built, started or reached. These are different results and the
+        reader needs to be able to tell them apart.
+
+        ## Unresolved candidates
+        Findings the adjudicator marked `uncertain`, with what would be needed
+        to settle them. These need a human.
+
+        ## Rejected findings
+        A short table: title, component, and the one-line reason each was
+        rejected. This is the audit trail for what was looked at and dismissed.
+
+        ## Method and limitations
+        How the audit worked: components mapped, hunted by several model
+        families independently, candidates deduplicated, each argued by a
+        prosecution and a defense and decided by a third model, confirmed
+        findings then run in a sandboxed container. Then the limitations that
+        actually apply to this run: components not covered, reproductions that
+        could not be attempted, and the fact that a rejected finding is a model
+        judgement rather than a proof of safety.
+
+        Write for an engineer who has to act on this. Be precise about
+        locations and specific about impact.
+
+        Do not overclaim. A finding's state is what the ledger says it is:
+        describe a finding as reproduced only if its state is `reproduced`, and
+        as confirmed only if its state is `confirmed`. Never present a rejected
+        or uncertain finding as though it were real.
+
+        {% include 'seclab_taskflows.prompts.audit_v2.severity_rubric' %}
+      toolboxes:
+        - seclab_taskflows.toolboxes.finding_ledger
+
+  - task:
+      if: "outputs.draft is defined and outputs.draft"
+      must_complete: false
+      model: adjudication
+      max_steps: 60
+      name: check report against ledger
+      description: Verify the draft does not claim more than the ledger records.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Below is a draft audit report for {{ globals.repo }}. Check it against
+        the finding ledger, which is the source of truth.
+
+        For every finding the draft describes, call `get_finding` and confirm:
+
+        1. The state the draft implies matches the state in the ledger. A
+           finding described as reproduced must be in state `reproduced`; one
+           described as confirmed must be in state `confirmed`.
+        2. Any reproduction the draft describes appears in that finding's
+           reproduction attempts, with outcome `reproduced`, and the observed
+           output in the draft matches what was actually recorded.
+        3. The severity in the draft matches the severity in the ledger.
+        4. The locations quoted in the draft appear in the finding.
+
+        Then output the final report: the draft with every discrepancy
+        corrected, so that it says exactly what the ledger supports and no
+        more. If the draft was accurate, output it unchanged.
+
+        After the report, add a short section `## Verification notes` listing
+        every correction you made, or stating that the draft matched the ledger
+        as written.
+
+        --- DRAFT REPORT ---
+
+        {{ outputs.draft }}
+      toolboxes:
+        - seclab_taskflows.toolboxes.finding_ledger

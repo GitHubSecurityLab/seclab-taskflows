@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+# Model assignment for the audit v2 pipeline.
+#
+# The stage names below are chosen so that models can be swapped per stage
+# without editing any taskflow. Two properties are deliberate:
+#
+# 1. The three hunt slots come from three different model families. Models in
+#    the same family tend to miss the same things, so mixing families buys
+#    real coverage rather than three correlated opinions.
+#
+# 2. The adjudicator belongs to a different family than either advocate, so it
+#    is never grading an argument written by a sibling model.
+#
+# Swap any entry for a different model if your entitlements differ; nothing in
+# the taskflows depends on a specific provider.
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: model_config
+models:
+  # Cheap, high-volume bookkeeping: fetching, clearing, summarising ledger state.
+  general_tasks: gpt-5-mini
+  # Attack-surface mapping and component inventory.
+  survey: gpt-5.4
+  # Three independent hunters, one per model family.
+  hunt_gpt: gpt-5.6-sol
+  hunt_claude: claude-sonnet-5
+  hunt_gemini: gemini-3.6-flash
+  # Adversarial contest. Advocates are strong; the judge is from a third family.
+  prosecution: gpt-5.6-sol
+  defense: claude-sonnet-5
+  adjudication: grok-4.5
+  # Dynamic reproduction is long-horizon tool use inside a container.
+  reproduction: claude-sonnet-5
+  # Final write-up.
+  reporting: gpt-5.5
+model_settings:
+  general_tasks:
+    api_type: responses
+  survey:
+    api_type: responses
+    reasoning:
+      effort: medium
+  hunt_gpt:
+    api_type: responses
+    reasoning:
+      effort: high
+  prosecution:
+    api_type: responses
+    reasoning:
+      effort: high
+  reporting:
+    api_type: responses
+    reasoning:
+      effort: medium

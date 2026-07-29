@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: toolbox
+  version: "1.0"
+
+server_params:
+  kind: stdio
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.container_shell"]
+  env:
+    CONTAINER_IMAGE: "ghcr.io/githubsecuritylab/seclab-shell-reproduction:latest"
+    # Same checkout the survey and hunt stages read, mounted read-write because
+    # reproduction has to build and run the target rather than just read it.
+    CONTAINER_WORKSPACE: "{{ env('CONTAINER_WORKSPACE', required=False) or env('DATA_DIR') ~ '/repo_under_test' }}"
+    CONTAINER_TIMEOUT: "{{ env('CONTAINER_TIMEOUT', '300') }}"
+    CONTAINER_PERSIST: "{{ env('CONTAINER_PERSIST', 'true') }}"
+    CONTAINER_PERSIST_KEY: "{{ env('CONTAINER_PERSIST_KEY', required=False) }}"
+    CONTAINER_NETWORK: "{{ env('CONTAINER_NETWORK', 'none') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"
+
+server_prompt: |
+  ## Container Shell (Reproduction)
+
+  You have an isolated Docker container for *executing* code. The repository
+  under test is mounted at /workspace. This is the only place in the audit
+  where you are allowed to run the target or a proof of concept.
+
+  Available runtimes and tools:
+  - python3 (with venv and dev headers), pip3
+  - node, npm
+  - java (headless JRE)
+  - gcc, g++, make (build-essential)
+  - gdb, valgrind, strace        — for memory-safety and crash triage
+  - curl, wget, jq, nc, socat    — for driving network-facing targets
+  - ps, lsof, tree, rg, less     — for inspecting what the target is doing
+
+  The repository under test is mounted read-write at /workspace. If /workspace
+  is empty, say so in your reproduction notes and record the attempt as
+  inconclusive; do not invent a target.
+
+  Networking is disabled by default (`CONTAINER_NETWORK=none`). Loopback still
+  works, so a server you start inside the container is reachable from the same
+  container at 127.0.0.1. If a target genuinely cannot be built without
+  fetching dependencies, say so in your reproduction notes rather than
+  guessing; the operator can rerun with `CONTAINER_NETWORK=bridge`.
+
+  A reproduction is only real if you observed it. Run the target, send the
+  input, and read the actual output, exit code, stack trace, or crash. Never
+  report an outcome you did not see in this container's output.
