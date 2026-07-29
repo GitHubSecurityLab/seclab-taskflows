@@ -130,14 +130,19 @@ def _require(value: str, allowed, name: str) -> str:
 
 
 class FindingLedgerBackend:
+    """Durable store for the audit v2 finding lifecycle.
+
+    The ledger is the only channel between pipeline stages, so it always
+    materialises a real database file. Other MCP servers in this package fall
+    back to an in-memory database when their state directory is missing, but
+    that would be silent data loss here: an audit would appear to run, promote
+    findings, and then have nothing to show at the end.
+    """
+
     def __init__(self, state_dir: str):
         self.state_dir = state_dir
-        db_dir = (
-            f"sqlite:///{self.state_dir}/finding_ledger.db"
-            if Path(self.state_dir).exists()
-            else "sqlite://"
-        )
-        self.engine = create_engine(db_dir, echo=False)
+        Path(self.state_dir).mkdir(parents=True, exist_ok=True)
+        self.engine = create_engine(f"sqlite:///{self.state_dir}/finding_ledger.db", echo=False)
         Base.metadata.create_all(
             self.engine,
             tables=[

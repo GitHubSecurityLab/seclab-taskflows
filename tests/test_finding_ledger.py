@@ -344,6 +344,29 @@ class TestLedgerMaintenance:
         )
 
 
+class TestDurability:
+    def test_missing_state_dir_is_created_not_silently_in_memory(self, tmp_path):
+        """A missing directory must not degrade the ledger to an in-memory DB.
+
+        That fallback would let a whole audit run, promote findings, and then
+        lose every one of them at exit.
+        """
+        state_dir = tmp_path / "does" / "not" / "exist"
+        ledger = FindingLedgerBackend(str(state_dir))
+
+        _add_finding(ledger)
+
+        assert (state_dir / "finding_ledger.db").is_file()
+
+    def test_findings_survive_a_new_backend_over_the_same_dir(self, tmp_path):
+        state_dir = tmp_path / "ledger"
+        finding_id = _add_finding(FindingLedgerBackend(str(state_dir)))
+
+        reopened = FindingLedgerBackend(str(state_dir))
+
+        assert reopened.get_finding(finding_id)["title"] == "Path traversal in file download"
+
+
 class TestServerWiring:
     def test_toolbox_yaml_valid(self):
         result = AvailableTools().get_toolbox("seclab_taskflows.toolboxes.finding_ledger")
