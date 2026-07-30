@@ -82,6 +82,61 @@ class TestComponents:
         assert survey.get_component(4242) is None
 
 
+class TestComponentsAreOnePerLocation:
+    """The hunt fans out over components, so two at one location cost a rerun.
+
+    Both the mapping task and the fan-out branches describe the same tree, and
+    a model asked to "be granular" happily emits several components for one
+    file. Left alone that reads the same code repeatedly and splits the file's
+    entry points arbitrarily between the copies.
+    """
+
+    def test_a_second_component_at_the_same_location_merges(self, survey):
+        first = survey.store_component(REPO, "main.go", "service", "go", "", True, False, "router")
+        second = survey.store_component(REPO, "main.go", "other", "", "", False, False, "ping")
+        assert second == first
+        assert len(survey.get_components(REPO)) == 1
+
+    def test_the_same_location_in_another_repo_is_a_different_component(self, survey):
+        first = _component(survey, location="main.go")
+        second = _component(survey, repo=OTHER_REPO, location="main.go")
+        assert second != first
+
+    def test_merging_keeps_the_first_description_and_adds_the_second(self, survey):
+        component_id = survey.store_component(REPO, "main.go", "service", "", "", True, False, "a")
+        survey.store_component(REPO, "main.go", "other", "", "", False, False, "b")
+        notes = survey.get_component(component_id)["notes"]
+        assert "a" in notes
+        assert "b" in notes
+
+    def test_merging_does_not_repeat_an_identical_note(self, survey):
+        component_id = survey.store_component(REPO, "main.go", "cli", "", "", True, False, "same")
+        survey.store_component(REPO, "main.go", "cli", "", "", True, False, "same")
+        assert survey.get_component(component_id)["notes"] == "same"
+
+    def test_merging_fills_in_fields_the_first_pass_left_blank(self, survey):
+        component_id = survey.store_component(REPO, "main.go", "", "", "", False, False, "")
+        survey.store_component(REPO, "main.go", "parser", "go", "native", False, False, "")
+        component = survey.get_component(component_id)
+        assert component["kind"] == "parser"
+        assert component["language"] == "go"
+        assert component["runtime"] == "native"
+
+    def test_merging_does_not_overwrite_what_the_first_pass_established(self, survey):
+        component_id = survey.store_component(REPO, "main.go", "parser", "go", "", False, False, "")
+        survey.store_component(REPO, "main.go", "cli", "rust", "", False, False, "")
+        component = survey.get_component(component_id)
+        assert component["kind"] == "parser"
+        assert component["language"] == "go"
+
+    def test_reachability_is_the_union_of_both_readings(self, survey):
+        component_id = survey.store_component(REPO, "main.go", "cli", "", "", True, False, "")
+        survey.store_component(REPO, "main.go", "cli", "", "", False, True, "")
+        component = survey.get_component(component_id)
+        assert component["is_app"] is True
+        assert component["is_library"] is True
+
+
 class TestEntryPoints:
     def test_stores_an_entry_point_against_a_component(self, survey):
         component_id = _component(survey)
@@ -134,6 +189,68 @@ class TestEntryPoints:
         )
         component = survey.get_component(component_id)
         assert [e["file"] for e in component["entry_points"]] == ["src/parser/frame.c"]
+
+
+class TestEntryPointsAreOnePerSite:
+    """An entry point is a place in the code; every pass that finds it means the same one.
+
+    The mapping task and all the fan-out branches read the same sources, and a
+    branch will record an entry point belonging to a sibling component. A live
+    survey of a 60-line Go file produced fourteen records for four sites.
+    """
+
+    def test_the_same_site_recorded_twice_is_one_entry_point(self, survey):
+        component_id = _component(survey)
+        first = survey.store_entry_point(REPO, component_id, "main.go", 25, "network", "q", "q", "")
+        second = survey.store_entry_point(
+            REPO, component_id, "main.go", 25, "network", "q", "q", ""
+        )
+        assert second == first
+        assert len(survey.get_entry_points(REPO)) == 1
+
+    def test_a_sibling_component_claiming_the_same_site_does_not_duplicate_it(self, survey):
+        owner = _component(survey, location="src/a")
+        sibling = _component(survey, location="src/b")
+        first = survey.store_entry_point(REPO, owner, "main.go", 41, "network", "", "", "")
+        second = survey.store_entry_point(REPO, sibling, "main.go", 41, "network", "", "", "")
+        assert second == first
+        entry_points = survey.get_entry_points(REPO)
+        assert len(entry_points) == 1
+        assert entry_points[0]["component_id"] == owner
+
+    def test_a_different_boundary_at_the_same_line_is_a_different_entry_point(self, survey):
+        component_id = _component(survey)
+        first = survey.store_entry_point(REPO, component_id, "main.go", 54, "network", "", "", "")
+        second = survey.store_entry_point(REPO, component_id, "main.go", 54, "file", "", "", "")
+        assert second != first
+        assert len(survey.get_entry_points(REPO)) == 2
+
+    def test_the_same_line_in_another_repo_is_a_different_entry_point(self, survey):
+        here = _component(survey)
+        there = _component(survey, repo=OTHER_REPO)
+        first = survey.store_entry_point(REPO, here, "main.go", 25, "network", "", "", "")
+        second = survey.store_entry_point(OTHER_REPO, there, "main.go", 25, "network", "", "", "")
+        assert second != first
+
+    def test_a_repeat_fills_in_blanks_without_overwriting(self, survey):
+        component_id = _component(survey)
+        entry_id = survey.store_entry_point(
+            REPO, component_id, "main.go", 25, "network", "q parameter", "", ""
+        )
+        survey.store_entry_point(
+            REPO, component_id, "main.go", 25, "network", "something else", "q", "reaches Query"
+        )
+        entry = survey.get_entry_points(REPO)[0]
+        assert entry["entry_point_id"] == entry_id
+        assert entry["untrusted_input"] == "q parameter"
+        assert entry["variables"] == "q"
+        assert entry["notes"] == "reaches Query"
+
+    def test_the_summary_counts_deduplicated_sites(self, survey):
+        component_id = _component(survey)
+        for _ in range(3):
+            survey.store_entry_point(REPO, component_id, "main.go", 25, "network", "", "", "")
+        assert survey.get_survey_summary(REPO)["entry_points"] == 1
 
 
 class TestSummaryAndClear:

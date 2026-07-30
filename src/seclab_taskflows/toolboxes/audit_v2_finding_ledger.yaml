@@ -42,5 +42,10 @@ server_prompt: |
   evidence supports. Do not describe a finding as confirmed or reproduced in
   prose unless the ledger says it is.
 
-  Before storing a new finding, call `find_similar_findings` for the same
-  component and vulnerability class so you do not file duplicates.
+  Repeats are folded in afterwards, by a step whose only job is deduplication.
+  A hunter should therefore file every path it finds rather than checking
+  first whether someone else got there: several hunters from different model
+  families work each component at once, and two of them arriving at the same
+  path independently is the strongest corroboration this pipeline produces.
+  `find_similar_findings` is for that deduplication step and for later stages
+  looking for related work, not for deciding whether to file.

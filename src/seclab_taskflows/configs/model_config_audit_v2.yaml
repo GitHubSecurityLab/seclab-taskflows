@@ -15,6 +15,13 @@
 #
 # Swap any entry for a different model if your entitlements differ; nothing in
 # the taskflows depends on a specific provider.
+#
+# One caveat when swapping: CAPI serves most models from exactly one endpoint,
+# and asking for the wrong one fails the whole stage with "model X is not
+# accessible via the /chat/completions endpoint". At the time of writing the
+# gemini and claude models are chat completions only, while gpt-5.5, gpt-5.6
+# and grok are responses only, which is why the entries below set `api_type`
+# where they do. Check a new model on both endpoints before relying on it.
 
 seclab-taskflow-agent:
   version: "1.0"
@@ -48,6 +55,10 @@ model_settings:
     reasoning:
       effort: high
   prosecution:
+    api_type: responses
+    reasoning:
+      effort: high
+  adjudication:
     api_type: responses
     reasoning:
       effort: high

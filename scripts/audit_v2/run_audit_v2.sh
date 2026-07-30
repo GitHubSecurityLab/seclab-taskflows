@@ -129,6 +129,18 @@ for stage in "${STAGES[@]}"; do
     fi
 done
 
+# Source access containers run with CONTAINER_PERSIST, and their name is a hash
+# of image, workspace and network rather than of the workspace's contents. A
+# container left over from a run whose workspace has since been recreated keeps
+# a bind mount on the old directory, so /workspace comes up empty and every
+# stage reads nothing. Drop them and let this run make its own.
+stale=$(docker ps -aq --filter "name=^seclab-persist-" 2>/dev/null || true)
+if [ -n "$stale" ]; then
+    echo "Removing stale persistent containers"
+    # shellcheck disable=SC2086
+    docker rm -f $stale >/dev/null
+fi
+
 echo "audit v2: ${REPO}"
 echo "stages:   ${STAGES[*]}"
 echo

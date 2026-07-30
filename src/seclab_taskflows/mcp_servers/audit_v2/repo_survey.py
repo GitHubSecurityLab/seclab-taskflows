@@ -81,6 +81,21 @@ class RepoSurveyBackend:
     ):
         kind = _require(kind, COMPONENT_KINDS, "kind", default=KIND_OTHER)
         with Session(self.engine) as session:
+            # A component is the unit the hunt stage fans out over, so two
+            # components at one location would have the hunt read the same code
+            # twice and report the same paths twice. It would also leave the
+            # entry points in that file split arbitrarily between them. One
+            # location is therefore one component, and a second description of
+            # the same location enriches the first.
+            existing = (
+                session.query(Component)
+                .filter(Component.repo == repo, Component.location == location)
+                .first()
+            )
+            if existing is not None:
+                self._enrich_component(existing, kind, language, runtime, is_app, is_library, notes)
+                session.commit()
+                return existing.id
             component = Component(
                 repo=repo,
                 location=location,
@@ -95,18 +110,62 @@ class RepoSurveyBackend:
             session.commit()
             return component.id
 
+    @staticmethod
+    def _enrich_component(existing, kind, language, runtime, is_app, is_library, notes):
+        """Fold a second description of a location into the record already held."""
+        for field, value in (("language", language), ("runtime", runtime)):
+            if value and not getattr(existing, field):
+                setattr(existing, field, value)
+        if kind != KIND_OTHER and existing.kind == KIND_OTHER:
+            existing.kind = kind
+        # Reachable as a program in any pass's reading means reachable, and the
+        # same for being callable as a library; plenty of components are both.
+        existing.is_app = bool(existing.is_app or is_app)
+        existing.is_library = bool(existing.is_library or is_library)
+        if notes and notes not in (existing.notes or ""):
+            existing.notes = f"{existing.notes}\n\n{notes}".strip()
+
     def store_entry_point(
         self, repo, component_id, file, line, trust_boundary, untrusted_input, variables, notes
     ):
         trust_boundary = _require(trust_boundary, TRUST_BOUNDARIES, "trust_boundary")
+        line = int(line or 0)
         with Session(self.engine) as session:
             if session.get(Component, component_id) is None:
                 return f"No component with id {component_id}"
+            # An entry point is a place in the code, so the same file, line and
+            # boundary is the same entry point no matter which pass found it.
+            # Several passes do find it: the mapping task and every fan-out
+            # branch read the same sources, and a branch will happily record an
+            # entry point that belongs to a sibling component. Recording those
+            # separately would make the hunt stage work each one repeatedly.
+            existing = (
+                session.query(EntryPoint)
+                .filter(
+                    EntryPoint.repo == repo,
+                    EntryPoint.file == file,
+                    EntryPoint.line == line,
+                    EntryPoint.trust_boundary == trust_boundary,
+                )
+                .first()
+            )
+            if existing is not None:
+                # Fill in what an earlier pass left blank, but let its wording
+                # stand, so a later terser pass cannot erase a better note.
+                for field, value in (
+                    ("untrusted_input", untrusted_input),
+                    ("variables", variables),
+                    ("notes", notes),
+                ):
+                    if value and not getattr(existing, field):
+                        setattr(existing, field, value)
+                session.commit()
+                return existing.id
             entry_point = EntryPoint(
                 repo=repo,
                 component_id=component_id,
                 file=file,
-                line=int(line or 0),
+                line=line,
                 trust_boundary=trust_boundary,
                 untrusted_input=untrusted_input or "",
                 variables=variables or "",

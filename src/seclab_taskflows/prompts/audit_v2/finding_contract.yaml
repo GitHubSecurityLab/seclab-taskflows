@@ -35,12 +35,23 @@ prompt: |
 
   ## Filing findings
 
-  Before filing, call `find_similar_findings` for the same component and
-  vulnerability class. If your path is the same as an existing finding, do not
-  file a duplicate.
+  File every distinct path you find, and do not look at what other hunters
+  have filed before you file. Several hunters are working this repository at
+  the same time, deliberately from different model families. Two of them
+  arriving independently at the same path is the strongest signal this
+  pipeline produces, and it only exists if each of you files what you found
+  without being influenced by, or deferring to, the others.
 
-  Call `store_finding` once per distinct path. Set `proposed_by` to the label
-  you were given for this hunt, so the ledger records which model proposed it.
+  So do not call `find_similar_findings` to decide whether to file. If a path
+  is real, file it, even if you suspect someone already has. A later step
+  folds the repeats together and records every model that proposed each path,
+  so nothing is lost by filing and the corroboration is lost by staying quiet.
+
+  Call `store_finding` once per distinct path. Two paths are distinct if they
+  have different sources or different sinks; the same source reaching the same
+  sink by a slightly different route is one finding. Set `proposed_by` to the
+  label you were given for this hunt, so the ledger records which model
+  proposed it.
 
   Findings enter the ledger as `candidate`. That is all they are at this point:
   you are proposing a hypothesis for adversarial review, not declaring a

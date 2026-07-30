@@ -78,9 +78,11 @@ taskflow:
 
         Start from the entry points already mapped for this component; fetch
         them with `get_entry_points` for component_id {{ result.component_id }}.
-        Each one records the trust boundary it crosses. They are a starting
-        point, not a limit. If you find an entry point that was missed, hunt it
-        too.
+        Each one records the trust boundary it crosses. If that comes back
+        empty, or looks thinner than the code warrants, fetch the entry points
+        for the whole repository and work out which of them reach this
+        component. They are a starting point, not a limit. If you find an entry
+        point that was missed, hunt it too.
 
         Work outward from each entry point:
 

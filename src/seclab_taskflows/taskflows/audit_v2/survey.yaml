@@ -83,6 +83,11 @@ taskflow:
         what they do. If the repository contains several applications, each one
         is its own component.
 
+        A component is identified by its `location`, and each location is one
+        component. If you would give two components the same directory or file,
+        they are one component: record it once and describe both roles in its
+        notes. If they are genuinely separate, give them separate locations.
+
         For each component, store an entry with `store_component`. Set its
         `kind` to the closest of: application, service, library, parser, cli,
         daemon, plugin, other. Set `is_app` and `is_library` according to how
@@ -94,6 +99,9 @@ taskflow:
         - anything that makes it interesting to attack: it parses untrusted
           formats, it executes things, it makes authorisation decisions, it
           handles credentials, it manages memory by hand
+
+        Record components only. The entry points are mapped in the next step,
+        so do not call `store_entry_point` here.
 
         Identify example, demo, fixture and test code. Do not create components
         for these, and say in your summary which directories you excluded.
@@ -183,6 +191,11 @@ taskflow:
         variables that carry untrusted data, and notes explaining why the data
         on the other side of that boundary is untrusted. If an entry point
         spans several lines, use the first.
+
+        Record only the entry points of the component in
+        {{ result.location }}. Other components are being mapped alongside this
+        one, so an entry point that belongs to a different component is not
+        yours to record.
 
         Do not assess vulnerabilities here. You are drawing the map, not
         hunting on it.

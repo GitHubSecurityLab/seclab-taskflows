@@ -26,6 +26,12 @@ server_prompt: |
   `is_app` and `is_library` independently, because plenty of components are
   both.
 
+  A component is identified by its `location`, and one location is one
+  component. Storing a second component at a location already recorded merges
+  the two descriptions and returns the original id rather than creating a
+  duplicate, because the hunt fans out over components and would otherwise read
+  the same code twice.
+
   An **entry point** is a place where data crosses into a component from
   somewhere less trusted. Always record which `trust_boundary` is crossed:
 
@@ -44,4 +50,6 @@ server_prompt: |
   supplies is trusted, the file's contents may not be.
 
   Record entry points with a precise file and integer line number. If one spans
-  several lines, use the first.
+  several lines, use the first. An entry point is identified by its file, line
+  and trust boundary; recording one that is already known returns the existing
+  id and fills in whatever the earlier record left blank.
