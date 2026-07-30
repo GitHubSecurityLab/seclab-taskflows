@@ -14,12 +14,12 @@ import pytest
 from seclab_taskflow_agent.available_tools import AvailableTools
 from seclab_taskflow_agent.models import ToolboxDocument
 
-from seclab_taskflows.mcp_servers.finding_ledger import (
+from seclab_taskflows.mcp_servers.audit_v2.finding_ledger import (
     FindingLedgerBackend,
     InvalidLedgerValueError,
     mcp,
 )
-from seclab_taskflows.mcp_servers.finding_ledger_models import (
+from seclab_taskflows.mcp_servers.audit_v2.finding_ledger_models import (
     STATE_CANDIDATE,
     STATE_CONFIRMED,
     STATE_DUPLICATE,
@@ -369,7 +369,7 @@ class TestDurability:
 
 class TestServerWiring:
     def test_toolbox_yaml_valid(self):
-        result = AvailableTools().get_toolbox("seclab_taskflows.toolboxes.finding_ledger")
+        result = AvailableTools().get_toolbox("seclab_taskflows.toolboxes.audit_v2_finding_ledger")
         assert result is not None
         assert isinstance(result, ToolboxDocument)
 

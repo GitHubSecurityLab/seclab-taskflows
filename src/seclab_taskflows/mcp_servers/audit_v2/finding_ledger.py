@@ -46,7 +46,7 @@ from .finding_ledger_models import (
     Finding,
     ReproductionAttempt,
 )
-from .utils import process_repo
+from ..utils import process_repo
 
 logging.basicConfig(
     level=logging.DEBUG,

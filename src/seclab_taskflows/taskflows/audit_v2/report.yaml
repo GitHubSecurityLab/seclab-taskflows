@@ -45,7 +45,7 @@ taskflow:
             proposed_by: {type: string}
           required: [finding_id, component, title, vuln_class, state]
       toolboxes:
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
 
   - task:
       id: draft
@@ -121,7 +121,7 @@ taskflow:
 
         {% include 'seclab_taskflows.prompts.audit_v2.severity_rubric' %}
       toolboxes:
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
 
   - task:
       if: "outputs.draft is defined and outputs.draft"
@@ -159,4 +159,4 @@ taskflow:
 
         {{ outputs.draft }}
       toolboxes:
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger

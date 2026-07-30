@@ -20,4 +20,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     jq netcat-openbsd socat procps lsof psmisc \
     ripgrep tree less \
     && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /workspace

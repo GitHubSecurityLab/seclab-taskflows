@@ -27,21 +27,36 @@ taskflow:
       exclude_from_context: true
       max_steps: 20
       model: general_tasks
-      name: reset and fetch
-      description: Clear prior state for this repo and fetch its source.
+      name: reset prior state
+      description: Clear any state left over from an earlier run of this repo.
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
-        Clear the memory cache. Clear the repo context results for the repo
+        Clear the memory cache. Clear the survey for the repo
         {{ globals.repo }}. Clear the findings in the finding ledger for the
         repo {{ globals.repo }}.
-
-        Then fetch and extract the source code of the repo {{ globals.repo }}
-        for container_shell analysis.
       toolboxes:
         - seclab_taskflow_agent.toolboxes.memcache
-        - seclab_taskflows.toolboxes.repo_context
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  # Kept as its own task with a single toolbox on purpose. Folded in with the
+  # resets above, the model reliably did one of the jobs and stopped, leaving
+  # an empty /workspace for every stage that follows.
+  - task:
+      must_complete: true
+      headless: true
+      exclude_from_context: true
+      max_steps: 20
+      model: general_tasks
+      name: fetch source
+      description: Fetch and extract the source code for container analysis.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch and extract the source code of the repo {{ globals.repo }} for
+        container_shell analysis.
+      toolboxes:
         - seclab_taskflows.toolboxes.local_gh_resources
 
   - task:
@@ -68,12 +83,13 @@ taskflow:
         what they do. If the repository contains several applications, each one
         is its own component.
 
-        For each component, store an entry with `store_new_component`. Set
-        `is_app` and `is_library` according to how the component is consumed,
-        and use `notes` to record:
+        For each component, store an entry with `store_component`. Set its
+        `kind` to the closest of: application, service, library, parser, cli,
+        daemon, plugin, other. Set `is_app` and `is_library` according to how
+        the component is consumed; a component is frequently both. Record
+        `language` and `runtime`, and use `notes` to record:
 
         - what the component does
-        - what language and runtime it is written in
         - who or what talks to it, and across which trust boundary
         - anything that makes it interesting to attack: it parses untrusted
           formats, it executes things, it makes authorisation decisions, it
@@ -85,7 +101,7 @@ taskflow:
         {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
       toolboxes:
         - seclab_taskflows.toolboxes.container_shell_source_access
-        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
 
   - task:
       id: components
@@ -105,12 +121,13 @@ taskflow:
         items:
           type: object
           properties:
-            id: {type: integer}
+            component_id: {type: integer}
             repo: {type: string}
             location: {type: string}
-          required: [id, repo, location]
+            kind: {type: string}
+          required: [component_id, repo, location]
       toolboxes:
-        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
 
   - task:
       if: "outputs.components | length > 0"
@@ -127,10 +144,12 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
         The component is in {{ result.repo }} in the directory
-        {{ result.location }}. Previous analysis recorded:
+        {{ result.location }}, and its id is {{ result.component_id }}.
+        Previous analysis recorded:
 
+        kind:          {{ result.kind | default('unknown') }}
         is_application ? {{ result.is_app | default('unknown') }}
-        is_library ? {{ result.is_library | default('unknown') }}
+        is_library     ? {{ result.is_library | default('unknown') }}
 
         {{ result.notes | default('') }}
 
@@ -157,11 +176,13 @@ taskflow:
         filename the operator supplies is trusted, but the file's contents may
         not be.
 
-        For each entry point, call `store_new_entry_point` with the precise
-        file and integer line number, the variables that carry untrusted data,
-        and notes explaining which trust boundary is crossed and why the data
-        on the other side is untrusted. If an entry point spans several lines,
-        use the first.
+        For each entry point, call `store_entry_point` with `component_id`
+        {{ result.component_id }}, the precise file and integer line number,
+        the `trust_boundary` that is crossed (one of: network, file, ipc,
+        process, stored_data, package_content, library_api, other), the
+        variables that carry untrusted data, and notes explaining why the data
+        on the other side of that boundary is untrusted. If an entry point
+        spans several lines, use the first.
 
         Do not assess vulnerabilities here. You are drawing the map, not
         hunting on it.
@@ -169,7 +190,7 @@ taskflow:
         {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
       toolboxes:
         - seclab_taskflows.toolboxes.container_shell_source_access
-        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
 
   - task:
       must_complete: true
@@ -187,4 +208,4 @@ taskflow:
         untrusted data enters each one. Call out the components you would
         prioritise for hunting and say why, in one or two sentences each.
       toolboxes:
-        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey

@@ -43,12 +43,13 @@ taskflow:
         items:
           type: object
           properties:
-            id: {type: integer}
+            component_id: {type: integer}
             repo: {type: string}
             location: {type: string}
-          required: [id, repo, location]
+            kind: {type: string}
+          required: [component_id, repo, location]
       toolboxes:
-        - seclab_taskflows.toolboxes.repo_context
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
 
   - task:
       if: "outputs.components | length > 0"
@@ -69,14 +70,17 @@ taskflow:
 
         What previous analysis recorded about this component:
 
+        kind:          {{ result.kind | default('unknown') }}
         is_application ? {{ result.is_app | default('unknown') }}
-        is_library ? {{ result.is_library | default('unknown') }}
+        is_library     ? {{ result.is_library | default('unknown') }}
 
         {{ result.notes | default('') }}
 
         Start from the entry points already mapped for this component; fetch
-        them with the repo context tools. They are a starting point, not a
-        limit. If you find an entry point that was missed, hunt it too.
+        them with `get_entry_points` for component_id {{ result.component_id }}.
+        Each one records the trust boundary it crosses. They are a starting
+        point, not a limit. If you find an entry point that was missed, hunt it
+        too.
 
         Work outward from each entry point:
 
@@ -108,8 +112,8 @@ taskflow:
         {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
       toolboxes:
         - seclab_taskflows.toolboxes.container_shell_source_access
-        - seclab_taskflows.toolboxes.repo_context
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
 
   - task:
       id: raw_candidates
@@ -136,7 +140,7 @@ taskflow:
             proposed_by: {type: string}
           required: [finding_id, component, title, vuln_class]
       toolboxes:
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
 
   - task:
       if: "outputs.raw_candidates | length > 1"
@@ -190,7 +194,7 @@ taskflow:
         groups you merged, and which findings more than one model family found
         independently.
       toolboxes:
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
 
   - task:
       must_complete: true
@@ -206,4 +210,4 @@ taskflow:
         title and `proposed_by`. Report them grouped by component, and call out
         any that were proposed by more than one model.
       toolboxes:
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger

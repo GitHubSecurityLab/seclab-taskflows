@@ -30,6 +30,7 @@ server_prompt: |
   Available runtimes and tools:
   - python3 (with venv and dev headers), pip3
   - node, npm
+  - go
   - java (headless JRE)
   - gcc, g++, make (build-essential)
   - gdb, valgrind, strace        — for memory-safety and crash triage

@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: toolbox
+  version: "1.0"
+
+server_params:
+  kind: stdio
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.audit_v2.repo_survey"]
+  env:
+    REPO_SURVEY_DIR: "{{ env('DATA_DIR') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"
+
+server_prompt: |
+  ## Repository Survey (audit v2)
+
+  The survey is the map the rest of the audit hunts over. It records what the
+  repository is made of and where untrusted data enters it.
+
+  A **component** is a coherent unit of functionality that can be reasoned
+  about on its own: one service, one parser, one protocol implementation, one
+  subsystem. It is not necessarily a web application. Record its `kind`
+  (application, service, library, parser, cli, daemon, plugin, other), and set
+  `is_app` and `is_library` independently, because plenty of components are
+  both.
+
+  An **entry point** is a place where data crosses into a component from
+  somewhere less trusted. Always record which `trust_boundary` is crossed:
+
+  - `network`          — requests, responses, protocol messages, peers
+  - `file`             — parsed bytes that came from elsewhere
+  - `ipc`              — pipes, sockets, shared memory from another process
+  - `process`          — argv and environment set by a less privileged caller
+  - `stored_data`      — database rows, cache entries, queue messages
+  - `package_content`  — filenames, paths, manifests, repository metadata
+  - `library_api`      — public API parameters a caller may pass attacker data
+  - `other`            — anything that does not fit the above
+
+  Configuration the operator wrote, arguments the operator typed and
+  environment the operator set are *not* untrusted on their own. They become
+  interesting when they point at untrusted resources: a filename the operator
+  supplies is trusted, the file's contents may not be.
+
+  Record entry points with a precise file and integer line number. If one spans
+  several lines, use the first.

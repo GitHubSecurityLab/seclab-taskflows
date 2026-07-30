@@ -127,7 +127,7 @@ Useful variants:
 
 | Stage | What it does | Ledger effect |
 | --- | --- | --- |
-| `survey` | Fetches the source, decomposes it into components, maps where untrusted data enters each one | populates `repo_context` |
+| `survey` | Fetches the source, decomposes it into components, maps where untrusted data enters each one | populates the v2 survey store |
 | `hunt` | Three model families hunt each component in parallel, then a dedup pass folds convergent findings | creates `candidate`s, some `duplicate` |
 | `contest` | Prosecution, defense, adjudication | `candidate` → `confirmed` or `rejected` |
 | `reproduce` | Builds and runs the target in a container, drives the path with a control case first, then the attack | `confirmed` → `reproduced` |

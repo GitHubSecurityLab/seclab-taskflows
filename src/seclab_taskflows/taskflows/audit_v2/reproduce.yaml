@@ -46,7 +46,7 @@ taskflow:
             severity: {type: string}
           required: [finding_id, repo, component, title, vuln_class]
       toolboxes:
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
 
   - task:
       if: "outputs.confirmed | length > 0"
@@ -100,7 +100,7 @@ taskflow:
         {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
       toolboxes:
         - seclab_taskflows.toolboxes.container_shell_reproduction
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
 
   - task:
       must_complete: true
@@ -116,4 +116,4 @@ taskflow:
         state `confirmed` together with why their reproduction attempt did not
         succeed.
       toolboxes:
-        - seclab_taskflows.toolboxes.finding_ledger
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger

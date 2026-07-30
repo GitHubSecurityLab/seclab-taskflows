@@ -13,6 +13,7 @@ file that does not exist.
 from __future__ import annotations
 
 import glob
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -23,18 +24,35 @@ from seclab_taskflow_agent.linting import lint_taskflow
 from seclab_taskflow_agent.models import DOCUMENT_MODELS
 from seclab_taskflow_agent.template_utils import evaluate_expression, render_template
 
+from seclab_taskflows.mcp_servers.audit_v2.finding_ledger import FindingLedgerBackend
+from seclab_taskflows.mcp_servers.audit_v2.repo_survey_models import (
+    Component,
+    component_to_dict,
+)
+
 _ROOT = "src/seclab_taskflows"
 
 # A representative component and finding, shaped like the `outputs` contracts
 # the audit_v2 stages declare. Rendering against these proves the prompts only
 # reference fields the pipeline actually produces.
+#
+# The component is built from the survey's own projection rather than written
+# out by hand, so a renamed column cannot leave this fixture agreeing with a
+# prompt that no longer matches the server.
 _COMPONENT = {
-    "id": 1,
-    "repo": "acme/widget",
-    "location": "src/api",
-    "is_app": True,
-    "is_library": False,
-    "notes": "handles uploads",
+    **component_to_dict(
+        Component(
+            id=1,
+            repo="acme/widget",
+            location="src/api",
+            kind="service",
+            language="go",
+            runtime="",
+            is_app=True,
+            is_library=False,
+            notes="handles uploads",
+        )
+    )
 }
 _FINDING = {
     "finding_id": 1,
@@ -195,3 +213,56 @@ def test_audit_v2_over_targets_are_produced_by_an_earlier_task() -> None:
                 )
             if task.id:
                 produced.add(task.id)
+
+
+def _declared_output_properties(tools: AvailableTools, dotted: str, task_id: str) -> set[str]:
+    taskflow = tools.get_taskflow(dotted)
+    for step in taskflow.taskflow:
+        if step.task.id == task_id:
+            schema = step.task.outputs or {}
+            return set((schema.get("items") or {}).get("properties", {}))
+    msg = f"{dotted} has no task with id {task_id!r}"
+    raise AssertionError(msg)
+
+
+def test_component_outputs_match_what_the_survey_returns() -> None:
+    """The declared component schema must match `component_to_dict`, not resemble it.
+
+    A field named `id` here instead of `component_id` still lints, still renders,
+    and still passes every static check, then fails at run time after the survey
+    has already paid for a full mapping pass. That is exactly what happened, so
+    the contract is asserted rather than assumed.
+    """
+    actual = set(_COMPONENT)
+    tools = AvailableTools()
+    for dotted in (
+        "seclab_taskflows.taskflows.audit_v2.survey",
+        "seclab_taskflows.taskflows.audit_v2.hunt",
+    ):
+        declared = _declared_output_properties(tools, dotted, "components")
+        assert declared <= actual, (
+            f"{dotted} declares component fields that get_components never returns: "
+            f"{sorted(declared - actual)}"
+        )
+
+
+def test_finding_outputs_match_what_the_ledger_returns() -> None:
+    """Same guard for the finding schemas the contest and reproduce stages read."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        ledger = FindingLedgerBackend(tmp_dir)
+        finding_id = ledger.store_finding(
+            "acme/widget", "src/api", "t", "CWE-22", "python", "s", "k", "f", [], "h", "m"
+        )
+        actual = set(ledger.get_finding(finding_id))
+
+    tools = AvailableTools()
+    for dotted, task_id in (
+        ("seclab_taskflows.taskflows.audit_v2.contest", "candidates"),
+        ("seclab_taskflows.taskflows.audit_v2.reproduce", "confirmed"),
+        ("seclab_taskflows.taskflows.audit_v2.report", "findings"),
+    ):
+        declared = _declared_output_properties(tools, dotted, task_id)
+        assert declared <= actual, (
+            f"{dotted} declares finding fields the ledger never returns: "
+            f"{sorted(declared - actual)}"
+        )
