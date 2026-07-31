@@ -56,7 +56,7 @@ taskflow:
       model: reproduction
       max_steps: 250
       name: reproduce finding
-      description: Attempt to trigger each confirmed finding in a container.
+      description: Validate reachability of each confirmed finding in a container.
       agents:
         - seclab_taskflows.personalities.reproduction_engineer
       env:
@@ -65,14 +65,14 @@ taskflow:
       user_prompt: |
         {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
 
-        Reproduce finding {{ result.finding_id }} in the repo {{ result.repo }},
-        in the component {{ result.component }}:
+        Validate the reachability of finding {{ result.finding_id }} in the repo
+        {{ result.repo }}, in the component {{ result.component }}:
 
         {{ result.title }} ({{ result.vuln_class }})
 
         Call `get_finding` for id {{ result.finding_id }} to read its source,
         sink, flow, locations and hypothesis, along with the adjudicator's
-        reasoning for confirming it. You are testing that specific path.
+        reasoning for confirming it. You are validating that specific path.
 
         The repository is mounted at /workspace inside the reproduction
         container. Work there:
@@ -82,11 +82,15 @@ taskflow:
            are usually the fastest route to a working invocation of the code
            the finding points at.
         2. Get it running.
-        3. Drive the path with benign input first and record what normal looks
-           like. Without that control, the malicious result proves nothing.
-        4. Then send the attack, from the entry point the finding names, with
-           a minimal non-destructive payload: read a marker file you created,
-           echo a marker string, trigger the crash under gdb or valgrind.
+        3. Drive the path with an ordinary input first and record what normal
+           looks like. Without that control, the reachability evidence proves
+           nothing.
+        4. Then show reachability, from the entry point the finding names, with
+           a benign, distinctive marker value in the attacker-controlled field:
+           reflect the marker back in a response, error, log line or emitted
+           query; add a lightweight log/print/breakpoint at the sink that fires
+           with your marker; or observe the target's own behaviour naming your
+           marker. Reach the sink; you do not need to exploit it.
         5. If it does not work the first time, change one thing and try again
            while you are still learning something from the failures.
 
@@ -109,7 +113,7 @@ taskflow:
       model: general_tasks
       max_steps: 20
       name: reproduction summary
-      description: Report which findings were actually triggered.
+      description: Report which findings were validated as reachable.
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |

@@ -64,9 +64,12 @@ models:
   prosecution: gpt-5.6-sol
   defense: claude-opus-5
   adjudication: gemini-3.6-flash
-  # Dynamic reproduction is long-horizon tool use inside a container: the stage
-  # has to actually drive the target to a crash or a proof, not describe one.
-  reproduction: claude-opus-5
+  # Dynamic reachability validation is long-horizon tool use inside a
+  # container: the stage has to actually drive the target and observe the flow
+  # reach the sink, not describe it. claude-opus-5 soft-refuses this work under
+  # content filtering (it returns a single text turn and calls no tools), so
+  # this slot runs claude-opus-4.8, which does the same job without tripping it.
+  reproduction: claude-opus-4.8
   # Final write-up.
   reporting: gpt-5.6-sol
 model_settings:

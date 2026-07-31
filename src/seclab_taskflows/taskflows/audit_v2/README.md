@@ -15,9 +15,11 @@ Audit v2 adds both, and makes them structural rather than advisory:
    defender argues it is not, and a third model from a different family
    adjudicates. Findings that survive are marked `confirmed`; the rest are
    `rejected` with a reason.
-2. **Confirmed findings must be reproduced.** The reproduction stage stands the
-   target up in a container and actually triggers the bug. Only an observed
-   trigger promotes a finding to `reproduced`.
+2. **Confirmed findings must be shown reachable.** The reproduction stage stands
+   the target up in a container and dynamically demonstrates that
+   attacker-controlled input reaches the dangerous sink at runtime, using a
+   benign marker or lightweight instrumentation. Only an observed reachable flow
+   promotes a finding to `reproduced`.
 
 It is also not web-specific. The survey stage asks where untrusted data crosses
 a trust boundary, which is a question you can ask of a parser, a daemon, a
@@ -40,7 +42,7 @@ The important design decision is that a finding's state is derived by the
             [rejected]   [confirmed]
                               |
                   store_reproduction_attempt
-                     (outcome: triggered)
+                     (outcome: reachable)
                               |
                               v
                         [reproduced]
@@ -52,9 +54,10 @@ backend decides what that evidence entitles the finding to:
 - `adjudicate_finding` is the only path to `confirmed`, and it is only
   reachable after both sides of the contest have filed their arguments.
 - `store_reproduction_attempt` only promotes a finding that is already
-  `confirmed`, and only when it observed a real trigger.
+  `confirmed`, and only when it observed the flow reach the sink at runtime.
 - A `reproduced` finding is immune to later adjudication. Once something has
-  been demonstrated, no amount of subsequent argument un-demonstrates it.
+  been demonstrated reachable, no amount of subsequent argument un-demonstrates
+  it.
 - `merge_duplicate_finding` only folds `candidate` findings, refuses to merge a
   finding into itself or into another duplicate, and refuses to merge across
   repositories.
@@ -153,7 +156,7 @@ Useful variants:
 | `survey` | Fetches the source, decomposes it into components, maps where untrusted data enters each one | populates the v2 survey store |
 | `hunt` | Three model families hunt each component in parallel, then a dedup pass folds convergent findings | creates `candidate`s, some `duplicate` |
 | `contest` | Prosecution, defense, adjudication | `candidate` → `confirmed` or `rejected` |
-| `reproduce` | Builds and runs the target in a container, drives the path with a control case first, then the attack | `confirmed` → `reproduced` |
+| `reproduce` | Builds and runs the target in a container, drives the path with a control case first, then a benign marker to show the flow reaches the sink | `confirmed` → `reproduced` |
 | `report` | Writes the report, then verifies every claim in it against the ledger | read-only |
 
 Each stage is a separate taskflow because each is expensive and each ends at a

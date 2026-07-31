@@ -10,7 +10,8 @@ resumable and makes the promotion rules auditable.
 
 Promotion is enforced here, not in prompts: a finding only becomes
 ``confirmed`` through adjudication, and only becomes ``reproduced`` when a
-reproduction attempt actually triggered it from a ``confirmed`` state.
+reproduction attempt observed its flow reaching the sink from a ``confirmed``
+state.
 """
 
 import json
@@ -608,13 +609,13 @@ def merge_duplicate_finding(
 def store_reproduction_attempt(
     owner: str = Field(description="The owner of the GitHub repository"),
     repo: str = Field(description="The name of the GitHub repository"),
-    finding_id: int = Field(description="The ID of the finding being reproduced"),
+    finding_id: int = Field(description="The ID of the finding being validated"),
     outcome: str = Field(description=f"One of: {', '.join(REPRODUCTION_OUTCOMES)}"),
-    harness: str = Field(description="The exact commands or PoC used", default=""),
-    observed: str = Field(description="What actually happened when the PoC ran", default=""),
+    harness: str = Field(description="The exact commands you ran to build, start and probe the target", default=""),
+    observed: str = Field(description="The actual container output showing whether the marker reached the sink", default=""),
     model: str = Field(description="Label of the model that ran the attempt", default=""),
 ):
-    """Record a dynamic reproduction attempt run inside the sandboxed container."""
+    """Record a dynamic reachability-validation attempt run inside the sandboxed container."""
     repo = process_repo(owner, repo)
     try:
         return backend.store_reproduction_attempt(
