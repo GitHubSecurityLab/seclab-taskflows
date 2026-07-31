@@ -13,16 +13,14 @@ uses this store instead.
 
 import json
 import logging
-from pathlib import Path
 
 from fastmcp import FastMCP
 from pydantic import Field
 from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from ..utils import process_repo
-from .schema_init import create_all_tolerating_races
+from .schema_init import open_state_engine
 from .repo_survey_models import (
     COMPONENT_KINDS,
     KIND_OTHER,
@@ -69,10 +67,8 @@ class RepoSurveyBackend:
 
     def __init__(self, state_dir: str):
         self.state_dir = state_dir
-        Path(self.state_dir).mkdir(parents=True, exist_ok=True)
-        self.engine = create_engine(f"sqlite:///{self.state_dir}/repo_survey.db", echo=False)
-        create_all_tolerating_races(
-            Base, self.engine, [Component.__table__, EntryPoint.__table__]
+        self.engine = open_state_engine(
+            state_dir, "repo_survey.db", Base, [Component.__table__, EntryPoint.__table__]
         )
 
     # -- writes ------------------------------------------------------------
@@ -226,7 +222,7 @@ class RepoSurveyBackend:
             return components
 
 
-backend = RepoSurveyBackend(str(MEMORY))
+backend = RepoSurveyBackend(MEMORY)
 
 mcp = FastMCP("RepoSurvey")
 
@@ -346,4 +342,4 @@ def clear_survey_for_repo(
 
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(show_banner=False)

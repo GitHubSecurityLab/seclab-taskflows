@@ -20,10 +20,7 @@ import logging
 from fastmcp import FastMCP
 from pydantic import Field
 from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-
-from pathlib import Path
 
 from .finding_ledger_models import (
     CONTEST_POSITIONS,
@@ -48,7 +45,7 @@ from .finding_ledger_models import (
     ReproductionAttempt,
 )
 from ..utils import process_repo
-from .schema_init import create_all_tolerating_races
+from .schema_init import open_state_engine
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -143,11 +140,10 @@ class FindingLedgerBackend:
 
     def __init__(self, state_dir: str):
         self.state_dir = state_dir
-        Path(self.state_dir).mkdir(parents=True, exist_ok=True)
-        self.engine = create_engine(f"sqlite:///{self.state_dir}/finding_ledger.db", echo=False)
-        create_all_tolerating_races(
+        self.engine = open_state_engine(
+            state_dir,
+            "finding_ledger.db",
             Base,
-            self.engine,
             [
                 Finding.__table__,
                 ContestVerdict.__table__,
@@ -366,7 +362,7 @@ class FindingLedgerBackend:
         )
 
     def store_reproduction_attempt(self, repo, finding_id, model, harness, outcome, observed):
-        """Record a dynamic trigger attempt; only a real trigger promotes state."""
+        """Record a dynamic reachability attempt; only an observed reachable flow promotes state."""
         outcome = _require(outcome, REPRODUCTION_OUTCOMES, "outcome")
         with Session(self.engine) as session:
             finding = session.get(Finding, finding_id)

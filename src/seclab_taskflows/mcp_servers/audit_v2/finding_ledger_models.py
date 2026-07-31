@@ -121,7 +121,7 @@ class ContestVerdict(Base):
 
 
 class ReproductionAttempt(Base):
-    """A dynamic attempt to trigger a finding inside a sandboxed container."""
+    """A dynamic attempt to show a finding's flow reaching its sink inside a sandboxed container."""
 
     __tablename__ = "reproduction_attempt"
 

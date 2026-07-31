@@ -20,10 +20,12 @@ retry until every table is present.
 """
 
 import time
+from pathlib import Path
 
+from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 
-__all__ = ["create_all_tolerating_races"]
+__all__ = ["create_all_tolerating_races", "open_state_engine"]
 
 _RETRIES = 8
 _BACKOFF_SECONDS = 0.05
@@ -45,3 +47,18 @@ def create_all_tolerating_races(base, engine, tables) -> None:
     # Every attempt collided. Let a real failure surface rather than starting
     # a server whose schema may be incomplete.
     base.metadata.create_all(engine, tables=tables)
+
+
+def open_state_engine(state_dir, db_filename, base, tables):
+    """Open a real on-disk SQLite engine for *db_filename* under *state_dir*.
+
+    Both audit v2 stores must persist. An in-memory fallback would let an audit
+    run to completion, promote findings and print a summary, and then leave
+    nothing on disk. So the directory is created if missing, a file-backed
+    engine is opened, and the schema is initialised race-tolerantly.
+    """
+    directory = Path(state_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    engine = create_engine(f"sqlite:///{directory / db_filename}", echo=False)
+    create_all_tolerating_races(base, engine, tables)
+    return engine
