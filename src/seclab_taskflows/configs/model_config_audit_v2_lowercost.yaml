@@ -24,16 +24,42 @@ models:
   reporting: gpt-5-mini
 model_settings:
   general_tasks:
+    backend: openai_agents
     api_type: responses
   survey:
+    backend: openai_agents
     api_type: responses
   hunt_gpt:
+    backend: openai_agents
     api_type: responses
     reasoning:
-      effort: medium
+      effort: high
+  hunt_claude:
+    backend: anthropic_sdk
+    api_type: messages
+    reasoning:
+      effort: high
+  hunt_gemini:
+    backend: openai_agents
+    api_type: chat_completions
   prosecution:
+    backend: openai_agents
     api_type: responses
     reasoning:
-      effort: medium
+      effort: high
+  defense:
+    backend: anthropic_sdk
+    api_type: messages
+    reasoning:
+      effort: high
+  adjudication:
+    backend: openai_agents
+    api_type: chat_completions
+  reproduction:
+    backend: anthropic_sdk
+    api_type: messages
+    reasoning:
+      effort: high
   reporting:
+    backend: openai_agents
     api_type: responses

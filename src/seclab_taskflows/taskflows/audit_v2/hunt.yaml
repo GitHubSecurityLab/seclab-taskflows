@@ -52,6 +52,7 @@ taskflow:
         - seclab_taskflows.toolboxes.audit_v2_repo_survey
 
   - task:
+      id: filings
       if: "outputs.components | length > 0"
       must_complete: false
       repeat_prompt: true
@@ -65,6 +66,8 @@ taskflow:
       agents:
         - seclab_taskflows.personalities.vulnerability_hunter
       user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
         Hunt for vulnerabilities in the component at {{ result.location }} in
         the repo {{ result.repo }}. The repository is mounted at /workspace.
 
@@ -106,15 +109,62 @@ taskflow:
 
         {% include 'seclab_taskflows.prompts.audit_v2.finding_contract' %}
 
-        Set `proposed_by` to the name of the model you are running as, for
-        example `gpt-5.6-sol` or `claude-sonnet-5`, so the ledger records which
-        family proposed each path. If you do not know your own model name, use
-        `unknown`.
-
         {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
+
+        Finish by returning the component you hunted and the ids
+        `store_finding` gave back, as `{"component": "...", "filed": [...]}`.
+        Return an empty `filed` list if you filed nothing. The ids are how this
+        run is credited to the model you are: do not omit any, and do not
+        include ids you did not file yourself.
+
+        That JSON object must be your entire final message. Put your reasoning
+        and your writeup in the findings you file, not in the last message; any
+        prose around the object makes the branch unreadable to the runner and
+        the credit for this run is lost.
+      capture: response
+      outputs:
+        type: object
+        properties:
+          component: {type: string}
+          filed:
+            type: array
+            items: {type: integer}
+        required: [component, filed]
       toolboxes:
         - seclab_taskflows.toolboxes.container_shell_source_access
         - seclab_taskflows.toolboxes.audit_v2_repo_survey
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      if: "outputs.filings | default([], true) | length > 0"
+      must_complete: false
+      exclude_from_context: true
+      model: general_tasks
+      max_steps: 120
+      name: attribute filings
+      description: Record which model proposed each finding, from the branch records.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Record which model proposed each candidate finding for the repo
+        {{ globals.repo }}.
+
+        Each line below is one hunt branch: the model slot the runner ran it
+        as, and the findings that branch filed. This is the authoritative
+        attribution, taken from the runner rather than self-reported by the
+        hunters.
+
+        {% for rec in outputs.filings %}
+        {% set filed = rec.result.filed | default([], true) if rec.result else [] %}
+        - model {{ rec.model }} filed: {{ filed | join(', ') | default('nothing', true) }}
+        {% endfor %}
+
+        Call `attribute_findings` exactly once, passing every branch above as
+        one entry: `{"proposed_by": "<model>", "finding_ids": [...]}`, with the
+        model written exactly as it appears above. Skip branches that filed
+        nothing. Make no other tool calls and change nothing else. Report the
+        result the tool gives back.
+      toolboxes:
         - seclab_taskflows.toolboxes.audit_v2_finding_ledger
 
   - task:

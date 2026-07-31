@@ -63,6 +63,8 @@ taskflow:
         CONTAINER_TIMEOUT: "600"
         CONTAINER_PERSIST: "false"
       user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
         Reproduce finding {{ result.finding_id }} in the repo {{ result.repo }},
         in the component {{ result.component }}:
 

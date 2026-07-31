@@ -22,6 +22,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from ..utils import process_repo
+from .schema_init import create_all_tolerating_races
 from .repo_survey_models import (
     COMPONENT_KINDS,
     KIND_OTHER,
@@ -70,8 +71,8 @@ class RepoSurveyBackend:
         self.state_dir = state_dir
         Path(self.state_dir).mkdir(parents=True, exist_ok=True)
         self.engine = create_engine(f"sqlite:///{self.state_dir}/repo_survey.db", echo=False)
-        Base.metadata.create_all(
-            self.engine, tables=[Component.__table__, EntryPoint.__table__]
+        create_all_tolerating_races(
+            Base, self.engine, [Component.__table__, EntryPoint.__table__]
         )
 
     # -- writes ------------------------------------------------------------

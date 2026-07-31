@@ -70,26 +70,49 @@ their `proposed_by` labels rather than discarding the duplicate's provenance.
 A finding proposed by three families is a materially different object from one
 proposed by a single model, and the adjudicator gets to see that.
 
+Those labels come from the runner, not from the hunters. A branch cannot
+reliably name the model it is running as, and asking it to guess is worse than
+useless here: two hunters that both answer `unknown` union down to one label,
+so a path two families found independently reads as a single opinion. The
+multi-model task publishes `{model, item, result}` per branch, where `model` is
+the slot named in `models:` (`hunt_claude`, not `claude-opus-5`), so the
+label survives swapping the model behind a slot. The hunt task sets
+`capture: response` so each branch's `result` is the JSON object it ends with,
+listing the ids it filed; a following task hands the whole set to
+`attribute_findings` in one call.
+
 ## Model assignment
 
 Defined in `configs/model_config_audit_v2.yaml`.
 
 | Role | Model | Why |
 | --- | --- | --- |
-| `general_tasks` | gpt-5-mini | Cheap bookkeeping: fetching and summarising ledger state |
-| `survey` | gpt-5.4 | Long-context mapping work |
+| `general_tasks` | gpt-5.4 | Cheap bookkeeping: fetching and summarising ledger state |
+| `survey` | gpt-5.6-sol | Long-context mapping work |
 | `hunt_gpt` | gpt-5.6-sol | |
-| `hunt_claude` | claude-sonnet-5 | Different family, different blind spots |
-| `hunt_gemini` | gemini-3.6-flash | Third family, cheap enough to run wide |
+| `hunt_claude` | claude-opus-5 | Different family, different blind spots |
+| `hunt_gemini` | gemini-3.6-flash | Third family |
 | `prosecution` | gpt-5.6-sol | |
-| `defense` | claude-sonnet-5 | |
-| `adjudication` | grok-4.5 | Deliberately not a sibling of either advocate |
-| `reproduction` | claude-sonnet-5 | Long agentic tool-use loops in a container |
-| `reporting` | gpt-5.5 | |
+| `defense` | claude-opus-5 | |
+| `adjudication` | gemini-3.6-flash | Deliberately not a sibling of either advocate |
+| `reproduction` | claude-opus-5 | Long agentic tool-use loops in a container |
+| `reporting` | gpt-5.6-sol | |
 
 The adjudicator's family is the point. A model grading an argument written by a
-sibling shares its priors, including the wrong ones. Only the gpt slots set
-`reasoning.effort`, because that setting is provider-specific; swap any entry
+sibling shares its priors, including the wrong ones; the adjudicator writes
+neither advocate's argument.
+
+No role uses xAI. CAPI rejects `grok-4.5` for security analysis at the platform
+rather than the model level: any request whose content is vulnerability
+analysis returns `403 permission-denied ... Failed check:
+SAFETY_CHECK_TYPE_CYBER`, down to a five-line snippet, so it cannot fill any
+role here.
+
+`hunt_gemini` is the least reliable slot. `gemini-3.6-flash` answers security
+questions put to it directly, but in the hunt loop it has refused after reading
+the target and produced nothing. The stage is built to survive that --
+`completion: any` and `must_complete: false` mean a refusing branch costs a
+branch and nothing else -- but do not count on three opinions. Swap any entry
 for a model your account is entitled to. Use
 `model_config_audit_v2_lowercost.yaml` for exploratory runs.
 
@@ -163,9 +186,5 @@ command needs a human. The isolation is the container, not the prompt.
 
 1. This will consume a large amount of model quota. Three hunters plus a
    three-model contest per finding is the cost of not shipping false positives.
-2. `proposed_by` is self-reported by the model. The grammar exposes no template
-   variable for the current branch's model label, so a mislabelled finding is
-   possible; the labels are useful as a convergence signal, not as an audit
-   trail.
-3. Everything here should still be reviewed by a human before it is reported to
+2. Everything here should still be reviewed by a human before it is reported to
    anyone. A reproduced finding is strong evidence, not a disclosure.

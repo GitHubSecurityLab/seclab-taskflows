@@ -47,6 +47,7 @@ from .finding_ledger_models import (
     ReproductionAttempt,
 )
 from ..utils import process_repo
+from .schema_init import create_all_tolerating_races
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -143,9 +144,10 @@ class FindingLedgerBackend:
         self.state_dir = state_dir
         Path(self.state_dir).mkdir(parents=True, exist_ok=True)
         self.engine = create_engine(f"sqlite:///{self.state_dir}/finding_ledger.db", echo=False)
-        Base.metadata.create_all(
+        create_all_tolerating_races(
+            Base,
             self.engine,
-            tables=[
+            [
                 Finding.__table__,
                 ContestVerdict.__table__,
                 ReproductionAttempt.__table__,
@@ -186,6 +188,69 @@ class FindingLedgerBackend:
             session.add(finding)
             session.commit()
             return finding.id
+
+    def attribute_finding(self, repo, finding_id, proposed_by):
+        """Union a model label onto a finding's ``proposed_by``.
+
+        Hunters cannot name the model they are running as, so the labels they
+        self-report are unreliable and, worse, they collide: two hunters that
+        both guess "unknown" union down to a single label, and a path that two
+        families found independently then reads as one. The runner does know
+        which model produced each branch, so attribution is applied afterwards
+        from the branch records rather than trusted from inside the branch.
+        """
+        with Session(self.engine) as session:
+            finding = session.get(Finding, finding_id)
+            if finding is None:
+                return f"No finding with id {finding_id}"
+            if finding.repo != repo:
+                return (
+                    f"Finding {finding_id} belongs to {finding.repo!r}, not {repo!r}; "
+                    f"refusing to attribute across repositories"
+                )
+            label = (proposed_by or "").strip()
+            if not label:
+                return "proposed_by must be a non-empty model label"
+            finding.proposed_by = _merge_labels(finding.proposed_by, label)
+            labels = finding.proposed_by
+            session.commit()
+        return f"Finding {finding_id} was proposed by: {labels}"
+
+    def attribute_findings(self, repo, attributions):
+        """Apply a whole run's worth of attribution in one call.
+
+        ``attributions`` is one entry per hunt branch, as
+        ``{"proposed_by": <label>, "finding_ids": [<id>, ...]}``. Entries are
+        applied independently: a branch naming a finding that no longer exists,
+        or that belongs to another repo, is reported without stopping the rest,
+        because losing the whole run's credit to one bad id is worse than
+        recording the pairs that were good.
+        """
+        if not isinstance(attributions, list):
+            return "attributions must be a list of {proposed_by, finding_ids} entries"
+        applied, problems = 0, []
+        for entry in attributions:
+            if not isinstance(entry, dict):
+                problems.append(f"not an object: {entry!r}")
+                continue
+            label = str(entry.get("proposed_by") or "").strip()
+            ids = entry.get("finding_ids") or []
+            if not label:
+                problems.append(f"missing proposed_by in {entry!r}")
+                continue
+            if not isinstance(ids, list):
+                problems.append(f"finding_ids must be a list in {entry!r}")
+                continue
+            for finding_id in ids:
+                outcome = self.attribute_finding(repo, finding_id, label)
+                if outcome.startswith("Finding") and "was proposed by" in outcome:
+                    applied += 1
+                else:
+                    problems.append(outcome)
+        summary = f"Recorded {applied} attribution pair(s)"
+        if problems:
+            summary += ". Problems: " + "; ".join(problems)
+        return summary
 
     def store_contest_verdict(self, repo, finding_id, role, model, position, rationale):
         role = _require(role, CONTEST_ROLES, "role")
@@ -407,9 +472,13 @@ def store_finding(
         description="Evidence locations as 'path:line' strings", default_factory=list
     ),
     hypothesis: str = Field(description="Why this may be exploitable", default=""),
-    proposed_by: str = Field(description="Label of the model proposing the finding", default=""),
 ):
-    """Store a new candidate finding and return its id."""
+    """Store a new candidate finding and return its id.
+
+    The proposing model is not recorded here. A branch cannot reliably name the
+    model it is running as, so attribution is applied afterwards with
+    `attribute_findings`, from the branch records the runner keeps.
+    """
     repo = process_repo(owner, repo)
     finding_id = backend.store_finding(
         repo,
@@ -422,9 +491,30 @@ def store_finding(
         flow,
         locations,
         hypothesis,
-        proposed_by,
+        "",
     )
     return json.dumps({"finding_id": finding_id, "state": STATE_CANDIDATE})
+
+
+@mcp.tool()
+def attribute_findings(
+    owner: str = Field(description="The owner of the GitHub repository"),
+    repo: str = Field(description="The name of the GitHub repository"),
+    attributions: list[dict] = Field(
+        description=(
+            "One entry per hunt branch, as "
+            "{'proposed_by': <model label>, 'finding_ids': [<id>, ...]}"
+        )
+    ),
+):
+    """Record which model proposed which findings, for every branch at once.
+
+    Takes the whole attribution set in a single call so that crediting a run
+    cannot be left half done: a caller asked to make one call per pair tends to
+    make the first and stop, which silently drops the corroboration signal that
+    the contest stage reads.
+    """
+    return backend.attribute_findings(process_repo(owner, repo), attributions)
 
 
 @mcp.tool()

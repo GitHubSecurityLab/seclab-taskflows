@@ -68,6 +68,8 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
         Map the repository {{ globals.repo }}, which is mounted at /workspace.
 
         First work out what this software actually is. Read the README, the
@@ -151,6 +153,8 @@ taskflow:
       agents:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
         The component is in {{ result.repo }} in the directory
         {{ result.location }}, and its id is {{ result.component_id }}.
         Previous analysis recorded:

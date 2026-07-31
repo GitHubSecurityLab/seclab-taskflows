@@ -8,6 +8,7 @@ what guarantees a finding cannot claim more than its recorded evidence.
 """
 
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -230,6 +231,112 @@ class TestReproductionGate:
             ledger.store_reproduction_attempt(REPO, finding_id, "m", "", "maybe", "")
 
 
+class TestAttribution:
+    def test_attribution_records_the_proposing_model(self, ledger):
+        finding_id = _add_finding(ledger, proposed_by="")
+
+        ledger.attribute_finding(REPO, finding_id, "claude-sonnet-5")
+
+        assert ledger.get_finding(finding_id)["proposed_by"] == "claude-sonnet-5"
+
+    def test_attribution_unions_rather_than_overwrites(self, ledger):
+        finding_id = _add_finding(ledger, proposed_by="")
+
+        ledger.attribute_finding(REPO, finding_id, "claude-sonnet-5")
+        ledger.attribute_finding(REPO, finding_id, "gemini-3.6-flash")
+
+        assert ledger.get_finding(finding_id)["proposed_by"] == (
+            "claude-sonnet-5, gemini-3.6-flash"
+        )
+
+    def test_attribution_is_idempotent(self, ledger):
+        finding_id = _add_finding(ledger, proposed_by="")
+
+        ledger.attribute_finding(REPO, finding_id, "claude-sonnet-5")
+        ledger.attribute_finding(REPO, finding_id, "claude-sonnet-5")
+
+        assert ledger.get_finding(finding_id)["proposed_by"] == "claude-sonnet-5"
+
+    def test_attribution_rejects_an_empty_label(self, ledger):
+        finding_id = _add_finding(ledger, proposed_by="")
+
+        result = ledger.attribute_finding(REPO, finding_id, "  ")
+
+        assert "non-empty model label" in result
+        assert ledger.get_finding(finding_id)["proposed_by"] == ""
+
+    def test_attribution_refuses_to_cross_repositories(self, ledger):
+        foreign = _add_finding(ledger, repo="acme/other", proposed_by="")
+
+        result = ledger.attribute_finding(REPO, foreign, "claude-sonnet-5")
+
+        assert "refusing to attribute across repositories" in result
+        assert ledger.get_finding(foreign)["proposed_by"] == ""
+
+    def test_attribution_reports_an_unknown_finding(self, ledger):
+        assert "No finding with id 999" in ledger.attribute_finding(REPO, 999, "m")
+
+
+class TestBatchAttribution:
+    def test_a_whole_run_is_recorded_in_one_call(self, ledger):
+        a = _add_finding(ledger, proposed_by="")
+        b = _add_finding(ledger, proposed_by="")
+        c = _add_finding(ledger, proposed_by="")
+
+        result = ledger.attribute_findings(
+            REPO,
+            [
+                {"proposed_by": "hunt_gpt", "finding_ids": [a, b]},
+                {"proposed_by": "hunt_claude", "finding_ids": [b, c]},
+            ],
+        )
+
+        assert "Recorded 4 attribution pair(s)" in result
+        assert ledger.get_finding(a)["proposed_by"] == "hunt_gpt"
+        assert ledger.get_finding(b)["proposed_by"] == "hunt_gpt, hunt_claude"
+        assert ledger.get_finding(c)["proposed_by"] == "hunt_claude"
+
+    def test_a_branch_that_filed_nothing_is_harmless(self, ledger):
+        finding_id = _add_finding(ledger, proposed_by="")
+
+        result = ledger.attribute_findings(
+            REPO,
+            [
+                {"proposed_by": "hunt_gpt", "finding_ids": [finding_id]},
+                {"proposed_by": "hunt_gemini", "finding_ids": []},
+            ],
+        )
+
+        assert "Recorded 1 attribution pair(s)" in result
+        assert "Problems" not in result
+
+    def test_one_bad_id_does_not_discard_the_rest(self, ledger):
+        finding_id = _add_finding(ledger, proposed_by="")
+
+        result = ledger.attribute_findings(
+            REPO,
+            [{"proposed_by": "hunt_gpt", "finding_ids": [finding_id, 999]}],
+        )
+
+        assert "Recorded 1 attribution pair(s)" in result
+        assert "No finding with id 999" in result
+        assert ledger.get_finding(finding_id)["proposed_by"] == "hunt_gpt"
+
+    def test_an_entry_without_a_label_is_reported(self, ledger):
+        finding_id = _add_finding(ledger, proposed_by="")
+
+        result = ledger.attribute_findings(
+            REPO, [{"proposed_by": "  ", "finding_ids": [finding_id]}]
+        )
+
+        assert "Recorded 0 attribution pair(s)" in result
+        assert "missing proposed_by" in result
+        assert ledger.get_finding(finding_id)["proposed_by"] == ""
+
+    def test_a_non_list_payload_is_rejected(self, ledger):
+        assert "must be a list" in ledger.attribute_findings(REPO, {"a": 1})
+
+
 class TestDeduplication:
     def test_merge_folds_duplicate_and_keeps_canonical(self, ledger):
         canonical = _add_finding(ledger, proposed_by="hunt_gpt")
@@ -366,6 +473,22 @@ class TestDurability:
 
         assert reopened.get_finding(finding_id)["title"] == "Path traversal in file download"
 
+    def test_concurrent_backends_over_one_dir_all_start(self, tmp_path):
+        """Every branch of a fanned-out task opens the ledger at the same time.
+
+        `create_all` checks for a table and then creates it, so two backends
+        racing on an empty database both decide to create and the loser used to
+        die with "table finding already exists". That killed its MCP server, so
+        the branch ran on with no ledger and filed nothing.
+        """
+        state_dir = str(tmp_path / "ledger")
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            backends = list(pool.map(lambda _: FindingLedgerBackend(state_dir), range(8)))
+
+        finding_id = _add_finding(backends[0])
+        assert all(b.get_finding(finding_id) is not None for b in backends)
+
 
 class TestServerWiring:
     def test_toolbox_yaml_valid(self):
@@ -378,6 +501,7 @@ class TestServerWiring:
         names = {tool.name for tool in await mcp.list_tools()}
         assert names == {
             "store_finding",
+            "attribute_findings",
             "get_findings",
             "get_finding",
             "find_similar_findings",

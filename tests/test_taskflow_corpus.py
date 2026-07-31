@@ -71,6 +71,15 @@ _OUTPUTS = {
     "confirmed": [_FINDING],
     "findings": [_FINDING],
     "draft": "# draft report",
+    # A multi-model task aggregates one record per branch, shaped
+    # {model, item, result}. Attribution reads the model label from here rather
+    # than trusting a hunter to name itself, so the shape is load-bearing.
+    "filings": [
+        {"model": "hunt_claude", "item": 0, "result": {"component": "src/api", "filed": [1]}},
+        {"model": "hunt_gemini", "item": 0, "result": {"component": "src/api", "filed": []}},
+        # A branch that failed contributes a record with no result at all.
+        {"model": "hunt_gpt", "item": 0, "result": None},
+    ],
 }
 
 # Pre-existing corpus debt, unrelated to audit_v2: these prompts embed literal

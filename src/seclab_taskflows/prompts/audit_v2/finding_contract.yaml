@@ -49,9 +49,9 @@ prompt: |
 
   Call `store_finding` once per distinct path. Two paths are distinct if they
   have different sources or different sinks; the same source reaching the same
-  sink by a slightly different route is one finding. Set `proposed_by` to the
-  label you were given for this hunt, so the ledger records which model
-  proposed it.
+  sink by a slightly different route is one finding. Keep the ids it returns:
+  you are asked for them at the end, and they are how your findings get
+  credited to you.
 
   Findings enter the ledger as `candidate`. That is all they are at this point:
   you are proposing a hypothesis for adversarial review, not declaring a

@@ -35,8 +35,12 @@ server_prompt: |
   - `store_reproduction_attempt` with outcome `reproduced` only promotes a
     finding that is already `confirmed`.
   - `merge_duplicate_finding` folds one candidate into another and carries its
-    `proposed_by` label across, so the surviving finding records every model
+    `proposed_by` labels across, so the surviving finding records every model
     that independently proposed it.
+  - `attribute_findings` records which models proposed which findings. It is
+    called once after hunting, from the runner's own record of which model ran
+    which branch; a hunter cannot reliably name the model it is running as, so
+    it is never asked to.
 
   This means a finding can never claim more certainty than its recorded
   evidence supports. Do not describe a finding as confirmed or reproduced in

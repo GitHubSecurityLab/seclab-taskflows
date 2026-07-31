@@ -16,53 +16,101 @@
 # Swap any entry for a different model if your entitlements differ; nothing in
 # the taskflows depends on a specific provider.
 #
-# One caveat when swapping: CAPI serves most models from exactly one endpoint,
-# and asking for the wrong one fails the whole stage with "model X is not
-# accessible via the /chat/completions endpoint". At the time of writing the
-# gemini and claude models are chat completions only, while gpt-5.5, gpt-5.6
-# and grok are responses only, which is why the entries below set `api_type`
-# where they do. Check a new model on both endpoints before relying on it.
+# Two things to check when swapping.
+#
+# Backend. Each family is driven through its own SDK: Claude over the native
+# Anthropic Messages API (`anthropic_sdk`), everything else over the OpenAI
+# surface (`openai_agents`). All of it still goes to CAPI; the backend only
+# decides which wire protocol is spoken. `backend` is set explicitly on every
+# slot rather than left to the default, so a slot's provider and its SDK
+# cannot drift apart unnoticed.
+#
+# Endpoint. CAPI serves most models from exactly one endpoint, and asking for
+# the wrong one fails the whole stage with "model X is not accessible via the
+# /chat/completions endpoint". Probed at the time of writing: gemini-3.6-flash
+# is chat completions only; gpt-5.6-sol is responses only; gpt-5.4 and
+# gpt-5-mini serve both; the Claude models answer on the native
+# `/v1/messages` surface, which is `api_type: messages`. `responses` is the
+# newer API and is preferred wherever a model offers it. Check a new model on
+# both endpoints before relying on it.
+#
+# Reasoning effort is set on every slot that supports it, including the
+# Anthropic ones, where the backend turns it into adaptive thinking.
 
 seclab-taskflow-agent:
   version: "1.0"
   filetype: model_config
 models:
-  # Cheap, high-volume bookkeeping: fetching, clearing, summarising ledger state.
-  general_tasks: gpt-5-mini
-  # Attack-surface mapping and component inventory.
-  survey: gpt-5.4
-  # Three independent hunters, one per model family.
+  # Cheap, high-volume bookkeeping: fetching, clearing, summarising ledger
+  # state and applying attribution. Not a reasoning slot, but it drives tool
+  # calls in a loop, so it is not the smallest model either.
+  general_tasks: gpt-5.4
+  # Attack-surface mapping and component inventory. Everything downstream hunts
+  # only what this stage found, so it is not a place to economise.
+  survey: gpt-5.6-sol
+  # Three independent hunters, one per family, each the strongest code-analysis
+  # model that family currently serves.
+  #
+  # xAI is deliberately absent everywhere in this file. CAPI rejects grok-4.5
+  # for security analysis at the platform level, not the model level: any
+  # request whose content is vulnerability analysis comes back
+  # `403 permission-denied ... Failed check: SAFETY_CHECK_TYPE_CYBER`, down to
+  # a five-line snippet. It is unusable for every role in this pipeline.
   hunt_gpt: gpt-5.6-sol
-  hunt_claude: claude-sonnet-5
+  hunt_claude: claude-opus-5
   hunt_gemini: gemini-3.6-flash
-  # Adversarial contest. Advocates are strong; the judge is from a third family.
+  # Adversarial contest. Advocates are strong; the judge is from the one family
+  # that writes neither argument, so it is never grading a sibling's case.
   prosecution: gpt-5.6-sol
-  defense: claude-sonnet-5
-  adjudication: grok-4.5
-  # Dynamic reproduction is long-horizon tool use inside a container.
-  reproduction: claude-sonnet-5
+  defense: claude-opus-5
+  adjudication: gemini-3.6-flash
+  # Dynamic reproduction is long-horizon tool use inside a container: the stage
+  # has to actually drive the target to a crash or a proof, not describe one.
+  reproduction: claude-opus-5
   # Final write-up.
-  reporting: gpt-5.5
+  reporting: gpt-5.6-sol
 model_settings:
   general_tasks:
+    backend: openai_agents
     api_type: responses
   survey:
+    backend: openai_agents
     api_type: responses
     reasoning:
       effort: medium
   hunt_gpt:
+    backend: openai_agents
     api_type: responses
     reasoning:
       effort: high
+  hunt_claude:
+    backend: anthropic_sdk
+    api_type: messages
+    reasoning:
+      effort: high
+  hunt_gemini:
+    backend: openai_agents
+    api_type: chat_completions
   prosecution:
+    backend: openai_agents
     api_type: responses
+    reasoning:
+      effort: high
+  defense:
+    backend: anthropic_sdk
+    api_type: messages
     reasoning:
       effort: high
   adjudication:
-    api_type: responses
+    backend: openai_agents
+    api_type: chat_completions
+  reproduction:
+    backend: anthropic_sdk
+    api_type: messages
     reasoning:
       effort: high
   reporting:
+    backend: openai_agents
     api_type: responses
     reasoning:
       effort: medium
