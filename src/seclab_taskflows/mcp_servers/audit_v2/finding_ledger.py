@@ -128,6 +128,21 @@ def _require(value: str, allowed, name: str) -> str:
     return normalized
 
 
+def _repo_mismatch(finding, repo, action: str):
+    """Message refusing a cross-repo write, or None when the finding matches.
+
+    Finding ids are global within the SQLite file, so every write that names a
+    repo has to check the finding it targets actually belongs to that repo;
+    otherwise one repo's stage could attach evidence to another's finding.
+    """
+    if finding.repo != repo:
+        return (
+            f"Finding {finding.id} belongs to {finding.repo!r}, not {repo!r}; "
+            f"refusing to {action} across repositories"
+        )
+    return None
+
+
 class FindingLedgerBackend:
     """Durable store for the audit v2 finding lifecycle.
 
@@ -200,11 +215,9 @@ class FindingLedgerBackend:
             finding = session.get(Finding, finding_id)
             if finding is None:
                 return f"No finding with id {finding_id}"
-            if finding.repo != repo:
-                return (
-                    f"Finding {finding_id} belongs to {finding.repo!r}, not {repo!r}; "
-                    f"refusing to attribute across repositories"
-                )
+            mismatch = _repo_mismatch(finding, repo, "attribute")
+            if mismatch:
+                return mismatch
             label = (proposed_by or "").strip()
             if not label:
                 return "proposed_by must be a non-empty model label"
@@ -256,6 +269,9 @@ class FindingLedgerBackend:
             finding = session.get(Finding, finding_id)
             if finding is None:
                 return f"No finding with id {finding_id}"
+            mismatch = _repo_mismatch(finding, repo, "record a verdict")
+            if mismatch:
+                return mismatch
             session.add(
                 ContestVerdict(
                     finding_id=finding_id,
@@ -283,6 +299,9 @@ class FindingLedgerBackend:
             finding = session.get(Finding, finding_id)
             if finding is None:
                 return f"No finding with id {finding_id}"
+            mismatch = _repo_mismatch(finding, repo, "adjudicate")
+            if mismatch:
+                return mismatch
             if finding.state == STATE_REPRODUCED:
                 return f"Finding {finding_id} is already reproduced; adjudication ignored"
             filed = {
@@ -368,6 +387,9 @@ class FindingLedgerBackend:
             finding = session.get(Finding, finding_id)
             if finding is None:
                 return f"No finding with id {finding_id}"
+            mismatch = _repo_mismatch(finding, repo, "record a reproduction attempt")
+            if mismatch:
+                return mismatch
             session.add(
                 ReproductionAttempt(
                     finding_id=finding_id,

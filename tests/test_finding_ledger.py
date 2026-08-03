@@ -181,6 +181,14 @@ class TestContestVerdicts:
         with pytest.raises(InvalidLedgerValueError):
             ledger.store_contest_verdict(REPO, finding_id, "jury", "m", "exploitable", "")
 
+    def test_verdict_refuses_to_cross_repositories(self, ledger):
+        foreign = _add_finding(ledger, repo="acme/other")
+        result = ledger.store_contest_verdict(
+            REPO, foreign, "prosecution", "m", "exploitable", "reachable"
+        )
+        assert "refusing to record a verdict across repositories" in result
+        assert ledger.get_finding(foreign)["verdicts"] == []
+
 
 class TestReproductionGate:
     def test_reproduction_promotes_only_from_confirmed(self, ledger):
@@ -229,6 +237,20 @@ class TestReproductionGate:
         finding_id = _add_finding(ledger)
         with pytest.raises(InvalidLedgerValueError):
             ledger.store_reproduction_attempt(REPO, finding_id, "m", "", "maybe", "")
+
+    def test_reproduction_refuses_to_cross_repositories(self, ledger):
+        foreign = _add_finding(ledger, repo="acme/other")
+        result = ledger.store_reproduction_attempt(
+            REPO, foreign, "reproducer", "curl ...", "reproduced", "marker reached"
+        )
+        assert "refusing to record a reproduction attempt across repositories" in result
+        assert ledger.get_finding(foreign)["reproduction_attempts"] == []
+
+    def test_adjudication_refuses_to_cross_repositories(self, ledger):
+        foreign = _add_finding(ledger, repo="acme/other")
+        result = ledger.adjudicate_finding(REPO, foreign, "exploitable", "high", "reachable")
+        assert "refusing to adjudicate across repositories" in result
+        assert ledger.get_finding(foreign)["state"] == STATE_CANDIDATE
 
 
 class TestAttribution:

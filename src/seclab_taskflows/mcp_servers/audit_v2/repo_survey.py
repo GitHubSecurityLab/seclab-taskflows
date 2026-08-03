@@ -128,8 +128,17 @@ class RepoSurveyBackend:
         trust_boundary = _require(trust_boundary, TRUST_BOUNDARIES, "trust_boundary")
         line = int(line or 0)
         with Session(self.engine) as session:
-            if session.get(Component, component_id) is None:
+            component = session.get(Component, component_id)
+            if component is None:
                 return f"No component with id {component_id}"
+            # Component ids are global within the SQLite file, so an entry point
+            # naming a repo must belong to a component in that same repo;
+            # otherwise one repo's survey could attach to another's component.
+            if component.repo != repo:
+                return (
+                    f"Component {component_id} belongs to {component.repo!r}, not "
+                    f"{repo!r}; refusing to attach an entry point across repositories"
+                )
             # An entry point is a place in the code, so the same file, line and
             # boundary is the same entry point no matter which pass found it.
             # Several passes do find it: the mapping task and every fan-out

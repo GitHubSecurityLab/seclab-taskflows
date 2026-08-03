@@ -42,7 +42,7 @@ The important design decision is that a finding's state is derived by the
             [rejected]   [confirmed]
                               |
                   store_reproduction_attempt
-                     (outcome: reachable)
+                     (outcome: reproduced)
                               |
                               v
                         [reproduced]
@@ -98,7 +98,7 @@ Defined in `configs/model_config_audit_v2.yaml`.
 | `prosecution` | gpt-5.6-sol | |
 | `defense` | claude-opus-5 | |
 | `adjudication` | gemini-3.6-flash | Deliberately not a sibling of either advocate |
-| `reproduction` | claude-opus-5 | Long agentic tool-use loops in a container |
+| `reproduction` | claude-opus-4.8 | Long agentic tool-use loops in a container |
 | `reporting` | gpt-5.6-sol | |
 
 The adjudicator's family is the point. A model grading an argument written by a

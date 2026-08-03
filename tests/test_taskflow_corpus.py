@@ -203,7 +203,7 @@ def test_audit_v2_over_expressions_resolve(dotted: str) -> None:
         value = evaluate_expression(
             task.over, tools, globals_dict={}, inputs_dict={}, outputs_dict=_OUTPUTS
         )
-        assert isinstance(list(value), list), f"{where}: `over` did not yield a list"
+        assert isinstance(value, list), f"{where}: `over` did not yield a list"
 
 
 def test_audit_v2_over_targets_are_produced_by_an_earlier_task() -> None:

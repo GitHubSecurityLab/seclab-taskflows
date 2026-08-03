@@ -155,6 +155,15 @@ class TestEntryPoints:
         assert "999" in result
         assert survey.get_entry_points(REPO) == []
 
+    def test_refuses_to_attach_to_a_component_in_another_repo(self, survey):
+        foreign = _component(survey, repo=OTHER_REPO)
+        result = survey.store_entry_point(
+            REPO, foreign, "src/parser/frame.c", 1, "network", "", "", ""
+        )
+        assert isinstance(result, str)
+        assert "refusing to attach an entry point across repositories" in result
+        assert survey.get_entry_points(REPO) == []
+
     def test_unknown_trust_boundary_is_rejected(self, survey):
         component_id = _component(survey)
         with pytest.raises(InvalidSurveyValueError) as exc:
