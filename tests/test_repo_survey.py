@@ -28,7 +28,11 @@ OTHER_REPO = "acme/gadget"
 
 @pytest.fixture
 def survey(tmp_path):
-    return RepoSurveyBackend(str(tmp_path / "state"))
+    backend = RepoSurveyBackend(str(tmp_path / "state"))
+    try:
+        yield backend
+    finally:
+        backend.dispose()
 
 
 def _component(survey, repo=REPO, location="src/parser", kind="parser"):

@@ -91,7 +91,12 @@ _KNOWN_LINT_ERRORS = {
 
 
 def _dotted(path: str) -> str:
-    return path.removeprefix("src/")[: -len(".yaml")].replace("/", ".")
+    # glob yields OS-native separators, so normalise backslashes to forward
+    # slashes before deriving the dotted module path; otherwise every dotted
+    # path on Windows keeps backslashes, which silently drops audit_v2 out of
+    # `.audit_v2.` membership checks and breaks the known-lint-error xfail set.
+    normalized = path.replace("\\", "/")
+    return normalized.removeprefix("src/")[: -len(".yaml")].replace("/", ".")
 
 
 def _grammar_files() -> list[str]:
@@ -303,10 +308,13 @@ def test_finding_outputs_match_what_the_ledger_returns() -> None:
     """Same guard for the finding schemas the contest and reproduce stages read."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         ledger = FindingLedgerBackend(tmp_dir)
-        finding_id = ledger.store_finding(
-            "acme/widget", "src/api", "t", "CWE-22", "python", "s", "k", "f", [], "h", "m"
-        )
-        actual = set(ledger.get_finding(finding_id))
+        try:
+            finding_id = ledger.store_finding(
+                "acme/widget", "src/api", "t", "CWE-22", "python", "s", "k", "f", [], "h", "m"
+            )
+            actual = set(ledger.get_finding(finding_id))
+        finally:
+            ledger.dispose()
 
     tools = AvailableTools()
     for dotted, task_id in (

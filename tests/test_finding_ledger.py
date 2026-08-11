@@ -34,7 +34,11 @@ REPO = "acme/widget"
 @pytest.fixture
 def ledger():
     with tempfile.TemporaryDirectory() as tmp_dir:
-        yield FindingLedgerBackend(tmp_dir)
+        backend = FindingLedgerBackend(tmp_dir)
+        try:
+            yield backend
+        finally:
+            backend.dispose()
 
 
 def _add_finding(

@@ -166,6 +166,15 @@ class FindingLedgerBackend:
             ],
         )
 
+    def dispose(self):
+        """Release the SQLite file handle held by the engine.
+
+        A long-lived server never needs this, but a test that opens a ledger in
+        a temporary directory has to let go of the file before the directory can
+        be removed, which on Windows fails while any handle is still open.
+        """
+        self.engine.dispose()
+
     # -- writes ------------------------------------------------------------
 
     @normalizes_repo
