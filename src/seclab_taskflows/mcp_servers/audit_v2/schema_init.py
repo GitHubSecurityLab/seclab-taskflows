@@ -59,6 +59,13 @@ def open_state_engine(state_dir, db_filename, base, tables):
     """
     directory = Path(state_dir)
     directory.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(f"sqlite:///{directory / db_filename}", echo=False)
+    # A fanned-out stage opens one server per branch and the pool can hand a
+    # connection to a different thread than the one that opened it, so the
+    # default same-thread check would raise. SQLite serialises access itself.
+    engine = create_engine(
+        f"sqlite:///{directory / db_filename}",
+        echo=False,
+        connect_args={"check_same_thread": False},
+    )
     create_all_tolerating_races(base, engine, tables)
     return engine
