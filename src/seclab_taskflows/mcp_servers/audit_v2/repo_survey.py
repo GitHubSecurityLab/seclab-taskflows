@@ -19,7 +19,7 @@ from pydantic import Field
 from seclab_taskflow_agent.path_utils import log_file_name, mcp_data_dir
 from sqlalchemy.orm import Session
 
-from ..utils import process_repo
+from ..utils import normalizes_repo, process_repo
 from .schema_init import open_state_engine
 from .repo_survey_models import (
     COMPONENT_KINDS,
@@ -73,6 +73,7 @@ class RepoSurveyBackend:
 
     # -- writes ------------------------------------------------------------
 
+    @normalizes_repo
     def store_component(
         self, repo, location, kind, language, runtime, is_app, is_library, notes
     ):
@@ -122,6 +123,7 @@ class RepoSurveyBackend:
         if notes and notes not in (existing.notes or ""):
             existing.notes = f"{existing.notes}\n\n{notes}".strip()
 
+    @normalizes_repo
     def store_entry_point(
         self, repo, component_id, file, line, trust_boundary, untrusted_input, variables, notes
     ):
@@ -183,6 +185,7 @@ class RepoSurveyBackend:
 
     # -- reads -------------------------------------------------------------
 
+    @normalizes_repo
     def get_components(self, repo):
         with Session(self.engine) as session:
             rows = session.query(Component).filter(Component.repo == repo).all()
@@ -202,6 +205,7 @@ class RepoSurveyBackend:
             data["entry_points"] = [entry_point_to_dict(e) for e in rows]
             return data
 
+    @normalizes_repo
     def get_entry_points(self, repo, component_id=None):
         with Session(self.engine) as session:
             query = session.query(EntryPoint).filter(EntryPoint.repo == repo)
@@ -209,6 +213,7 @@ class RepoSurveyBackend:
                 query = query.filter(EntryPoint.component_id == component_id)
             return [entry_point_to_dict(e) for e in query.all()]
 
+    @normalizes_repo
     def get_survey_summary(self, repo):
         with Session(self.engine) as session:
             components = session.query(Component).filter(Component.repo == repo).all()
@@ -223,6 +228,7 @@ class RepoSurveyBackend:
                 "by_trust_boundary": by_boundary,
             }
 
+    @normalizes_repo
     def clear_survey(self, repo):
         with Session(self.engine) as session:
             components = session.query(Component).filter(Component.repo == repo).delete()

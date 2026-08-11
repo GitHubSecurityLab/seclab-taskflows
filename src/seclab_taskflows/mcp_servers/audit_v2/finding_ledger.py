@@ -44,7 +44,7 @@ from .finding_ledger_models import (
     Finding,
     ReproductionAttempt,
 )
-from ..utils import process_repo
+from ..utils import normalizes_repo, process_repo
 from .schema_init import open_state_engine
 
 logging.basicConfig(
@@ -168,6 +168,7 @@ class FindingLedgerBackend:
 
     # -- writes ------------------------------------------------------------
 
+    @normalizes_repo
     def store_finding(
         self,
         repo,
@@ -201,6 +202,7 @@ class FindingLedgerBackend:
             session.commit()
             return finding.id
 
+    @normalizes_repo
     def attribute_finding(self, repo, finding_id, proposed_by):
         """Union a model label onto a finding's ``proposed_by``.
 
@@ -226,6 +228,7 @@ class FindingLedgerBackend:
             session.commit()
         return f"Finding {finding_id} was proposed by: {labels}"
 
+    @normalizes_repo
     def attribute_findings(self, repo, attributions):
         """Apply a whole run's worth of attribution in one call.
 
@@ -262,6 +265,7 @@ class FindingLedgerBackend:
             summary += ". Problems: " + "; ".join(problems)
         return summary
 
+    @normalizes_repo
     def store_contest_verdict(self, repo, finding_id, role, model, position, rationale):
         role = _require(role, CONTEST_ROLES, "role")
         position = _require(position, CONTEST_POSITIONS, "position")
@@ -285,6 +289,7 @@ class FindingLedgerBackend:
             session.commit()
         return f"Recorded {role} verdict ({position}) for finding {finding_id}"
 
+    @normalizes_repo
     def adjudicate_finding(self, repo, finding_id, position, severity, rationale):
         """Resolve a contested finding. This is the only path to ``confirmed``.
 
@@ -338,6 +343,7 @@ class FindingLedgerBackend:
             session.commit()
             return f"Finding {finding_id} adjudicated {position}; state is now {finding.state}"
 
+    @normalizes_repo
     def merge_duplicate_finding(self, repo, duplicate_id, canonical_id):
         """Fold one candidate into another, carrying its provenance across.
 
@@ -380,6 +386,7 @@ class FindingLedgerBackend:
             f"{canonical_id} was proposed by: {labels}"
         )
 
+    @normalizes_repo
     def store_reproduction_attempt(self, repo, finding_id, model, harness, outcome, observed):
         """Record a dynamic reachability attempt; only an observed reachable flow promotes state."""
         outcome = _require(outcome, REPRODUCTION_OUTCOMES, "outcome")
@@ -414,6 +421,7 @@ class FindingLedgerBackend:
                 )
             return f"Recorded {outcome} reproduction attempt for finding {finding_id}"
 
+    @normalizes_repo
     def clear_findings_for_repo(self, repo):
         with Session(self.engine) as session:
             ids = [f.id for f in session.query(Finding).filter_by(repo=repo).all()]
@@ -430,6 +438,7 @@ class FindingLedgerBackend:
 
     # -- reads -------------------------------------------------------------
 
+    @normalizes_repo
     def get_findings(self, repo, state=None):
         with Session(self.engine) as session:
             query = session.query(Finding).filter_by(repo=repo)
@@ -453,6 +462,7 @@ class FindingLedgerBackend:
             ]
             return data
 
+    @normalizes_repo
     def find_similar_findings(self, repo, component, vuln_class):
         with Session(self.engine) as session:
             query = session.query(Finding).filter_by(repo=repo)
@@ -462,6 +472,7 @@ class FindingLedgerBackend:
                 query = query.filter_by(vuln_class=vuln_class)
             return [finding_to_dict(f) for f in query.all()]
 
+    @normalizes_repo
     def get_ledger_summary(self, repo):
         with Session(self.engine) as session:
             findings = session.query(Finding).filter_by(repo=repo).all()

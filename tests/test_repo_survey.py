@@ -314,3 +314,18 @@ def test_the_toolbox_points_at_this_server() -> None:
     """A renamed module would otherwise only surface as a dead server at run time."""
     toolbox = AvailableTools().get_toolbox("seclab_taskflows.toolboxes.audit_v2_repo_survey")
     assert "seclab_taskflows.mcp_servers.audit_v2.repo_survey" in toolbox.server_params.args
+
+
+class TestRepoNormalization:
+    def test_component_repo_is_normalized_across_writes_and_reads(self, survey):
+        component_id = _component(survey, repo="Acme/Widget")
+        assert len(survey.get_components("acme/widget")) == 1
+        assert survey.get_components(" ACME/WIDGET ")[0]["component_id"] == component_id
+
+    def test_entry_point_guard_treats_repo_casing_as_the_same_repo(self, survey):
+        component_id = _component(survey, repo="acme/widget")
+        result = survey.store_entry_point(
+            "ACME/Widget", component_id, "src/f.c", 1, "network", "", "", ""
+        )
+        assert isinstance(result, int)
+        assert len(survey.get_entry_points("acme/widget")) == 1

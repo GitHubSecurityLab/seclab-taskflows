@@ -255,6 +255,50 @@ def test_component_outputs_match_what_the_survey_returns() -> None:
         )
 
 
+def test_report_stage_handles_an_empty_ledger() -> None:
+    """The report stage must still say something when the ledger is empty.
+
+    The draft and verification tasks are guarded on there being findings, so
+    without an explicit empty branch a maintainer running `report` on a repo
+    with nothing recorded gets the raw empty finding list back instead of a
+    report. Assert one task runs precisely when there are no findings, and
+    another (the draft) runs precisely when there are.
+    """
+    tools = AvailableTools()
+    taskflow = tools.get_taskflow("seclab_taskflows.taskflows.audit_v2.report")
+
+    def guard_holds(expr: str, findings: list) -> bool:
+        # `draft` is captured by the draft task, so on an empty ledger, where
+        # that task is skipped, it is simply absent. Modelling that is what
+        # keeps this test honest: with `draft` always present the verification
+        # task would look like an empty-ledger branch when it is not.
+        outputs = {k: v for k, v in _OUTPUTS.items() if k != "draft"}
+        outputs["findings"] = findings
+        if findings:
+            outputs["draft"] = _OUTPUTS["draft"]
+        return bool(
+            evaluate_expression(
+                expr, tools, globals_dict={}, inputs_dict={}, outputs_dict=outputs
+            )
+        )
+
+    empty_branches, populated_branches = [], []
+    for step in taskflow.taskflow:
+        task = step.task
+        if task.id == "findings" or not task.if_:
+            continue
+        if guard_holds(task.if_, []):
+            empty_branches.append(task.name)
+        if guard_holds(task.if_, [_FINDING]):
+            populated_branches.append(task.name)
+
+    assert empty_branches, (
+        "report stage has no task that runs when the ledger is empty; a "
+        "maintainer would get the raw empty finding list instead of a report"
+    )
+    assert populated_branches, "report stage has no task that runs when findings exist"
+
+
 def test_finding_outputs_match_what_the_ledger_returns() -> None:
     """Same guard for the finding schemas the contest and reproduce stages read."""
     with tempfile.TemporaryDirectory() as tmp_dir:

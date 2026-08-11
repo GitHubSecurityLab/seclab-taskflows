@@ -534,3 +534,17 @@ class TestServerWiring:
             "get_ledger_summary",
             "clear_findings_for_repo",
         }
+
+
+class TestRepoNormalization:
+    def test_repo_is_normalized_across_writes_and_reads(self, ledger):
+        finding_id = _add_finding(ledger, repo="Acme/Widget")
+        assert len(ledger.get_findings("acme/widget")) == 1
+        assert len(ledger.get_findings("  ACME/WIDGET ")) == 1
+        assert ledger.get_finding(finding_id)["repo"] == "acme/widget"
+
+    def test_guard_matches_the_same_repo_in_a_different_casing(self, ledger):
+        finding_id = _contested_finding(ledger, repo="acme/widget")
+        result = ledger.adjudicate_finding("ACME/Widget", finding_id, "exploitable", "high", "x")
+        assert "adjudicated" in result
+        assert ledger.get_finding(finding_id)["state"] == STATE_CONFIRMED

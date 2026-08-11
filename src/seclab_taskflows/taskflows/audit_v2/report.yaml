@@ -48,6 +48,31 @@ taskflow:
         - seclab_taskflows.toolboxes.audit_v2_finding_ledger
 
   - task:
+      if: "outputs.findings | length == 0"
+      must_complete: false
+      capture: response
+      model: general_tasks
+      max_steps: 1
+      name: nothing to report
+      description: Explain that the ledger holds no findings for this repo.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Output the following message verbatim and make no tool calls:
+
+        No findings are recorded in the ledger for {{ globals.repo }}, so there
+        is nothing to report yet.
+
+        This happens when the earlier stages have not been run for this
+        repository, or when they ran and recorded nothing worth promoting. Run
+        the survey, hunt and contest stages before reporting, then run this
+        stage again:
+
+          ./scripts/audit_v2/run_audit_v2.sh {{ globals.repo }}
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
       id: draft
       if: "outputs.findings | length > 0"
       must_complete: false
