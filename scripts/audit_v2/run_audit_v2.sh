@@ -73,6 +73,16 @@ if [ -z "$REPO" ]; then
     exit 1
 fi
 
+# Catch a mistyped target here rather than several minutes into a stage. The
+# repo is threaded through to every tool as a single owner/repo string, so it
+# has to be exactly that: one slash, and neither half empty or containing
+# whitespace.
+if [[ ! "$REPO" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
+    echo "Expected a target of the form <owner/repo>, got: ${REPO}" >&2
+    echo "For example: ${BASH_SOURCE[0]} octocat/hello-world" >&2
+    exit 1
+fi
+
 if [ -n "$FROM_STAGE" ] && [ ${#STAGES[@]} -gt 0 ]; then
     echo "Use either --from or -s, not both." >&2
     exit 1
