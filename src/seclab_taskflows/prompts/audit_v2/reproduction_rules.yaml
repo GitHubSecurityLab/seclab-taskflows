@@ -1,0 +1,86 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: prompt
+
+prompt: |
+  ## What counts as a validated reproduction
+
+  A validated reproduction is reachability you watched happen. You built or
+  started the target inside the reproduction container, you drove the
+  attacker-controlled entry point with a benign, distinctive marker value, and
+  you read evidence in the container's output that the marker reached the sink
+  the finding names.
+
+  You are proving reachability, not impact. The danger of the sink is already
+  established by the finding and the adjudicator. Your job is the one thing only
+  a running system can answer: does attacker-controlled input actually get
+  there? The least forceful observation that settles that question is the right
+  one.
+
+  These are validated reproductions:
+
+  - the marker value reflected back in a response, error, log line or emitted
+    query, showing it flowed from the entry point through to the sink
+  - lightweight instrumentation at or near the sink (a log, a print, a
+    breakpoint, a trace) that fires with your marker as its argument
+  - the target's own behaviour naming your marker in a way that is only
+    possible if it reached the sink — a resolver error for your marker host, a
+    "no such file" for your marker path, a parser error quoting your marker
+    string
+  - a crash, assertion, or sanitizer report directly attributable to a benign
+    malformed marker (when the finding is a memory-safety bug and reaching the
+    sink is inseparable from tripping it)
+
+  You do **not** need, and should not produce, a weaponised exploit to reach
+  this bar. Executing injected commands, reading data you should not, writing
+  files outside a scratch area, or crashing a process on purpose are not
+  required — a benign marker observed at the sink is sufficient and preferred.
+
+  These are **not** validated reproductions, no matter how convincing they look:
+
+  - a proof of concept you wrote but did not run
+  - a description of what the code "would" do
+  - a request you sent that you did not verify actually reached the sink
+  - output you reconstructed rather than copied from the container
+
+  ## Recording the outcome
+
+  Record exactly one outcome:
+
+  - `reproduced`     — you drove the entry point and observed your marker reach
+                       the sink at runtime. Put the exact commands in `harness`
+                       and the actual observed output in `observed`. Only this
+                       outcome promotes a confirmed finding.
+  - `not_reproduced` — you got the target running, drove the path, and the
+                       marker did not reach the sink; the flow the finding
+                       claims does not appear to be live. Say what happened
+                       instead; that is a real result and it is valuable.
+  - `inconclusive`   — you could not get far enough to find out. Say exactly
+                       where you stopped: the build failed, a dependency was
+                       unavailable, the service would not start, the entry
+                       point needs credentials you do not have.
+
+  `inconclusive` is not a failure and it is not a polite `reproduced`. A
+  finding that stays confirmed-but-unvalidated is an honest result. A finding
+  marked reproduced on evidence you did not see is a lie in the report.
+
+  ## Working method
+
+  1. Read the finding first: its source, sink, flow, and the adjudicator's
+     reasoning. You are validating that specific path.
+  2. Get the target running before you probe it. Note in `harness` what you had
+     to do; the next person needs it.
+  3. Establish a control. Show an ordinary input behaving normally, then show
+     the marker input reaching the sink. A result with no control is not
+     evidence of anything.
+  4. Keep the marker benign and distinctive. Use a value that is unmistakably
+     yours (a nonce string, a marker hostname, a marker path) and that does no
+     damage when it lands. Reach the sink; do not exploit it.
+  5. If you cannot reach the sink through the intended entry point, do not
+     reach it by calling the vulnerable function directly and calling that a
+     reproduction. That proves the sink is dangerous, which was never in
+     dispute. Record it as `inconclusive` and say the entry point was not
+     reachable.

@@ -1,0 +1,125 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config_audit_v2
+
+globals:
+  repo:
+
+# Stage 4 of the audit v2 pipeline: stop reasoning about the code and run it.
+#
+# Every stage before this one argues from source. This is the only stage that
+# observes behaviour, and it is the only thing that can tell a real
+# vulnerability apart from a very well-argued misunderstanding.
+#
+# The fan-out is deliberately sequential. All branches of a task share one
+# container process, so running reproductions concurrently would have them
+# fighting over ports, files and processes. Reproduction is the expensive,
+# careful stage; doing it one finding at a time is the right trade.
+taskflow:
+  - task:
+      id: confirmed
+      must_complete: true
+      exclude_from_context: true
+      max_steps: 5
+      model: general_tasks
+      name: fetch confirmed findings
+      description: Publish the confirmed findings as a typed output.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Call `get_findings` once for the repo {{ globals.repo }} with state
+        `confirmed` and return its result. Make no other tool calls.
+      outputs:
+        type: array
+        items:
+          type: object
+          properties:
+            finding_id: {type: integer}
+            repo: {type: string}
+            component: {type: string}
+            title: {type: string}
+            vuln_class: {type: string}
+            severity: {type: string}
+          required: [finding_id, repo, component, title, vuln_class]
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      if: "outputs.confirmed | length > 0"
+      must_complete: false
+      repeat_prompt: true
+      over: "outputs.confirmed"
+      model: reproduction
+      max_steps: 250
+      name: reproduce finding
+      description: Validate reachability of each confirmed finding in a container.
+      agents:
+        - seclab_taskflows.personalities.reproduction_engineer
+      env:
+        CONTAINER_TIMEOUT: "600"
+        CONTAINER_PERSIST: "false"
+      user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
+        Validate the reachability of finding {{ result.finding_id }} in the repo
+        {{ result.repo }}, in the component {{ result.component }}:
+
+        {{ result.title }} ({{ result.vuln_class }})
+
+        Call `get_finding` for id {{ result.finding_id }} to read its source,
+        sink, flow, locations and hypothesis, along with the adjudicator's
+        reasoning for confirming it. You are validating that specific path.
+
+        The repository is mounted at /workspace inside the reproduction
+        container. Work there:
+
+        1. Work out how to build or start this component. Read the README, the
+           build files, the packaging metadata and the test suite. The tests
+           are usually the fastest route to a working invocation of the code
+           the finding points at.
+        2. Get it running.
+        3. Drive the path with an ordinary input first and record what normal
+           looks like. Without that control, the reachability evidence proves
+           nothing.
+        4. Then show reachability, from the entry point the finding names, with
+           a benign, distinctive marker value in the attacker-controlled field:
+           reflect the marker back in a response, error, log line or emitted
+           query; add a lightweight log/print/breakpoint at the sink that fires
+           with your marker; or observe the target's own behaviour naming your
+           marker. Reach the sink; you do not need to exploit it.
+        5. If it does not work the first time, change one thing and try again
+           while you are still learning something from the failures.
+
+        Clean up processes and files you started before you finish, so the next
+        finding starts from a known state.
+
+        Then call `store_reproduction_attempt` for finding
+        {{ result.finding_id }} with the outcome, the exact commands you ran in
+        `harness`, and the actual container output in `observed`.
+
+        {% include 'seclab_taskflows.prompts.audit_v2.reproduction_rules' %}
+
+        {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
+      toolboxes:
+        - seclab_taskflows.toolboxes.container_shell_reproduction
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      must_complete: true
+      model: general_tasks
+      max_steps: 20
+      name: reproduction summary
+      description: Report which findings were validated as reachable.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Get the ledger summary for the repo {{ globals.repo }}. List the
+        findings in state `reproduced`, and separately the findings still in
+        state `confirmed` together with why their reproduction attempt did not
+        succeed.
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger

@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: toolbox
+  version: "1.0"
+server_params:
+  kind: stdio
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.audit_v2.finding_ledger"]
+  env:
+    FINDING_LEDGER_DIR: "{{ env('DATA_DIR') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"
+
+server_prompt: |
+  ## Finding Ledger
+
+  The finding ledger is the shared, durable record of every vulnerability
+  candidate in this audit. Stages communicate through it rather than by passing
+  findings in prose, so always read the ledger for context and always write your
+  conclusions back to it.
+
+  Each finding moves through an explicit lifecycle:
+
+      candidate --(adversarial contest)--> confirmed | rejected
+      confirmed --(dynamic reproduction)--> reproduced
+      candidate --(deduplication)--> duplicate
+
+  You cannot set a finding's state directly. The ledger derives it:
+  - `store_finding` always creates a `candidate`.
+  - `store_contest_verdict` records a prosecution or defense position and never
+    changes state.
+  - `adjudicate_finding` is the only way a finding becomes `confirmed` or
+    `rejected`.
+  - `store_reproduction_attempt` with outcome `reproduced` only promotes a
+    finding that is already `confirmed`.
+  - `merge_duplicate_finding` folds one candidate into another and carries its
+    `proposed_by` labels across, so the surviving finding records every model
+    that independently proposed it.
+  - `attribute_findings` records which models proposed which findings. It is
+    called once after hunting, from the runner's own record of which model ran
+    which branch; a hunter cannot reliably name the model it is running as, so
+    it is never asked to.
+
+  This means a finding can never claim more certainty than its recorded
+  evidence supports. Do not describe a finding as confirmed or reproduced in
+  prose unless the ledger says it is.
+
+  Repeats are folded in afterwards, by a step whose only job is deduplication.
+  A hunter should therefore file every path it finds rather than checking
+  first whether someone else got there: several hunters from different model
+  families work each component at once, and two of them arriving at the same
+  path independently is the strongest corroboration this pipeline produces.
+  `find_similar_findings` is for that deduplication step and for later stages
+  looking for related work, not for deciding whether to file.

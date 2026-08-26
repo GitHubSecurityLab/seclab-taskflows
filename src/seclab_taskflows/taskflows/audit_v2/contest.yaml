@@ -1,0 +1,208 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config_audit_v2
+
+globals:
+  repo:
+
+# Stage 3 of the audit v2 pipeline: put every candidate on trial.
+#
+# This is the stage that separates v2 from the v1 audit. A candidate is argued
+# by a model whose job is to prove it, then by a model from a different family
+# whose job is to kill it, and then decided by a model from a third family.
+# Most false positives in automated code audit survive simply because nobody
+# was ever tasked with destroying them.
+#
+# The three tasks all fan out over the same typed candidate list, but they do
+# not pass arguments to each other through the taskflow. Prosecution and defense
+# write their positions into the ledger, and the adjudicator reads them back
+# joined by `finding_id`. That join is authoritative, whereas correlating three
+# fan-outs by branch index would silently mispair arguments if any branch
+# failed.
+taskflow:
+  - task:
+      id: candidates
+      must_complete: true
+      exclude_from_context: true
+      max_steps: 5
+      model: general_tasks
+      name: fetch candidates
+      description: Publish the candidate findings as a typed output.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Call `get_findings` once for the repo {{ globals.repo }} with state
+        `candidate` and return its result. Make no other tool calls.
+      outputs:
+        type: array
+        items:
+          type: object
+          properties:
+            finding_id: {type: integer}
+            repo: {type: string}
+            component: {type: string}
+            title: {type: string}
+            vuln_class: {type: string}
+          required: [finding_id, repo, component, title, vuln_class]
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      if: "outputs.candidates | length > 0"
+      must_complete: false
+      repeat_prompt: true
+      over: "outputs.candidates"
+      async: true
+      async_limit: 4
+      model: prosecution
+      max_steps: 120
+      name: prosecute
+      description: Argue that each candidate is exploitable.
+      agents:
+        - seclab_taskflows.personalities.exploit_prosecutor
+      user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
+        You are prosecuting finding {{ result.finding_id }} in the repo
+        {{ result.repo }}, in the component {{ result.component }}:
+
+        {{ result.title }} ({{ result.vuln_class }})
+
+        Call `get_finding` for id {{ result.finding_id }} to read its source,
+        sink, flow, locations and hypothesis in full. The repository is mounted
+        at /workspace; read the code at every location before you argue about
+        it.
+
+        Build the case that this finding is exploitable. Walk the path from the
+        entry point to the sink, and for every check between them explain, with
+        the line in front of you, why it fails to stop a hostile value.
+
+        Then record your position with `store_contest_verdict` for finding
+        {{ result.finding_id }}, with role `prosecution`. Put your full
+        argument in `rationale`, including the citations, so the adjudicator
+        can check it without re-deriving your reasoning.
+
+        If reading the code convinces you the finding is wrong, record
+        `not_exploitable` and say what kills it.
+
+        {% include 'seclab_taskflows.prompts.audit_v2.contest_rules' %}
+
+        {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
+      toolboxes:
+        - seclab_taskflows.toolboxes.container_shell_source_access
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      if: "outputs.candidates | length > 0"
+      must_complete: false
+      repeat_prompt: true
+      over: "outputs.candidates"
+      async: true
+      async_limit: 4
+      model: defense
+      max_steps: 120
+      name: defend
+      description: Argue that each candidate is not exploitable.
+      agents:
+        - seclab_taskflows.personalities.exploit_defender
+      user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
+        You are defending against finding {{ result.finding_id }} in the repo
+        {{ result.repo }}, in the component {{ result.component }}:
+
+        {{ result.title }} ({{ result.vuln_class }})
+
+        Call `get_finding` for id {{ result.finding_id }} to read its source,
+        sink, flow, locations and hypothesis in full, along with the
+        prosecution's argument if it has already been recorded. The repository
+        is mounted at /workspace; read the code at every location before you
+        argue about it.
+
+        Try to break this finding. Work through the ways a finding like this
+        usually dies: the source is not really attacker-controlled, the path is
+        not really reachable, a check really does hold, the flow does not
+        really connect, the impact is not what is claimed. Take the strongest
+        one you can support with code.
+
+        Then record your position with `store_contest_verdict` for finding
+        {{ result.finding_id }}, with role `defense`. Put your full argument in
+        `rationale`, including the citations.
+
+        If the finding survives everything you can throw at it, record
+        `exploitable` and say which of your attacks failed and why.
+
+        {% include 'seclab_taskflows.prompts.audit_v2.contest_rules' %}
+
+        {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
+      toolboxes:
+        - seclab_taskflows.toolboxes.container_shell_source_access
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      if: "outputs.candidates | length > 0"
+      must_complete: false
+      repeat_prompt: true
+      over: "outputs.candidates"
+      async: true
+      async_limit: 4
+      model: adjudication
+      max_steps: 120
+      name: adjudicate
+      description: Decide each contested finding and assign its severity.
+      agents:
+        - seclab_taskflows.personalities.finding_adjudicator
+      user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
+        Decide finding {{ result.finding_id }} in the repo {{ result.repo }},
+        in the component {{ result.component }}:
+
+        {{ result.title }} ({{ result.vuln_class }})
+
+        Call `get_finding` for id {{ result.finding_id }}. It returns the
+        finding together with the prosecution and defense verdicts recorded
+        against it. Read both arguments and the finding itself.
+
+        Both arguments are evidence, not authority. The repository is mounted
+        at /workspace: where they disagree about what the code does, open the
+        cited lines and settle it yourself. An argument whose citations do not
+        say what it claims they say loses, however well it reads.
+
+        Then call `adjudicate_finding` for finding {{ result.finding_id }} with
+        your position and severity. Your `rationale` is what a human reviewer
+        reads first, so write it so that someone who has seen neither argument
+        can follow your reasoning and check it against the code. Say explicitly
+        which argument prevailed and on which point.
+
+        Remember what your decision does: `exploitable` confirms the finding
+        and sends it to dynamic reproduction, `not_exploitable` rejects it, and
+        `uncertain` leaves it a candidate for a human to look at.
+
+        {% include 'seclab_taskflows.prompts.audit_v2.contest_rules' %}
+
+        {% include 'seclab_taskflows.prompts.audit_v2.severity_rubric' %}
+
+        {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
+      toolboxes:
+        - seclab_taskflows.toolboxes.container_shell_source_access
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      must_complete: true
+      model: general_tasks
+      max_steps: 20
+      name: contest summary
+      description: Report what survived the contest.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Get the ledger summary for the repo {{ globals.repo }}, then list the
+        confirmed findings with their severity and the rejected findings with
+        the reason they were rejected.
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger

@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: prompt
+
+prompt: |
+  ## Severity
+
+  Severity describes what an attacker gets and what it costs them to get it.
+  Rate the demonstrated impact of this specific path, not the worst case the
+  vulnerability class can reach in general.
+
+  - `critical` — unauthenticated remote code execution, unauthenticated full
+                 data access, or complete authentication bypass, reachable by
+                 default with no unusual configuration.
+  - `high`     — code execution, arbitrary file read or write, or privilege
+                 escalation that needs low-privileged access, a non-default
+                 but realistic configuration, or a plausible user interaction.
+  - `medium`   — meaningful but bounded impact: information disclosure of
+                 non-secret data, denial of service, a partial bypass, or a
+                 path that needs privileges most users do not have.
+  - `low`      — real but minor: limited disclosure, a bypass that requires
+                 conditions an attacker cannot reliably arrange, or impact an
+                 attacker with the required access already had anyway.
+  - `none`     — the finding was rejected. There is no impact.
+
+  Two things pull severity down, and you should apply them:
+
+  - **Preconditions.** If the attacker must already be an administrator, the
+    finding is worth less. State the preconditions and rate accordingly.
+  - **Reachability.** If the path is only reachable from an entry point that is
+    disabled by default, say so and rate accordingly.
+
+  One thing does not pull severity down: the fact that the code is a library
+  rather than an application. Judge library findings by what happens to the
+  applications that use the library as documented.
