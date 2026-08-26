@@ -21,9 +21,17 @@ permissions:
   packages: write
 
 jobs:
-  publish:
-    name: Build and publish container images
-    runs-on: ubuntu-latest
+  build:
+    name: Build ${{ matrix.arch }} images
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-26.04
+          - arch: arm64
+            runner: ubuntu-26.04-arm
 
     steps:
     - name: Checkout repository
@@ -36,10 +44,33 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: echo "${GITHUB_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
 
-    - name: Build local container images
-      run: ./scripts/build_container_images.sh all
+    - name: Build and push single-architecture images
+      env:
+        ARCH: ${{ matrix.arch }}
+      run: |
+        set -euo pipefail
 
-    - name: Tag and push images
+        arch_tag="sha-${GITHUB_SHA::12}-${ARCH}"
+
+        export PUSH=1
+        export IMAGE_TAGS="${arch_tag}"
+        # derived images must build on the base pushed by this same job
+        export BASE_IMAGE="ghcr.io/githubsecuritylab/seclab-shell-base:${arch_tag}"
+
+        ./scripts/build_container_images.sh all
+
+  publish:
+    name: Publish multi-architecture images
+    needs: build
+    runs-on: ubuntu-26.04
+
+    steps:
+    - name: Log in to GHCR
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: echo "${GITHUB_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+
+    - name: Combine per-architecture images into manifest lists
       env:
         CUSTOM_TAG: ${{ github.event.inputs.tag }}
       run: |
@@ -69,8 +100,11 @@ jobs:
         )
 
         for image in "${images[@]}"; do
+          args=()
           for tag in "${tags[@]}"; do
-            docker tag "${image}:latest" "${image}:${tag}"
-            docker push "${image}:${tag}"
+            args+=(--tag "${image}:${tag}")
           done
+          docker buildx imagetools create "${args[@]}" \
+            "${image}:sha-${short_sha}-amd64" \
+            "${image}:sha-${short_sha}-arm64"
         done
