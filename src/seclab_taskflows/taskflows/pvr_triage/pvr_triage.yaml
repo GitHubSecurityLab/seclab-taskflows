@@ -1,0 +1,637 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+# PVR Triage Taskflow
+#
+# Fetches a GHSA in triage state submitted via Private Vulnerability Reporting,
+# verifies the vulnerability claim against actual source code, assesses
+# impact and report quality, and generates a structured triage analysis
+# for the maintainer.
+#
+# Usage:
+#   python -m seclab_taskflow_agent \
+#     -t seclab_taskflows.taskflows.pvr_triage.pvr_triage \
+#     -g repo=owner/repo \
+#     -g ghsa=GHSA-xxxx-xxxx-xxxx
+#
+# Required environment variables:
+#   GH_TOKEN        - GitHub token with repo and security_events scope
+#   AI_API_TOKEN    - API token for the AI model provider
+#   AI_API_ENDPOINT - Model provider endpoint (default: https://api.githubcopilot.com)
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: taskflow
+
+model_config: seclab_taskflows.configs.model_config_pvr_triage
+
+globals:
+  # GitHub repository in owner/repo format
+  repo:
+  # GHSA ID of the advisory to triage
+  ghsa:
+  # Advisory state to filter by for dedup comparison (default: triage).
+  # Use "draft" for testing with owner-created advisories.
+  state: triage
+
+taskflow:
+  # -------------------------------------------------------------------------
+  # Task 1: Initialize
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      headless: true
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Clear the memory cache.
+
+  # -------------------------------------------------------------------------
+  # Task 2: Fetch and parse the GHSA
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Fetch the security advisory {{ globals.ghsa }} for repository {{ globals.repo }}.
+
+        Extract the owner and repo name from "{{ globals.repo }}" (format: owner/repo).
+
+        Store the full raw advisory description text under key "pvr_description".
+
+        Then store a structured summary in memcache under the key "pvr_parsed" as a JSON
+        object with these fields:
+          - ghsa_id: the GHSA ID
+          - repo: "{{ globals.repo }}"
+          - summary: the advisory one-line summary
+          - severity_claimed: the severity rating in the advisory (critical/high/medium/low)
+          - vuln_type: vulnerability class (e.g. "path traversal", "IDOR", "XSS", "SQL injection")
+          - affected_component: the component, endpoint, or feature described as vulnerable
+          - affected_files: list of source file paths explicitly mentioned (empty list if none)
+          - affected_functions: list of function/method names mentioned (empty list if none)
+          - affected_versions: for version ranges, prefer the structured vulnerabilities[].vulnerable_versions
+            field from the advisory API response. Fall back to parsing the description only if
+            the structured field is absent or empty. Empty list if none found.
+          - poc_provided: true if a proof-of-concept or reproduction steps are described
+          - poc_summary: brief description of the PoC steps, or null if none provided
+          - quality_signals:
+              has_file_references: true if specific source file paths are cited
+              has_line_numbers: true if specific line numbers are cited
+              has_poc: true if reproduction steps are provided
+              has_version_info: true if specific affected versions are mentioned
+              has_code_snippets: true if actual code is quoted in the report
+          - credits: the credits list from the advisory API response (list of {login, type} objects)
+
+        Do not perform any code analysis yet.
+
+        Also call fetch_security_policy with owner and repo. If a security policy
+        is returned (non-empty), store it under memcache key "security_policy".
+        If no policy is found, store an empty string.
+
+        Execute all steps above, then stop. Do not ask what to do next.
+
+  # -------------------------------------------------------------------------
+  # Task 3: Quick Quality Gate
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflows.toolboxes.reporter_reputation
+      user_prompt: |
+        Retrieve "pvr_parsed" and "security_policy" from memcache.
+
+        Extract reporter login from pvr_parsed.credits: find the first entry with
+        type "reporter" and use its login. If credits is empty or no reporter type
+        is found, use "unknown".
+
+        Call get_reporter_score with that login and store the result as reporter_score.
+
+        If security_policy is non-empty, evaluate the PVR report against the
+        repository's security policy. Check:
+          - Scope: does the reported vulnerability type and component fall within
+            the scope defined by the policy? If the policy defines supported versions,
+            is the reported version in scope?
+          - Required elements: does the report contain what the policy asks reporters
+            to include (e.g. reproduction steps, impact assessment, affected versions)?
+          - Reporting channel: the report was submitted via PVR which is generally
+            the correct private channel, but note if the policy specifies a different
+            preferred channel (e.g. email, HackerOne).
+          - Out-of-scope: does the policy explicitly exclude certain vulnerability
+            classes, test environments, or components that match this report?
+
+        Store the evaluation under the key "policy_compliance" as:
+          {
+            "policy_found": true,
+            "in_scope": true/false/null (null if policy doesn't define scope),
+            "version_in_scope": true/false/null,
+            "required_elements_present": list of elements met,
+            "required_elements_missing": list of elements the policy asks for but
+              the report does not provide,
+            "out_of_scope_match": true if the report matches an explicit exclusion,
+            "notes": brief summary of compliance assessment
+          }
+
+        If security_policy is empty, store:
+          {"policy_found": false}
+
+        Call find_similar_triage_reports with:
+          - vuln_type: pvr_parsed.vuln_type
+          - affected_component: pvr_parsed.affected_component
+
+        Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
+        Call compare_advisories with owner, repo, state="{{ globals.state }}",
+        and target_ghsa="{{ globals.ghsa }}" to check if this advisory is a
+        structural duplicate of another advisory currently in the triage inbox.
+        Store the result as dedup_result.
+
+        Note: compare_advisories uses structural field overlap only. A result
+        of "none" means insufficient metadata to determine, not necessarily
+        that the advisories are distinct.
+
+        Additionally, if dedup_result contains other advisories (even with
+        match_level "none"), read the summaries and descriptions of the other
+        triage-state advisories returned in the comparison. Use your own
+        judgment to determine if any describe the same underlying vulnerability
+        as this one, even if the structural metadata differs. Two reports about
+        the same code path, attack scenario, or root cause are duplicates
+        regardless of CWE tags or wording.
+
+        Evaluate fast_close based on reporter_score.recommendation:
+
+          If reporter_score.recommendation is "high trust":
+            Set fast_close = false unconditionally.
+            Set reason = "High-trust reporter — full verification required."
+
+          Else if reporter_score.recommendation is "treat with skepticism":
+            Set fast_close = true if ALL THREE quality signals are absent:
+              - pvr_parsed.quality_signals.has_file_references is false
+              - pvr_parsed.quality_signals.has_poc is false
+              - pvr_parsed.quality_signals.has_line_numbers is false
+            (Prior similar report NOT required for skepticism reporters.)
+            Set reason accordingly.
+
+          Else (normal / no history):
+            Set fast_close = true only if ALL FOUR conditions hold:
+              - pvr_parsed.quality_signals.has_file_references is false
+              - pvr_parsed.quality_signals.has_poc is false
+              - pvr_parsed.quality_signals.has_line_numbers is false
+              - At least one similar report exists with verdict UNCONFIRMED or CONFIRMED
+            Set reason accordingly.
+
+        Store under memcache key "quality_gate":
+          {
+            "fast_close": true or false,
+            "reason": "brief explanation of why fast_close was triggered or not",
+            "reporter_login": "the login extracted above",
+            "reporter_score": {the full object returned by get_reporter_score},
+            "similar_reports": [the list returned by find_similar_triage_reports],
+            "duplicate_advisories": {
+              "structural_clusters": dedup_result.clusters (only clusters containing this GHSA),
+              "semantic_duplicates": list of other GHSA IDs you identified as describing
+                the same vulnerability via semantic analysis (may be empty),
+              "is_duplicate": true if this GHSA appears in any structural cluster
+                (strong or moderate) OR you identified semantic duplicates
+            }
+          }
+
+        If duplicate_advisories.is_duplicate is true, note this in the reason field
+        but do NOT auto-set fast_close. Duplicates still require human judgment.
+        The report will surface the duplicate info for the maintainer to decide.
+
+        Execute all steps above, then stop. Do not ask what to do next.
+
+  # -------------------------------------------------------------------------
+  # Task 4: Verify vulnerability in source code
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflows.toolboxes.gh_file_viewer
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "pvr_parsed", "pvr_description", and "quality_gate" from memcache.
+
+        If quality_gate.fast_close is true, store under "code_verification":
+          {
+            "ref_used": null,
+            "files_examined": [],
+            "vulnerability_confirmed": null,
+            "confirmation_evidence": "Fast-close: quality gate triggered. Reason: {quality_gate.reason}",
+            "mitigation_found": null,
+            "mitigation_details": null,
+            "patch_status": "could_not_determine",
+            "patch_notes": null,
+            "notes": "Skipped deep analysis."
+          }
+        and stop. Do not fetch any files.
+
+        Otherwise proceed with full code verification:
+
+        Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
+
+        Verify the vulnerability at the affected version, not HEAD.
+        If affected_versions lists a version (e.g. "<= 1.25.4"), resolve the
+        upper bound to a git commit SHA using resolve_version_ref, then use
+        fetch_file_at_ref to fetch code at that SHA. If no version is specified,
+        fall back to fetch_file_from_gh / get_file_lines_from_gh (HEAD).
+
+        If affected_files or affected_versions are empty, read pvr_description
+        directly to identify any file paths, function names, or version references
+        the extraction may have missed. Advisory descriptions vary widely in format
+        and structure — treat pvr_parsed as a starting point, not a complete picture.
+
+        For each file path identified:
+          1. Resolve the version to a SHA (if available).
+          2. Fetch the file at that SHA using fetch_file_at_ref.
+          3. Locate the affected function(s) at the stated line numbers.
+          4. Check whether the vulnerability pattern described in the advisory
+             is present at that version.
+          5. Look for authorization checks, input validation, or other mitigations.
+
+        If no specific files are named, use search_repo_from_gh to locate
+        the affected function names or code patterns.
+
+        Focus on the specific code path described. Do not perform a broad audit.
+
+        After completing the main verification at the claimed version, re-check the
+        same code pattern at HEAD using fetch_file_from_gh. Add to code_verification:
+          "patch_status": "still_vulnerable" | "patched" | "could_not_determine"
+          "patch_notes": brief description of what changed at HEAD (or null)
+
+        Store your findings under memcache key "code_verification" as JSON:
+          - ref_used: the git SHA or ref used for code fetching (or "HEAD" if none)
+          - files_examined: list of file paths fetched
+          - vulnerability_confirmed: true / false / null (null = could not determine)
+          - confirmation_evidence: precise description of what the code does,
+            including file path and line numbers
+          - mitigation_found: true if existing checks prevent exploitation
+          - mitigation_details: description of mitigating code, or null
+          - patch_status: "still_vulnerable" | "patched" | "could_not_determine"
+          - patch_notes: description of HEAD state vs claimed version (or null)
+          - notes: any additional observations
+
+        Execute all steps above, then stop. Do not ask what to do next.
+
+  # -------------------------------------------------------------------------
+  # Task 4b: Container-based validation (optional)
+  # -------------------------------------------------------------------------
+  # Gated by PVR_CONTAINER_VALIDATION env var. When enabled, clones the repo
+  # at the affected version into an isolated SAST container and performs:
+  #   - SAST scanning (semgrep) on reported file paths
+  #   - Call graph / reachability analysis on reported functions
+  #   - PoC reproduction attempt if reproduction steps are provided
+  #   - Patch diff analysis between affected and fixed versions
+  #
+  # Requires Docker and the seclab-shell-sast image.
+  # Set PVR_CONTAINER_VALIDATION=true and optionally CONTAINER_WORKSPACE.
+  - task:
+      must_complete: false
+      model: triage
+      headless: true
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflows.toolboxes.container_shell_sast
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      env:
+        CONTAINER_PERSIST: "true"
+        CONTAINER_PERSIST_KEY: "pvr-validation-{{ globals.ghsa }}"
+        CONTAINER_TIMEOUT: "120"
+      user_prompt: |
+        Check if container validation is enabled:
+        If the environment variable PVR_CONTAINER_VALIDATION is not set or not "true",
+        store under memcache key "container_validation":
+          {"enabled": false, "reason": "PVR_CONTAINER_VALIDATION not set"}
+        and stop immediately. Do not execute any shell commands.
+
+        Otherwise, retrieve "pvr_parsed", "pvr_description", "code_verification",
+        and "quality_gate" from memcache.
+
+        If quality_gate.fast_close is true or code_verification.vulnerability_confirmed
+        is false, store under "container_validation":
+          {"enabled": true, "skipped": true, "reason": "fast_close or unconfirmed"}
+        and stop.
+
+        Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
+
+        Perform container-based validation in the SAST container:
+
+        Step 1: Clone and checkout
+          shell_exec: git clone --depth=50 https://github.com/{owner}/{repo}.git /workspace/repo
+          If code_verification.ref_used is not null and not "HEAD":
+            shell_exec: cd /workspace/repo && git checkout {ref_used}
+
+        Step 2: SAST scan on reported files
+          For each file in pvr_parsed.affected_files (if any):
+            shell_exec: semgrep scan --config=auto --json /workspace/repo/{file}
+          Store findings as sast_results.
+
+        Step 3: Reachability analysis
+          Determine the language from file extensions in pvr_parsed.affected_files.
+          For Python projects:
+            shell_exec: cd /workspace/repo && pyan3 $(fd -e py . | tr '\n' ' ') --dot --no-defines 2>/dev/null | grep -i "{function_name}" || echo "function not found in call graph"
+          For C/C++ projects:
+            shell_exec: cd /workspace/repo && ctags -R --fields=+ne . && cscope -R -b 2>/dev/null
+            shell_exec: cd /workspace/repo && cscope -R -L -2 {function_name} 2>/dev/null || echo "no callers found"
+          For other languages:
+            shell_exec: cd /workspace/repo && rg -n "def |function |func |fn " --glob "*.{ext}" | grep -i "{function_name}" || echo "function not found"
+            shell_exec: cd /workspace/repo && rg -n "{function_name}" --glob "*.{ext}" | head -30
+          Assess: is the reported function reachable from public API / entry points?
+
+        Step 4: PoC reproduction attempt
+          If pvr_parsed.poc_provided is true and pvr_parsed.poc_summary describes
+          executable steps (curl commands, script, input data):
+            Attempt a best-effort reproduction. If it involves running code:
+              shell_exec: cd /workspace/repo && {appropriate setup and run commands}
+            Do NOT execute anything that could be destructive or contact external services.
+            If the PoC requires network access or external dependencies, note this as
+            a limitation rather than attempting it.
+
+        Step 5: Patch status verification
+          If code_verification.patch_status is "patched" or if a patched version exists:
+            shell_exec: cd /workspace/repo && git log --oneline --all --grep="{cve_id or ghsa_id or vuln keyword}" | head -10
+            shell_exec: cd /workspace/repo && git diff {affected_ref}..HEAD -- {affected_files} | head -100
+          Assess: does the diff actually address the reported vulnerability?
+
+        Store results under memcache key "container_validation":
+          {
+            "enabled": true,
+            "skipped": false,
+            "sast_findings": list of semgrep findings relevant to the reported vuln type,
+            "reachability": {
+              "function_reachable": true/false/null,
+              "call_chain": brief description of how the function is reached (or null),
+              "entry_points": list of public entry points that reach the vulnerable function
+            },
+            "poc_result": {
+              "attempted": true/false,
+              "reproduced": true/false/null,
+              "details": description of what happened
+            },
+            "patch_analysis": {
+              "patch_found": true/false,
+              "patch_addresses_vuln": true/false/null,
+              "details": description of the patch
+            },
+            "notes": any additional observations
+          }
+
+  # -------------------------------------------------------------------------
+  # Task 5: Generate triage report
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: triage
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "pvr_parsed", "pvr_description", "code_verification", "quality_gate",
+        "policy_compliance", and "container_validation" from memcache.
+        container_validation and policy_compliance may not exist; treat missing as disabled/not found.
+
+        Generate a triage analysis report in markdown and store it under
+        memcache key "triage_report".
+
+        The report must follow this structure exactly:
+
+        ---
+
+        ## PVR Triage Analysis: {{ globals.ghsa }}
+
+        **Repository:** {{ globals.repo }}
+        **Claimed Severity:** [from pvr_parsed]
+        **Vulnerability Type:** [from pvr_parsed]
+
+        ### Verdict
+
+        **[CONFIRMED / UNCONFIRMED / INCONCLUSIVE]**
+
+        One or two sentences stating the verdict and the primary reason.
+
+        ### Code Verification
+
+        State the git ref (version tag / commit SHA) used for analysis, or note
+        if HEAD was used and why.
+        Describe exactly what code was examined and what was found.
+        Reference specific file paths and line numbers.
+        If the vulnerability is confirmed, show the vulnerable code pattern.
+        If unconfirmed, explain what the code actually does and why it is not vulnerable.
+        If inconclusive, explain what could not be determined and why.
+
+        ### Validation Results
+
+        If container_validation exists and container_validation.enabled is true
+        and container_validation.skipped is false, include this section. Otherwise omit it.
+
+        Summarize findings from automated validation:
+        - SAST: note any semgrep findings relevant to the reported vulnerability type
+        - Reachability: state whether the reported function is reachable from public
+          entry points, and list the call chain if found. If unreachable, note this
+          significantly reduces impact.
+        - PoC Reproduction: if attempted, state whether it succeeded. If not attempted,
+          note why (e.g. requires network access, no executable steps provided).
+        - Patch Analysis: if a patch was found, summarize whether it addresses
+          the reported vulnerability.
+
+        ### Severity Assessment
+
+        State whether the claimed severity is accurate, overstated, or understated.
+        Base this on the actual exploitability and impact from the code evidence.
+        If container_validation was performed and reachability data is available,
+        factor that into the assessment (unreachable code is lower impact).
+
+        ### CVSS Assessment
+
+        Derive a CVSS 3.1 vector for this vulnerability based on the code evidence.
+        State: Base Score, Vector String, and whether the reporter's claimed severity
+        (pvr_parsed.severity_claimed) is accurate / overstated / understated.
+        If vulnerability_confirmed is false or null, note that CVSS is based on
+        the claimed scenario and may not reflect actual risk.
+
+        ### Duplicate / Prior Reports
+
+        If quality_gate.duplicate_advisories.is_duplicate is true, prominently flag this
+        advisory as a potential duplicate. List the other GHSAs in the cluster, the match
+        level, and the reasons for the match (shared CWE, package, version, file paths).
+        Recommend the maintainer review the cluster and triage the best report.
+
+        If quality_gate.similar_reports is non-empty, list them with their verdict and quality.
+        Note whether this report adds new evidence vs. restating a known issue.
+        If no duplicates or similar reports found, state "No duplicates or prior reports found."
+
+        ### Patch Status
+
+        State code_verification.patch_status at HEAD.
+        If patched: note the triage impact (lower urgency for confirmed vulnerabilities).
+        If still_vulnerable: note urgency is unchanged.
+        If could_not_determine: state that HEAD status could not be assessed.
+
+        ### Security Policy Compliance
+
+        If policy_compliance exists and policy_compliance.policy_found is true,
+        include this section. Otherwise omit it entirely.
+
+        Summarize how the PVR report aligns with the repository's security policy:
+        - Scope: is the reported vulnerability in scope per the policy?
+          If a supported versions table exists, is the reported version covered?
+        - Required elements: list what the policy asks for and whether this report
+          provides each element (e.g. reproduction steps, impact, affected versions).
+        - Out-of-scope: note if the report matches any explicit exclusion in the policy.
+        - Channel: note if the policy prefers a different reporting channel than PVR.
+        - Conclusion: state whether the report is compliant, partially compliant,
+          or non-compliant with the security policy. This helps the maintainer
+          decide whether to engage or redirect the reporter.
+
+        ### Report Quality
+
+        Assess the quality of the PVR submission:
+        - Note which claims were accurate (correct file paths, line numbers, functions)
+        - Note any inaccuracies (wrong paths, non-existent functions, incorrect PoC)
+        - Rate overall quality: High / Medium / Low
+        - High: specific, accurate, verified PoC
+        - Medium: partially accurate, some details wrong or missing
+        - Low: vague, speculative, or significantly inaccurate ("AI slop")
+
+        ### Reporter Reputation
+
+        Reporter login: [quality_gate.reporter_login]
+        Score summary: [quality_gate.reporter_score.recommendation] (confirmed_pct,
+        total_reports, quality_breakdown from reporter_score)
+
+        ### Recommendations
+
+        Provide 1-3 specific, actionable recommendations for the maintainer.
+        If confirmed: suggest the fix approach.
+        If unconfirmed: suggest whether to close, request more info, or monitor.
+        If low quality: recommend closing with explanation.
+
+        ---
+
+        Be factual. Do not include anything not supported by code evidence.
+        Keep the report concise. Aim for under 800 words.
+
+        After generating the report, also store a structured summary under memcache
+        key "triage_outcome":
+          {
+            "verdict": "CONFIRMED" | "UNCONFIRMED" | "INCONCLUSIVE",
+            "quality": "High" | "Medium" | "Low"
+          }
+
+        Execute all steps above, then stop. Do not ask what to do next.
+
+  # -------------------------------------------------------------------------
+  # Task 6: Save report to disk and print path
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve the "triage_report" from memcache.
+
+        Call save_triage_report with:
+          - ghsa_id: "{{ globals.ghsa }}"
+          - report: the full report content exactly as stored in memcache
+
+        Then print the report content verbatim, followed by a blank line and:
+        "Report saved to: <path returned by save_triage_report>"
+
+  # -------------------------------------------------------------------------
+  # Task 7: Generate Reporter Response Draft
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "pvr_parsed", "code_verification", "quality_gate", "triage_report",
+        and "triage_outcome" from memcache.
+
+        Use triage_outcome.verdict as the verdict.
+
+        Draft a response comment to the reporter. Tone: direct, factual, not harsh.
+        Select the template based on triage_outcome.verdict and quality_gate.fast_close:
+
+          fast_close (quality_gate.fast_close=true):
+            Explain that the report lacks file paths, functions, and reproduction steps
+            that match the codebase. Invite resubmission with specific details including
+            the exact file path, line number, and a concrete reproduction scenario.
+
+          CONFIRMED:
+            Acknowledge the finding. State that a fix is in progress and credit will
+            be given when the advisory is published.
+
+          UNCONFIRMED:
+            Cite specific code evidence for why the claim could not be confirmed
+            (reference the file path and what the code actually does). Ask for more
+            specific reproduction steps if the reporter wants to follow up.
+
+          INCONCLUSIVE:
+            Explain what specific information is missing to complete verification
+            (e.g. exact version, file path, reproduction steps).
+
+        Keep the response under 200 words. No markdown headers. Plain text suitable
+        for a GitHub comment.
+
+        Store under memcache key "response_draft".
+
+        Execute all steps above, then stop. Do not ask what to do next.
+
+  # -------------------------------------------------------------------------
+  # Task 8: Update Reporter Reputation + Save Response Draft
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflows.toolboxes.reporter_reputation
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "pvr_parsed", "code_verification", "quality_gate", "triage_report",
+        "triage_outcome", and "response_draft" from memcache.
+
+        Use triage_outcome.verdict as the verdict.
+        Use triage_outcome.quality as the quality rating.
+        Extract reporter login from quality_gate.reporter_login.
+
+        Call record_triage_result with:
+          - login: quality_gate.reporter_login
+          - ghsa_id: "{{ globals.ghsa }}"
+          - repo: "{{ globals.repo }}"
+          - verdict: the extracted verdict
+          - quality: the extracted quality rating
+
+        Call save_triage_report with:
+          - ghsa_id: "{{ globals.ghsa }}_response"
+          - report: response_draft
+
+        Print: "Response draft saved." followed by the response_draft text.

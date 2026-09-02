@@ -1,0 +1,214 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+# PVR Triage Batch Taskflow
+#
+# Lists PVR advisories in triage state for a repository, scores each unprocessed one by
+# priority (based on severity and quality signals), and outputs a ranked
+# markdown table to REPORT_DIR for maintainer review.
+# Advisories with an existing triage report in REPORT_DIR are skipped.
+#
+# Usage:
+#   python -m seclab_taskflow_agent \
+#     -t seclab_taskflows.taskflows.pvr_triage.pvr_triage_batch \
+#     -g repo=owner/repo
+#
+# Required environment variables:
+#   GH_TOKEN        - GitHub token with repo and security_events scope
+#   AI_API_TOKEN    - API token for the AI model provider
+#   AI_API_ENDPOINT - Model provider endpoint (default: https://api.githubcopilot.com)
+#   REPORT_DIR      - Directory where triage reports are stored (and batch output is saved)
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: taskflow
+
+model_config: seclab_taskflows.configs.model_config_pvr_triage
+
+globals:
+  # GitHub repository in owner/repo format
+  repo:
+  # Advisory state to filter by (default: triage). Use "draft" for testing
+  # with owner-created advisories.
+  state: triage
+
+taskflow:
+  # -------------------------------------------------------------------------
+  # Task 1: List triage advisories
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
+
+        Call list_pvr_advisories with owner, repo, and state="{{ globals.state }}" to retrieve
+        all advisories in {{ globals.state }} state.
+
+        Store the full JSON list under memcache key "pvr_queue".
+
+        Print: "Found N {{ globals.state }} advisories for {{ globals.repo }}." where N is the count.
+
+        If no advisories are found, print "No {{ globals.state }} advisories found." and stop.
+
+        Execute all steps above, then stop. Do not ask what to do next.
+
+  # -------------------------------------------------------------------------
+  # Task 2: Score each advisory and detect duplicates
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflows.personalities.pvr_analyst
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "pvr_queue" from memcache.
+
+        Extract owner and repo from "{{ globals.repo }}" (format: owner/repo).
+
+        First, call compare_advisories with owner, repo, and state="{{ globals.state }}" to
+        detect duplicate or near-duplicate advisories via structural metadata
+        comparison. Store the result under memcache key "dedup_result".
+
+        Note: compare_advisories uses structural field overlap (CWE, package,
+        version, file paths). A match level of "none" does NOT mean two advisories
+        are distinct -- it means there was insufficient structured metadata to
+        determine overlap. Low-quality reports often lack these fields entirely.
+
+        Then for each advisory in pvr_queue:
+          1. Call fetch_pvr_advisory to get the full advisory details.
+          2. Check for existing triage by calling read_triage_report with the ghsa_id.
+             If the result does not start with "Report not found", mark already_triaged=true
+             and extract the verdict from the report content.
+             Otherwise, mark already_triaged=false and verdict=null.
+          3. Extract quality signals from the description:
+             - has_file_references: description mentions specific file paths
+             - has_poc: description includes reproduction steps or exploit code
+             - has_line_numbers: description cites line numbers
+          4. Compute priority_score using this formula:
+             severity_weight: critical=4, high=3, medium=2, low=1, unknown=1
+             quality_weight: has_file_references(+1) + has_poc(+1) + has_line_numbers(+1)
+             priority_score = severity_weight + quality_weight
+          5. Check if this ghsa_id appears in any dedup_result.clusters entry.
+             If so, set structural_duplicate to the list of other GHSAs in that cluster
+             and the match_level. Otherwise set structural_duplicate=null.
+          6. Determine suggested_action:
+             - If already_triaged and verdict is UNCONFIRMED or INCONCLUSIVE: "Review/Close"
+             - If already_triaged and verdict is CONFIRMED: "Fix/Publish"
+             - If structural_duplicate is not null and match_level is "strong": "Likely Duplicate -- Triage Best"
+             - If priority_score >= 5: "Triage Immediately"
+             - If priority_score >= 3: "Triage Soon"
+             - If priority_score <= 1: "Likely Low Quality -- Fast Close"
+             - Otherwise: "Triage"
+
+        After scoring all advisories individually, perform semantic duplicate
+        analysis across the full set of fetched advisory descriptions:
+
+        Review the summary and description of every advisory you fetched above.
+        Identify groups that appear to describe the same underlying vulnerability,
+        even if they use different wording, cite different CWEs, or lack structured
+        metadata. Consider: same code path or function, same attack scenario,
+        same root cause, same affected behavior. Two reports from different
+        reporters about the same bug are duplicates regardless of how they word it.
+
+        For any semantic duplicate groups you identify that were NOT already caught
+        by compare_advisories, add them as additional duplicate_cluster entries on
+        the relevant scored entries. Set match_level to "semantic" for these.
+        Update suggested_action to "Likely Duplicate -- Triage Best" for all but
+        the highest-quality report in each semantic group.
+
+        Build a list of scored entries, each with:
+          {ghsa_id, severity, summary, vuln_type, quality_signals,
+           priority_score, already_triaged, verdict, suggested_action,
+           duplicate_cluster, created_at}
+
+        Sort the list: primary key priority_score descending; ties broken by
+        created_at ascending (oldest advisory first).
+
+        Split the list:
+          - scored_queue: entries where already_triaged=false only
+          - skipped_count: count of entries where already_triaged=true
+
+        Store scored_queue under memcache key "scored_queue".
+        Store skipped_count under memcache key "skipped_count".
+
+        Execute all steps above, then stop. Do not ask what to do next.
+
+  # -------------------------------------------------------------------------
+  # Task 3: Generate and save ranked queue report
+  # -------------------------------------------------------------------------
+  - task:
+      must_complete: true
+      model: extraction
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      toolboxes:
+        - seclab_taskflows.toolboxes.pvr_ghsa
+        - seclab_taskflow_agent.toolboxes.memcache
+      user_prompt: |
+        Retrieve "scored_queue" and "skipped_count" from memcache.
+
+        Generate today's date in YYYY-MM-DD format.
+
+        For each entry in scored_queue compute days_pending:
+          days_pending = (today - date(created_at)).days  (integer, round down)
+          Parse created_at as an ISO 8601 date string (YYYY-MM-DD prefix is sufficient).
+          If created_at is missing or unparseable, use "?" for Age.
+
+        Build a report string with this structure:
+
+        # PVR Batch Triage Queue: {{ globals.repo }}
+
+        **Generated:** [today's date]
+        **Pending triage:** [count of scored_queue entries]
+        **Skipped (already triaged):** [skipped_count]
+
+        | GHSA | Age (days) | Severity | Vuln Type | Quality Signals | Priority | Duplicates | Status | Suggested Action |
+        |------|------------|----------|-----------|-----------------|----------|------------|--------|-----------------|
+        [one row per advisory, sorted by priority_score desc then created_at asc]
+
+        For each row:
+          - GHSA: the ghsa_id as a plain string
+          - Age (days): days_pending computed above
+          - Severity: severity from the advisory
+          - Vuln Type: vuln_type (truncated to 30 chars if needed)
+          - Quality Signals: compact representation, e.g. "PoC, Files, Lines" for all three,
+            or list only the signals present, or "None" if all false
+          - Priority: priority_score as an integer
+          - Duplicates: if duplicate_cluster is not null, show the other GHSA IDs and match
+            level (e.g. "GHSA-xxxx [strong]"). Otherwise "-"
+          - Status: "Triaged (CONFIRMED)" / "Triaged (UNCONFIRMED)" / "Triaged (INCONCLUSIVE)" /
+            "Not triaged"
+          - Suggested Action: from suggested_action field
+
+        If scored_queue is empty, replace the table with:
+        "No pending advisories."
+
+        After the table, add a section:
+
+        ## Summary
+
+        List any advisories with priority_score >= 5 as "Requires immediate attention."
+        If any duplicate clusters were found, list them with the shared GHSAs and match reasons.
+        Recommend triaging the highest-quality report in each cluster and closing the rest.
+        If skipped_count > 0, note: "[skipped_count] already-triaged advisories skipped."
+
+        Sanitize the repo name for use in a filename: replace "/" and any non-alphanumeric
+        characters (except "-" and "_") with "_".
+
+        Call save_triage_report with:
+          - ghsa_id: "batch_queue_[sanitized_repo]_[today's date]"
+          - report: the full report string
+
+        Print: "Batch queue report saved to: <path returned by save_triage_report>"
+        Then print the full report.
+
+        Execute all steps above, then stop. Do not ask what to do next.
