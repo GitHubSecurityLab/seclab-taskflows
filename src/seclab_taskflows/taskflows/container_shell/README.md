@@ -26,7 +26,8 @@ Packet capture analysis and network recon. Extends base with nmap, tcpdump,
 tshark, netcat, dig, jq, httpie.
 
 **source-access** (`ghcr.io/githubsecuritylab/seclab-shell-source-access:latest`)
-Source access and code exploration. Tools to search and access source code. Does not extend base.
+Source access and code exploration. Includes tgrep, fd, tree, universal-ctags,
+GNU global, cscope, and git. Does not extend base.
 
 **sast** (`ghcr.io/githubsecuritylab/seclab-shell-sast:latest`)
 Static analysis and code exploration. Extends base with semgrep, pyan3,
@@ -51,6 +52,39 @@ To build a single profile (the base image is always built first when needed):
 ```
 
 Images only need to be rebuilt when a Dockerfile changes.
+
+## Source search with tgrep
+
+The source-access image installs [Microsoft tgrep](https://github.com/microsoft/tgrep)
+instead of ripgrep. Its Linux release is version-pinned and SHA-256 verified for
+amd64 and arm64. When updating `TGREP_VERSION`, also update the corresponding
+`TGREP_SHA256_AMD64` and `TGREP_SHA256_ARM64` build arguments.
+
+After rebuilding the image, stop and remove any existing persistent source-access
+container so the next MCP call creates one from the new image. Restarting only the
+MCP server reuses the old container.
+
+Run these commands **inside the container**, after the source is mounted:
+
+```sh
+tgrep index /workspace --index-path /tmp/tgrep-index
+tgrep -n --index-path /tmp/tgrep-index '<pattern>' /workspace
+tgrep -n -i -g '*.py' -C 3 --index-path /tmp/tgrep-index '<pattern>' /workspace
+```
+
+Before the first search in each session, build the index and wait for success.
+For `container_shell_exec`, use `timeout=300` for indexing, or longer for large
+repositories. Plain searches do not build an index automatically. The toolbox
+instructs the agent to perform this indexing step; no background server is needed.
+Keep `--index-path /tmp/tgrep-index` on every indexed search. This stores the index
+outside the source tree and preserves it while the container persists.
+
+Rebuild after source changes or checkouts to avoid stale results. Use `-F` for
+literal text, `-l` for filenames only, and `--stats` to see index candidate counts.
+For a fresh scan without an index or the default 64 MiB file-size cap, use
+`tgrep --no-index --no-max-filesize -n '<pattern>' /workspace`. Hidden, ignored,
+and binary files are still skipped by default; `--hidden` and `--no-ignore`
+include their respective file sets and bypass the index.
 
 ## Environment variables
 

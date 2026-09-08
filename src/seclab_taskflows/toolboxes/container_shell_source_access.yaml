@@ -25,7 +25,7 @@ server_prompt: |
   the container, and the container is persistent across MCP server restarts by default.
 
   Available tools:
-  - ripgrep (rg)  — Fast regex search: `rg <pattern> /workspace`
+  - tgrep         - Trigram-indexed regex search: `tgrep -n --index-path /tmp/tgrep-index '<pattern>' /workspace`
   - fd            — Fast file finder: `fd -e py /workspace`
   - tree          — Directory structure: `tree /workspace`
   - ctags         — Multi-language tag/symbol index (`ctags -R .`)
@@ -34,9 +34,29 @@ server_prompt: |
   - git           — Version control and source history inspection
   - grep, sed, awk, find — Standard code exploration
 
+  tgrep usage (https://github.com/microsoft/tgrep):
+  - Before the first search in each session, run
+    `tgrep index /workspace --index-path /tmp/tgrep-index` and wait for it to succeed.
+    Use container_shell_exec with timeout=300 for indexing; allow longer for large repositories.
+    Plain searches do not automatically build an index: without one they scan every file.
+  - Keep the index in /tmp/tgrep-index, outside the mounted source tree. Pass
+    `--index-path /tmp/tgrep-index` on every indexed search so tgrep finds it.
+    The index survives MCP server restarts while the container persists.
+  - No server is required. Re-run the index command after files change or a different
+    revision is checked out; an on-disk index is a snapshot and can miss new matches.
+  - Use `-n` for line numbers, `-i` for case-insensitive matching, `-F` for literal text,
+    `-g '*.py'` to filter paths, `-C 3` for context, and `-l` for matching filenames.
+    Add `--stats` to inspect the query plan and index candidate counts.
+  - Hidden, ignored, binary, and files larger than 64 MiB are skipped by default.
+    Use `--hidden` or `--no-ignore` when needed (these bypass the index).
+    Use `tgrep --no-index --no-max-filesize -n '<pattern>' /workspace` to search current
+    files without an index or size cap; normal hidden/ignore/binary rules still apply.
+  - Exit codes: 0 means matches, 1 means no matches, and 2 means an error.
+
   Typical source access workflow:
   1. `tree /workspace | head -80` — inspect the repository layout
   2. `fd . /workspace | head -100` — list files quickly
-  3. `rg -n "<pattern>" /workspace` — search source text
-  4. `cd /workspace && ctags -R --fields=+ne .` — build a symbol index
-  5. `cd /workspace && gtags --compact && global -x <symbol>` — cross-reference symbols
+  3. `tgrep index /workspace --index-path /tmp/tgrep-index` - build the search index
+  4. `tgrep -n --index-path /tmp/tgrep-index '<pattern>' /workspace` - search source text
+  5. `cd /workspace && ctags -R --fields=+ne .` - build a symbol index
+  6. `cd /workspace && gtags --compact && global -x <symbol>` - cross-reference symbols
