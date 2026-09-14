@@ -69,7 +69,7 @@ taskflow:
       must_complete: false
       repeat_prompt: true
       async: true
-      max_steps: 100
+      max_steps: 300
       name: entry point analysis
       description: Identify entry points that allow untrusted users to interact with the component.
       agents:
@@ -128,7 +128,7 @@ taskflow:
       must_complete: false
       repeat_prompt: true
       async: true
-      max_steps: 100
+      max_steps: 300
       name: user actions analysis
       description: Identify actions that untrusted users are allowed performed the component.
       agents:
