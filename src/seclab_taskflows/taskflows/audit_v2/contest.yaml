@@ -153,7 +153,7 @@ taskflow:
       model: adjudication
       max_steps: 120
       name: adjudicate
-      description: Decide each contested finding and assign its severity.
+      description: Decide each contested finding and record its preconditions.
       agents:
         - seclab_taskflows.personalities.finding_adjudicator
       user_prompt: |
@@ -174,10 +174,17 @@ taskflow:
         say what it claims they say loses, however well it reads.
 
         Then call `adjudicate_finding` for finding {{ result.finding_id }} with
-        your position and severity. Your `rationale` is what a human reviewer
+        your position. Your `rationale` is what a human reviewer
         reads first, so write it so that someone who has seen neither argument
         can follow your reasoning and check it against the code. Say explicitly
         which argument prevailed and on which point.
+
+        If your position is `exploitable`, you must also record the
+        preconditions — `required_access`, `required_config`,
+        `default_reachable` — and the `cwe` ids. The ledger will refuse to
+        confirm the finding without them. Those are what the finding is scoped
+        by downstream, so derive them from the code you just read rather than
+        from what this vulnerability class usually implies.
 
         Remember what your decision does: `exploitable` confirms the finding
         and sends it to dynamic reproduction, `not_exploitable` rejects it, and
@@ -185,7 +192,7 @@ taskflow:
 
         {% include 'seclab_taskflows.prompts.audit_v2.contest_rules' %}
 
-        {% include 'seclab_taskflows.prompts.audit_v2.severity_rubric' %}
+        {% include 'seclab_taskflows.prompts.audit_v2.preconditions' %}
 
         {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
       toolboxes:
@@ -202,7 +209,7 @@ taskflow:
         - seclab_taskflow_agent.personalities.assistant
       user_prompt: |
         Get the ledger summary for the repo {{ globals.repo }}, then list the
-        confirmed findings with their severity and the rejected findings with
-        the reason they were rejected.
+        confirmed findings with their preconditions and the rejected findings
+        with the reason they were rejected.
       toolboxes:
         - seclab_taskflows.toolboxes.audit_v2_finding_ledger

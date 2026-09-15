@@ -61,7 +61,8 @@ _FINDING = {
     "title": "Path traversal in file download",
     "vuln_class": "CWE-22",
     "state": "confirmed",
-    "severity": "high",
+    "required_access": "unauthenticated",
+    "default_reachable": "no",
     "proposed_by": "hunt_gpt",
 }
 _OUTPUTS = {

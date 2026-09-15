@@ -43,7 +43,8 @@ taskflow:
             component: {type: string}
             title: {type: string}
             vuln_class: {type: string}
-            severity: {type: string}
+            required_access: {type: string}
+            required_config: {type: string}
           required: [finding_id, repo, component, title, vuln_class]
       toolboxes:
         - seclab_taskflows.toolboxes.audit_v2_finding_ledger
@@ -73,6 +74,19 @@ taskflow:
         Call `get_finding` for id {{ result.finding_id }} to read its source,
         sink, flow, locations and hypothesis, along with the adjudicator's
         reasoning for confirming it. You are validating that specific path.
+
+        The adjudicator recorded the conditions this path needs:
+
+        required access: {{ result.required_access | default('unknown') }}
+        required config: {{ result.required_config | default('') | default('none recorded', true) }}
+
+        Stand the target up in that configuration. If a setting is named above,
+        set it before you try the path, otherwise a failure here means nothing:
+        you will have shown that the default build is safe, which nobody
+        disputed. If you find the path needs configuration that is not recorded
+        above, or works without configuration that is, say so in `observed` —
+        the preconditions are part of the claim and correcting them is as
+        useful as the reachability evidence itself.
 
         The repository is mounted at /workspace inside the reproduction
         container. Work there:

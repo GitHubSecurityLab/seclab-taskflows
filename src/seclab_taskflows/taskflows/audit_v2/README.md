@@ -53,6 +53,9 @@ backend decides what that evidence entitles the finding to:
 
 - `adjudicate_finding` is the only path to `confirmed`, and it is only
   reachable after both sides of the contest have filed their arguments.
+- Confirming a finding requires its preconditions. `unknown` is an allowed
+  answer for both, so this never blocks an honest adjudicator; it only stops
+  one from skipping the question and leaving a finding nobody can scope.
 - `store_reproduction_attempt` only promotes a finding that is already
   `confirmed`, and only when it observed the flow reach the sink at runtime.
 - A `reproduced` finding is immune to later adjudication. Once something has
@@ -64,6 +67,35 @@ backend decides what that evidence entitles the finding to:
 
 This matters because prompts are advice and code is not. A model that decides
 mid-run that its finding is obviously real cannot promote it by saying so.
+
+## There is no severity rating
+
+A confirmed finding records the conditions under which it is reachable, not a
+rating of how bad it is. `adjudicate_finding` takes `required_access`,
+`required_config`, `default_reachable` and `cwe`; there is no severity field
+anywhere in the ledger, and the report stage is explicitly told not to invent
+one.
+
+This is deliberate, and it is worth not undoing:
+
+- **Nothing downstream consumes a rating.** The report a maintainer actually
+  receives has an impact section and CWE ids, and no severity.
+- **The audit cannot see what severity depends on.** How much a finding matters
+  is a function of how the reader deploys the code. A model reading library
+  source has no access to that, so any label it produces is answering a
+  different question than the one the reader is asking, in the same words.
+- **A rating discards the evidence it was derived from.** "High" is a lossy
+  compression of "unauthenticated attacker, default configuration". The
+  uncompressed version is what lets a reader decide whether they are affected,
+  and it is what a maintainer needs in order to scope the fix.
+- **It kept the verdict honest.** Rating and verdict used to be set in one
+  call, which let severity leak backwards into the decision and gave a model
+  that wanted to hedge a way to confirm a finding while quietly rating it away
+  instead of making the call.
+
+So `default_reachable` is the bit that does the work a severity label was
+pretending to do, and `required_config` is what stops a finding that needs
+three opt-in settings from being reported as though it shipped enabled.
 
 ## Convergence is signal, not noise
 

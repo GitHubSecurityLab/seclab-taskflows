@@ -75,6 +75,16 @@ def _contested_finding(ledger, **kwargs):
     return _contest(ledger, _add_finding(ledger, **kwargs))
 
 
+def _confirm(ledger, finding_id, rationale="reachable", repo=REPO, **overrides):
+    """Adjudicate a finding exploitable, supplying the preconditions confirmation needs."""
+    preconditions = {
+        "required_access": "unauthenticated",
+        "default_reachable": "yes",
+        **overrides,
+    }
+    return ledger.adjudicate_finding(repo, finding_id, "exploitable", rationale, **preconditions)
+
+
 class TestFindingCreation:
     def test_new_finding_starts_as_candidate(self, ledger):
         finding_id = _add_finding(ledger)
@@ -86,7 +96,7 @@ class TestFindingCreation:
     def test_findings_filtered_by_state(self, ledger):
         first = _contested_finding(ledger)
         _add_finding(ledger, component="src/web")
-        ledger.adjudicate_finding(REPO, first, "exploitable", "high", "clear taint path")
+        _confirm(ledger, first, "clear taint path")
 
         confirmed = ledger.get_findings(REPO, state=STATE_CONFIRMED)
         candidates = ledger.get_findings(REPO, state=STATE_CANDIDATE)
@@ -107,31 +117,31 @@ class TestFindingCreation:
 class TestAdjudication:
     def test_exploitable_confirms_finding(self, ledger):
         finding_id = _contested_finding(ledger)
-        ledger.adjudicate_finding(REPO, finding_id, "exploitable", "high", "prosecution prevailed")
+        _confirm(ledger, finding_id, "prosecution prevailed")
         assert ledger.get_finding(finding_id)["state"] == STATE_CONFIRMED
 
     def test_not_exploitable_rejects_finding(self, ledger):
         finding_id = _contested_finding(ledger)
-        ledger.adjudicate_finding(REPO, finding_id, "not_exploitable", "none", "input is validated")
+        ledger.adjudicate_finding(REPO, finding_id, "not_exploitable", "input is validated")
         finding = ledger.get_finding(finding_id)
         assert finding["state"] == STATE_REJECTED
         assert finding["disposition_reason"] == "input is validated"
 
     def test_uncertain_leaves_finding_as_candidate(self, ledger):
         finding_id = _contested_finding(ledger)
-        ledger.adjudicate_finding(REPO, finding_id, "uncertain", "low", "needs runtime evidence")
+        ledger.adjudicate_finding(REPO, finding_id, "uncertain", "needs runtime evidence")
         assert ledger.get_finding(finding_id)["state"] == STATE_CANDIDATE
 
     def test_adjudication_is_recorded_as_a_verdict(self, ledger):
         finding_id = _contested_finding(ledger)
-        ledger.adjudicate_finding(REPO, finding_id, "exploitable", "medium", "reachable")
+        _confirm(ledger, finding_id, "reachable")
         roles = [v["role"] for v in ledger.get_finding(finding_id)["verdicts"]]
         assert roles == ["prosecution", "defense", "adjudication"]
 
     def test_adjudication_requires_both_advocates(self, ledger):
         finding_id = _add_finding(ledger)
 
-        result = ledger.adjudicate_finding(REPO, finding_id, "exploitable", "high", "reachable")
+        result = ledger.adjudicate_finding(REPO, finding_id, "exploitable", "reachable")
 
         assert "cannot be adjudicated yet" in result
         assert ledger.get_finding(finding_id)["state"] == STATE_CANDIDATE
@@ -142,7 +152,7 @@ class TestAdjudication:
             REPO, finding_id, "prosecution", "m", "exploitable", "reachable"
         )
 
-        result = ledger.adjudicate_finding(REPO, finding_id, "exploitable", "high", "reachable")
+        result = ledger.adjudicate_finding(REPO, finding_id, "exploitable", "reachable")
 
         assert "no defense verdict" in result
         assert ledger.get_finding(finding_id)["state"] == STATE_CANDIDATE
@@ -151,7 +161,7 @@ class TestAdjudication:
         finding_id = _add_finding(ledger)
         ledger.store_contest_verdict(REPO, finding_id, "defense", "m", "not_exploitable", "safe")
 
-        result = ledger.adjudicate_finding(REPO, finding_id, "exploitable", "high", "reachable")
+        result = ledger.adjudicate_finding(REPO, finding_id, "exploitable", "reachable")
 
         assert "no prosecution verdict" in result
         assert ledger.get_finding(finding_id)["state"] == STATE_CANDIDATE
@@ -159,12 +169,144 @@ class TestAdjudication:
     def test_invalid_position_is_rejected(self, ledger):
         finding_id = _contested_finding(ledger)
         with pytest.raises(InvalidLedgerValueError):
-            ledger.adjudicate_finding(REPO, finding_id, "probably", "high", "")
+            ledger.adjudicate_finding(REPO, finding_id, "probably", "")
 
-    def test_invalid_severity_is_rejected(self, ledger):
+    def test_invalid_required_access_is_rejected(self, ledger):
         finding_id = _contested_finding(ledger)
         with pytest.raises(InvalidLedgerValueError):
-            ledger.adjudicate_finding(REPO, finding_id, "exploitable", "catastrophic", "")
+            ledger.adjudicate_finding(
+                REPO, finding_id, "exploitable", "", required_access="root-ish"
+            )
+
+    def test_invalid_default_reachable_is_rejected(self, ledger):
+        finding_id = _contested_finding(ledger)
+        with pytest.raises(InvalidLedgerValueError):
+            ledger.adjudicate_finding(
+                REPO, finding_id, "exploitable", "", default_reachable="probably"
+            )
+
+
+class TestPreconditions:
+    """Preconditions replaced the severity rating: facts, not a label."""
+
+    def test_preconditions_are_recorded_on_a_confirmed_finding(self, ledger):
+        finding_id = _contested_finding(ledger)
+
+        ledger.adjudicate_finding(
+            REPO,
+            finding_id,
+            "exploitable",
+            "reachable",
+            required_access="unauthenticated",
+            required_config="server.allow_uploads=true",
+            default_reachable="no",
+            cwe=["CWE-22"],
+        )
+
+        finding = ledger.get_finding(finding_id)
+        assert finding["required_access"] == "unauthenticated"
+        assert finding["required_config"] == "server.allow_uploads=true"
+        assert finding["default_reachable"] == "no"
+        assert finding["cwe"] == ["CWE-22"]
+
+    def test_omitted_preconditions_block_confirmation(self, ledger):
+        """Silence must not quietly become "unknown"; it must stop the promotion."""
+        finding_id = _contested_finding(ledger)
+
+        ledger.adjudicate_finding(REPO, finding_id, "exploitable", "reachable")
+
+        finding = ledger.get_finding(finding_id)
+        assert finding["state"] == STATE_CANDIDATE
+        assert finding["required_access"] == ""
+        assert finding["default_reachable"] == ""
+
+    def test_cwe_list_is_capped_at_three(self, ledger):
+        """The report schema this feeds accepts at most three."""
+        finding_id = _contested_finding(ledger)
+
+        ledger.adjudicate_finding(
+            REPO,
+            finding_id,
+            "exploitable",
+            "reachable",
+            required_access="unauthenticated",
+            default_reachable="yes",
+            cwe=["CWE-78", "CWE-77", "CWE-20", "CWE-74", "CWE-116"],
+        )
+
+        assert ledger.get_finding(finding_id)["cwe"] == ["CWE-78", "CWE-77", "CWE-20"]
+
+    def test_confirming_without_preconditions_is_refused(self, ledger):
+        """The point of the change is that preconditions get recorded."""
+        finding_id = _contested_finding(ledger)
+
+        result = ledger.adjudicate_finding(REPO, finding_id, "exploitable", "reachable")
+
+        assert "cannot be confirmed without its preconditions" in result
+        assert "required_access" in result
+        assert "default_reachable" in result
+        assert ledger.get_finding(finding_id)["state"] == STATE_CANDIDATE
+
+    def test_unknown_always_satisfies_the_precondition_requirement(self, ledger):
+        """Requiring preconditions must never be a dead end for the adjudicator."""
+        finding_id = _contested_finding(ledger)
+
+        ledger.adjudicate_finding(
+            REPO,
+            finding_id,
+            "exploitable",
+            "reachable",
+            required_access="unknown",
+            default_reachable="unknown",
+        )
+
+        finding = ledger.get_finding(finding_id)
+        assert finding["state"] == STATE_CONFIRMED
+        assert finding["required_access"] == "unknown"
+
+    def test_rejecting_needs_no_preconditions(self, ledger):
+        finding_id = _contested_finding(ledger)
+
+        ledger.adjudicate_finding(REPO, finding_id, "not_exploitable", "input is validated")
+
+        assert ledger.get_finding(finding_id)["state"] == STATE_REJECTED
+
+    def test_rejected_findings_do_not_carry_preconditions(self, ledger):
+        finding_id = _contested_finding(ledger)
+
+        ledger.adjudicate_finding(
+            REPO,
+            finding_id,
+            "not_exploitable",
+            "input is validated",
+            required_access="unauthenticated",
+            default_reachable="yes",
+        )
+
+        finding = ledger.get_finding(finding_id)
+        assert finding["required_access"] == ""
+        assert finding["default_reachable"] == ""
+
+    def test_cwe_ids_are_normalized(self, ledger):
+        finding_id = _contested_finding(ledger)
+
+        ledger.adjudicate_finding(
+            REPO,
+            finding_id,
+            "exploitable",
+            "reachable",
+            required_access="unauthenticated",
+            default_reachable="yes",
+            cwe=["78", "CWE-22: Path Traversal", "cwe 78", "not a cwe"],
+        )
+
+        assert ledger.get_finding(finding_id)["cwe"] == ["CWE-78", "CWE-22"]
+
+    def test_findings_carry_no_severity_field(self, ledger):
+        finding_id = _contested_finding(ledger)
+        _confirm(ledger, finding_id, "reachable")
+
+        assert "severity" not in ledger.get_finding(finding_id)
 
 
 class TestContestVerdicts:
@@ -197,7 +339,7 @@ class TestContestVerdicts:
 class TestReproductionGate:
     def test_reproduction_promotes_only_from_confirmed(self, ledger):
         finding_id = _contested_finding(ledger)
-        ledger.adjudicate_finding(REPO, finding_id, "exploitable", "high", "reachable")
+        _confirm(ledger, finding_id, "reachable")
         ledger.store_reproduction_attempt(
             REPO, finding_id, "reproducer", "curl ...", "reproduced", "read /etc/passwd"
         )
@@ -213,7 +355,7 @@ class TestReproductionGate:
 
     def test_failed_reproduction_leaves_state_confirmed(self, ledger):
         finding_id = _contested_finding(ledger)
-        ledger.adjudicate_finding(REPO, finding_id, "exploitable", "high", "reachable")
+        _confirm(ledger, finding_id, "reachable")
         ledger.store_reproduction_attempt(
             REPO, finding_id, "reproducer", "curl ...", "not_reproduced", "404 returned"
         )
@@ -221,11 +363,11 @@ class TestReproductionGate:
 
     def test_reproduced_finding_is_not_downgraded_by_adjudication(self, ledger):
         finding_id = _contested_finding(ledger)
-        ledger.adjudicate_finding(REPO, finding_id, "exploitable", "high", "reachable")
+        _confirm(ledger, finding_id, "reachable")
         ledger.store_reproduction_attempt(
             REPO, finding_id, "reproducer", "curl ...", "reproduced", "read /etc/passwd"
         )
-        ledger.adjudicate_finding(REPO, finding_id, "not_exploitable", "none", "second thoughts")
+        ledger.adjudicate_finding(REPO, finding_id, "not_exploitable", "second thoughts")
         assert ledger.get_finding(finding_id)["state"] == STATE_REPRODUCED
 
     def test_attempts_are_recorded_on_the_finding(self, ledger):
@@ -252,7 +394,7 @@ class TestReproductionGate:
 
     def test_adjudication_refuses_to_cross_repositories(self, ledger):
         foreign = _add_finding(ledger, repo="acme/other")
-        result = ledger.adjudicate_finding(REPO, foreign, "exploitable", "high", "reachable")
+        result = ledger.adjudicate_finding(REPO, foreign, "exploitable", "reachable")
         assert "refusing to adjudicate across repositories" in result
         assert ledger.get_finding(foreign)["state"] == STATE_CANDIDATE
 
@@ -423,7 +565,7 @@ class TestDeduplication:
     def test_adjudicated_findings_cannot_be_merged_away(self, ledger):
         canonical = _add_finding(ledger)
         confirmed = _contested_finding(ledger)
-        ledger.adjudicate_finding(REPO, confirmed, "exploitable", "high", "reachable")
+        _confirm(ledger, confirmed, "reachable")
 
         message = ledger.merge_duplicate_finding(REPO, confirmed, canonical)
 
@@ -451,7 +593,7 @@ class TestLedgerMaintenance:
     def test_summary_counts_by_state(self, ledger):
         confirmed = _contested_finding(ledger)
         _add_finding(ledger, component="src/web")
-        ledger.adjudicate_finding(REPO, confirmed, "exploitable", "high", "reachable")
+        _confirm(ledger, confirmed, "reachable")
 
         summary = ledger.get_ledger_summary(REPO)
 
@@ -471,7 +613,7 @@ class TestLedgerMaintenance:
         assert ledger.get_finding(9999) is None
 
     def test_writes_against_unknown_finding_are_reported(self, ledger):
-        assert "No finding" in ledger.adjudicate_finding(REPO, 9999, "exploitable", "high", "")
+        assert "No finding" in ledger.adjudicate_finding(REPO, 9999, "exploitable", "")
         assert "No finding" in ledger.store_reproduction_attempt(
             REPO, 9999, "m", "", "reproduced", ""
         )
@@ -549,6 +691,6 @@ class TestRepoNormalization:
 
     def test_guard_matches_the_same_repo_in_a_different_casing(self, ledger):
         finding_id = _contested_finding(ledger, repo="acme/widget")
-        result = ledger.adjudicate_finding("ACME/Widget", finding_id, "exploitable", "high", "x")
+        result = _confirm(ledger, finding_id, "x", repo="ACME/Widget")
         assert "adjudicated" in result
         assert ledger.get_finding(finding_id)["state"] == STATE_CONFIRMED

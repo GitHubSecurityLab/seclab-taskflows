@@ -60,7 +60,33 @@ OUTCOME_NOT_REPRODUCED = "not_reproduced"
 OUTCOME_INCONCLUSIVE = "inconclusive"
 REPRODUCTION_OUTCOMES = (OUTCOME_REPRODUCED, OUTCOME_NOT_REPRODUCED, OUTCOME_INCONCLUSIVE)
 
-SEVERITIES = ("critical", "high", "medium", "low", "none")
+# What an attacker must already have to reach the source. This is half of the
+# precondition pair that replaced a severity rating: severity was a single
+# label standing in for facts a triager has to re-derive anyway, and nothing
+# downstream consumed it. These are the facts.
+ACCESS_UNAUTHENTICATED = "unauthenticated"
+ACCESS_AUTHENTICATED = "authenticated"
+ACCESS_PRIVILEGED = "privileged"
+ACCESS_LOCAL = "local"
+ACCESS_UNKNOWN = "unknown"
+
+REQUIRED_ACCESS = (
+    ACCESS_UNAUTHENTICATED,
+    ACCESS_AUTHENTICATED,
+    ACCESS_PRIVILEGED,
+    ACCESS_LOCAL,
+    ACCESS_UNKNOWN,
+)
+
+# Whether the path is reachable in the target's default, documented
+# configuration. This is the single most decision-relevant bit about a
+# finding: a bug reachable only under opt-in configuration is a materially
+# different report from one that ships enabled.
+REACHABLE_YES = "yes"
+REACHABLE_NO = "no"
+REACHABLE_UNKNOWN = "unknown"
+
+DEFAULT_REACHABILITY = (REACHABLE_YES, REACHABLE_NO, REACHABLE_UNKNOWN)
 
 
 class Finding(Base):
@@ -85,7 +111,14 @@ class Finding(Base):
     # converged on the same path, which is a meaningful prior.
     proposed_by: Mapped[str] = mapped_column(default="")
     state: Mapped[str] = mapped_column(default=STATE_CANDIDATE)
-    severity: Mapped[str] = mapped_column(default="")
+    # Preconditions, set when the finding is resolved. Recorded as facts rather
+    # than compressed into a rating, because the downstream consumer needs to
+    # know *when* the path is reachable, not how bad someone thought it was.
+    required_access: Mapped[str] = mapped_column(default="")
+    required_config: Mapped[str] = mapped_column(Text, default="")
+    default_reachable: Mapped[str] = mapped_column(default="")
+    # JSON-encoded list of "CWE-nnn" strings, most specific first.
+    cwe: Mapped[str] = mapped_column(Text, default="[]")
     disposition_reason: Mapped[str] = mapped_column(Text, default="")
     # Set when this finding was folded into another as a duplicate.
     duplicate_of: Mapped[int | None] = mapped_column(Integer, default=None, nullable=True)
@@ -94,8 +127,8 @@ class Finding(Base):
     def __repr__(self):
         return (
             f"<Finding(id={self.id}, repo={self.repo}, component={self.component}, "
-            f"vuln_class={self.vuln_class}, state={self.state}, severity={self.severity}, "
-            f"title={self.title})>"
+            f"vuln_class={self.vuln_class}, state={self.state}, "
+            f"default_reachable={self.default_reachable}, title={self.title})>"
         )
 
 

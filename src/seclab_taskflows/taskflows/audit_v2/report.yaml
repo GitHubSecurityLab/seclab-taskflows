@@ -41,7 +41,8 @@ taskflow:
             title: {type: string}
             vuln_class: {type: string}
             state: {type: string}
-            severity: {type: string}
+            required_access: {type: string}
+            default_reachable: {type: string}
             proposed_by: {type: string}
           required: [finding_id, component, title, vuln_class, state]
       toolboxes:
@@ -89,7 +90,7 @@ taskflow:
         The ledger holds these findings:
 
         {% for f in outputs.findings %}
-        - id {{ f.finding_id }} [{{ f.state }}] {{ f.severity | default('') }}
+        - id {{ f.finding_id }} [{{ f.state }}]
           ({{ f.component }}, {{ f.vuln_class }}): {{ f.title }}
         {% endfor %}
 
@@ -106,10 +107,11 @@ taskflow:
         ## Reproduced findings
         The strongest results: findings that were argued, confirmed, and then
         actually triggered in a container. For each one give the title,
-        severity, component, the source-to-sink path with its locations, the
-        impact, and the exact reproduction: the commands from `harness` and the
-        observed output from `observed`. State the preconditions an attacker
-        needs.
+        component, the source-to-sink path with its locations, the impact, the
+        CWE ids, and the exact reproduction: the commands from `harness` and
+        the observed output from `observed`. State the preconditions exactly as
+        the ledger records them: `required_access`, `required_config`, and
+        whether the path is reachable in the default configuration.
 
         ## Confirmed but not reproduced
         Findings that survived adversarial review but were not triggered. For
@@ -144,7 +146,12 @@ taskflow:
         as confirmed only if its state is `confirmed`. Never present a rejected
         or uncertain finding as though it were real.
 
-        {% include 'seclab_taskflows.prompts.audit_v2.severity_rubric' %}
+        Do not assign severity ratings. This pipeline deliberately does not
+        produce them: whether a finding matters depends on how the reader
+        deploys the code, which this audit cannot see. Report the preconditions
+        the ledger records and let the reader judge. Do not invent a
+        critical/high/medium/low label, a CVSS score, or a risk ranking, and do
+        not order findings as though one had been rated above another.
       toolboxes:
         - seclab_taskflows.toolboxes.audit_v2_finding_ledger
 
@@ -169,7 +176,10 @@ taskflow:
         2. Any reproduction the draft describes appears in that finding's
            reproduction attempts, with outcome `reproduced`, and the observed
            output in the draft matches what was actually recorded.
-        3. The severity in the draft matches the severity in the ledger.
+        3. The preconditions and CWE ids in the draft match those in the
+           ledger, and the draft has not added a severity rating, CVSS score or
+           risk ranking of its own. The ledger records no severity; a draft
+           that asserts one is claiming something no stage decided.
         4. The locations quoted in the draft appear in the finding.
 
         Then output the final report: the draft with every discrepancy

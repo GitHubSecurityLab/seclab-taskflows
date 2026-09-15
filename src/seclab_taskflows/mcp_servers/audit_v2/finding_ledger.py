@@ -16,6 +16,7 @@ state.
 
 import json
 import logging
+import re
 
 from fastmcp import FastMCP
 from pydantic import Field
@@ -25,15 +26,16 @@ from sqlalchemy.orm import Session
 from .finding_ledger_models import (
     CONTEST_POSITIONS,
     CONTEST_ROLES,
+    DEFAULT_REACHABILITY,
     FINDING_STATES,
     OUTCOME_REPRODUCED,
     POSITION_EXPLOITABLE,
     POSITION_NOT_EXPLOITABLE,
     REPRODUCTION_OUTCOMES,
+    REQUIRED_ACCESS,
     ROLE_ADJUDICATION,
     ROLE_DEFENSE,
     ROLE_PROSECUTION,
-    SEVERITIES,
     STATE_CANDIDATE,
     STATE_CONFIRMED,
     STATE_DUPLICATE,
@@ -68,11 +70,40 @@ def _merge_labels(*label_groups) -> str:
     return ", ".join(seen)
 
 
+def _normalize_cwe(values) -> list[str]:
+    """Normalize CWE identifiers to canonical ``CWE-nnn`` form, most specific first.
+
+    Models write CWE references every way you can imagine: ``79``, ``cwe 79``,
+    ``CWE-79: Cross-site Scripting``. The downstream report schema wants a
+    numeric id, so anything that carries one is accepted and anything that
+    does not is dropped rather than stored as noise.
+
+    The list is capped at three, because that is what the report schema this
+    feeds accepts. Callers are asked for the most specific id first, so the
+    ones dropped here are the vaguest ones.
+    """
+    if isinstance(values, str):
+        values = re.split(r"[,;]", values)
+    normalized = []
+    for raw in values or []:
+        match = re.search(r"(\d{1,5})", str(raw))
+        if not match:
+            continue
+        label = f"CWE-{int(match.group(1))}"
+        if label not in normalized:
+            normalized.append(label)
+    return normalized[:3]
+
+
 def finding_to_dict(f):
     try:
         locations = json.loads(f.locations or "[]")
     except (json.JSONDecodeError, ValueError):
         locations = []
+    try:
+        cwe = json.loads(f.cwe or "[]")
+    except (json.JSONDecodeError, ValueError):
+        cwe = []
     return {
         "finding_id": f.id,
         "repo": f.repo.lower(),
@@ -87,7 +118,10 @@ def finding_to_dict(f):
         "hypothesis": f.hypothesis,
         "proposed_by": f.proposed_by,
         "state": f.state,
-        "severity": f.severity,
+        "required_access": f.required_access,
+        "required_config": f.required_config,
+        "default_reachable": f.default_reachable,
+        "cwe": cwe,
         "disposition_reason": f.disposition_reason,
         "duplicate_of": f.duplicate_of,
     }
@@ -299,16 +333,40 @@ class FindingLedgerBackend:
         return f"Recorded {role} verdict ({position}) for finding {finding_id}"
 
     @normalizes_repo
-    def adjudicate_finding(self, repo, finding_id, position, severity, rationale):
+    def adjudicate_finding(
+        self,
+        repo,
+        finding_id,
+        position,
+        rationale,
+        required_access="",
+        required_config="",
+        default_reachable="",
+        cwe=None,
+    ):
         """Resolve a contested finding. This is the only path to ``confirmed``.
 
         Adjudication requires that both advocates have actually filed. A
         contest with only one side is not a contest, and letting a finding
         reach ``confirmed`` on an unopposed argument would quietly undo the
         thing this stage exists to do.
+
+        Preconditions are recorded here rather than rated, and confirming a
+        finding requires them: an adjudicator that skips the question would
+        leave the ledger full of findings nobody can scope, which is the
+        failure a severity rating already produced. ``unknown`` is always an
+        available answer, so the requirement is satisfiable whenever the code
+        genuinely does not settle it. They are only meaningful for a finding
+        that survived, so they are stored when the position is ``exploitable``
+        and left alone otherwise.
         """
         position = _require(position, CONTEST_POSITIONS, "position")
-        severity = _require(severity, SEVERITIES, "severity")
+        if required_access:
+            required_access = _require(required_access, REQUIRED_ACCESS, "required_access")
+        if default_reachable:
+            default_reachable = _require(
+                default_reachable, DEFAULT_REACHABILITY, "default_reachable"
+            )
         with Session(self.engine) as session:
             finding = session.get(Finding, finding_id)
             if finding is None:
@@ -331,13 +389,34 @@ class FindingLedgerBackend:
                     f"{' or '.join(missing)} verdict has been filed. Call "
                     f"`store_contest_verdict` for each side first."
                 )
+            if position == POSITION_EXPLOITABLE and not (required_access and default_reachable):
+                missing_preconditions = [
+                    name
+                    for name, value in (
+                        ("required_access", required_access),
+                        ("default_reachable", default_reachable),
+                    )
+                    if not value
+                ]
+                return (
+                    f"Finding {finding_id} cannot be confirmed without its "
+                    f"preconditions; {' and '.join(missing_preconditions)} "
+                    f"{'is' if len(missing_preconditions) == 1 else 'are'} missing. "
+                    f"Call `adjudicate_finding` again with required_access (one of: "
+                    f"{', '.join(REQUIRED_ACCESS)}) and default_reachable (one of: "
+                    f"{', '.join(DEFAULT_REACHABILITY)}). Use `unknown` for either one "
+                    f"if the code genuinely does not settle it."
+                )
             if position == POSITION_EXPLOITABLE:
                 finding.state = STATE_CONFIRMED
+                finding.required_access = required_access
+                finding.required_config = required_config or ""
+                finding.default_reachable = default_reachable
+                finding.cwe = json.dumps(_normalize_cwe(cwe))
             elif position == POSITION_NOT_EXPLOITABLE:
                 finding.state = STATE_REJECTED
             else:
                 finding.state = STATE_CANDIDATE
-            finding.severity = severity
             finding.disposition_reason = rationale or ""
             session.add(
                 ContestVerdict(
@@ -502,7 +581,13 @@ def store_finding(
     repo: str = Field(description="The name of the GitHub repository"),
     component: str = Field(description="Directory or module the finding belongs to"),
     title: str = Field(description="Short one-line description of the finding"),
-    vuln_class: str = Field(description="Vulnerability class, e.g. CWE-22 or 'path traversal'"),
+    vuln_class: str = Field(
+        description=(
+            "Vulnerability class in plain words, e.g. 'path traversal'. This is a "
+            "grouping label for deduplication; the authoritative CWE ids are recorded "
+            "later, at adjudication."
+        )
+    ),
     language: str = Field(description="Primary language of the affected code", default=""),
     source: str = Field(description="Where the untrusted input originates", default=""),
     sink: str = Field(description="The dangerous operation reached by the input", default=""),
@@ -616,13 +701,53 @@ def adjudicate_finding(
     repo: str = Field(description="The name of the GitHub repository"),
     finding_id: int = Field(description="The ID of the finding to adjudicate"),
     position: str = Field(description=f"One of: {', '.join(CONTEST_POSITIONS)}"),
-    severity: str = Field(description=f"One of: {', '.join(SEVERITIES)}"),
     rationale: str = Field(description="Why the prosecution or defense prevailed", default=""),
+    required_access: str = Field(
+        description=(
+            "What the attacker must already have to reach the source. "
+            f"One of: {', '.join(REQUIRED_ACCESS)}. Required when position is exploitable."
+        ),
+        default="",
+    ),
+    required_config: str = Field(
+        description=(
+            "Non-default configuration, build flags or API usage the path depends on. "
+            "Empty means the path needs no special configuration."
+        ),
+        default="",
+    ),
+    default_reachable: str = Field(
+        description=(
+            "Whether the path is reachable in the target's default, documented "
+            f"configuration. One of: {', '.join(DEFAULT_REACHABILITY)}. "
+            "Required when position is exploitable."
+        ),
+        default="",
+    ),
+    cwe: list[str] = Field(
+        description="One to three CWE ids, most specific first, e.g. ['CWE-78']",
+        default_factory=list,
+    ),
 ):
-    """Resolve a contested finding. This is the only way a finding becomes confirmed."""
+    """Resolve a contested finding. This is the only way a finding becomes confirmed.
+
+    Preconditions describe when the path is reachable. They are recorded
+    instead of a severity rating: a rating compresses these facts into a label
+    that the reader has to unpack again, and the unpacking is what actually
+    decides whether a finding is worth reporting.
+    """
     repo = process_repo(owner, repo)
     try:
-        return backend.adjudicate_finding(repo, finding_id, position, severity, rationale)
+        return backend.adjudicate_finding(
+            repo,
+            finding_id,
+            position,
+            rationale,
+            required_access,
+            required_config,
+            default_reachable,
+            cwe,
+        )
     except InvalidLedgerValueError as exc:
         return f"Error: {exc}"
 

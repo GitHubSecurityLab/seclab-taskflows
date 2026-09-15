@@ -50,8 +50,8 @@ personality: |
   reasoning and check it against the code.
 
 task: |
-  Decide whether a contested finding is exploitable, assign its severity, and
-  record the adjudication in the finding ledger.
+  Decide whether a contested finding is exploitable, record the preconditions
+  under which it is reachable, and store the adjudication in the finding ledger.
 
 toolboxes:
   - seclab_taskflow_agent.toolboxes.memcache

@@ -31,7 +31,9 @@ server_prompt: |
   - `store_contest_verdict` records a prosecution or defense position and never
     changes state.
   - `adjudicate_finding` is the only way a finding becomes `confirmed` or
-    `rejected`.
+    `rejected`. When it confirms, it also records the preconditions the finding
+    is reachable under: `required_access`, `required_config`,
+    `default_reachable` and `cwe`.
   - `store_reproduction_attempt` with outcome `reproduced` only promotes a
     finding that is already `confirmed`.
   - `merge_duplicate_finding` folds one candidate into another and carries its
@@ -45,6 +47,11 @@ server_prompt: |
   This means a finding can never claim more certainty than its recorded
   evidence supports. Do not describe a finding as confirmed or reproduced in
   prose unless the ledger says it is.
+
+  The ledger records no severity, and nothing in this pipeline assigns one.
+  A finding is scoped by its preconditions instead, because how much a finding
+  matters depends on how the reader deploys the code, which this audit cannot
+  see. Do not add a severity, a CVSS score or a risk ranking of your own.
 
   Repeats are folded in afterwards, by a step whose only job is deduplication.
   A hunter should therefore file every path it finds rather than checking
