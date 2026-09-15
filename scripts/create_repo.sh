@@ -35,12 +35,21 @@ cd new-taskflows-repo
 cp -r "$SECLAB_TASKFLOWS/.devcontainer" .
 cp "$SECLAB_TASKFLOWS/CODE_OF_CONDUCT.md" .
 cp "$SECLAB_TASKFLOWS/.gitignore" .
+mkdir -p .github/workflows
 cp "$SECLAB_TASKFLOWS/.github/workflows/publish-to-pypi.yaml" .github/workflows/
 cp "$SECLAB_TASKFLOWS/.github/workflows/publish-to-testpypi.yaml" .github/workflows/
 
 # Replace any occurrences of "seclab-taskflows" with the correct project name.
 PROJECT_NAME="$(hatch project metadata name)"
-find . -type f -exec sed -i "s/seclab-taskflows/$PROJECT_NAME/g" {} \;
+# detect whether GNU sed or BSD sed (macOS) is being used
+if sed --version 2>/dev/null | grep -q "GNU sed"; then
+  SED_IN_PLACE=(-i)
+else
+  SED_IN_PLACE=(-i '')
+fi
+
+find . -type f -exec sed "${SED_IN_PLACE[@]}" \
+  "s/seclab-taskflows/$PROJECT_NAME/g" {} \;
 
 # Get the path to the source code. (Usually something like "src/my_project")
 SRCDIR="$(dirname $(find . -name __about__.py))"
