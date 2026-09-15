@@ -35,6 +35,7 @@ cd new-taskflows-repo
 cp -r "$SECLAB_TASKFLOWS/.devcontainer" .
 cp "$SECLAB_TASKFLOWS/CODE_OF_CONDUCT.md" .
 cp "$SECLAB_TASKFLOWS/.gitignore" .
+mkdir -p .github/workflows
 cp "$SECLAB_TASKFLOWS/.github/workflows/publish-to-pypi.yaml" .github/workflows/
 cp "$SECLAB_TASKFLOWS/.github/workflows/publish-to-testpypi.yaml" .github/workflows/
 
