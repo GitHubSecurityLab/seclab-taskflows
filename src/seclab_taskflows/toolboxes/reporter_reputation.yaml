@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+# Toolbox: Reporter Reputation tracker
+#
+# Provides tools for recording PVR triage outcomes per reporter and
+# querying their reputation score across prior reports.
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: toolbox
+
+server_params:
+  kind: stdio
+  command: python
+  args: ["-m", "seclab_taskflows.mcp_servers.reporter_reputation"]
+  env:
+    GH_TOKEN: "{{ env('GH_TOKEN') }}"
+    LOG_DIR: "{{ env('LOG_DIR') }}"
+    REPORTER_DB_DIR: "{{ env('REPORTER_DB_DIR', '') }}"
