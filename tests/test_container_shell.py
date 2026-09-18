@@ -76,7 +76,7 @@ class TestStartContainer:
             assert "run" in cmd
             assert "--name" in cmd
             assert "-v" in cmd
-            assert "/host/workspace:/workspace" in cmd
+            assert "/host/workspace:/workspace:ro" in cmd
             assert "test-image:latest" in cmd
             assert "tail" in cmd
 
@@ -90,6 +90,30 @@ class TestStartContainer:
             assert name.startswith("seclab-shell-")
             cmd = mock_run.call_args[0][0]
             assert "-v" not in cmd
+
+    def test_start_container_workspace_read_only_by_default(self):
+        """The workspace mount is read-only unless a caller opts in."""
+        with (
+            patch.object(cs_mod, "CONTAINER_IMAGE", "test-image:latest"),
+            patch.object(cs_mod, "CONTAINER_WORKSPACE", "/host/workspace"),
+            patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "ro"),
+            patch("subprocess.run", return_value=_make_proc(returncode=0)) as mock_run,
+        ):
+            cs_mod._start_container()
+            cmd = mock_run.call_args[0][0]
+            assert "/host/workspace:/workspace:ro" in cmd
+
+    def test_start_container_workspace_rw_opt_in(self):
+        """CONTAINER_WORKSPACE_MODE=rw restores a writable mount."""
+        with (
+            patch.object(cs_mod, "CONTAINER_IMAGE", "test-image:latest"),
+            patch.object(cs_mod, "CONTAINER_WORKSPACE", "/host/workspace"),
+            patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "rw"),
+            patch("subprocess.run", return_value=_make_proc(returncode=0)) as mock_run,
+        ):
+            cs_mod._start_container()
+            cmd = mock_run.call_args[0][0]
+            assert "/host/workspace:/workspace:rw" in cmd
 
     def test_start_container_failure(self):
         with (
@@ -139,6 +163,36 @@ class TestStartContainer:
             cmd = mock_run.call_args[0][0]
             assert "--network" in cmd
             assert cmd[cmd.index("--network") + 1] == "bridge"
+
+    def test_workspace_mode_defaults_to_ro_when_unset(self, monkeypatch):
+        original = os.environ.get("CONTAINER_WORKSPACE_MODE")
+        monkeypatch.delenv("CONTAINER_WORKSPACE_MODE", raising=False)
+        try:
+            reloaded = _reload_cs()
+            assert reloaded.CONTAINER_WORKSPACE_MODE == "ro"
+        finally:
+            _restore_env_and_reload("CONTAINER_WORKSPACE_MODE", original)
+
+    @pytest.mark.parametrize("value", ["", "   ", "\t", "bogus", "readwrite", "ro"])
+    def test_workspace_mode_falls_back_to_ro(self, monkeypatch, value):
+        """Only an explicit "rw" opts in; anything else is read-only."""
+        original = os.environ.get("CONTAINER_WORKSPACE_MODE")
+        monkeypatch.setenv("CONTAINER_WORKSPACE_MODE", value)
+        try:
+            reloaded = _reload_cs()
+            assert reloaded.CONTAINER_WORKSPACE_MODE == "ro"
+        finally:
+            _restore_env_and_reload("CONTAINER_WORKSPACE_MODE", original)
+
+    @pytest.mark.parametrize("value", ["rw", "RW", " rw "])
+    def test_workspace_mode_rw_opt_in(self, monkeypatch, value):
+        original = os.environ.get("CONTAINER_WORKSPACE_MODE")
+        monkeypatch.setenv("CONTAINER_WORKSPACE_MODE", value)
+        try:
+            reloaded = _reload_cs()
+            assert reloaded.CONTAINER_WORKSPACE_MODE == "rw"
+        finally:
+            _restore_env_and_reload("CONTAINER_WORKSPACE_MODE", original)
 
     def test_network_defaults_to_none_when_unset(self, monkeypatch):
         original = os.environ.get("CONTAINER_NETWORK")
@@ -300,6 +354,19 @@ class TestPersistentContainer:
             with patch.object(cs_mod, "CONTAINER_WORKSPACE", "/source/tree-b"):
                 name_b = cs_mod._persistent_name()
             assert name_a != name_b
+
+    def test_persistent_name_varies_with_workspace_mode(self):
+        """A "ro" run must not reuse a container created with a writable mount."""
+        with (
+            patch.object(cs_mod, "CONTAINER_IMAGE", "test-image:latest"),
+            patch.object(cs_mod, "CONTAINER_WORKSPACE", "/source/tree"),
+            patch.object(cs_mod, "CONTAINER_PERSIST_KEY", ""),
+        ):
+            with patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "ro"):
+                name_ro = cs_mod._persistent_name()
+            with patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "rw"):
+                name_rw = cs_mod._persistent_name()
+            assert name_ro != name_rw
 
     def test_persistent_name_varies_with_network(self):
         with (
