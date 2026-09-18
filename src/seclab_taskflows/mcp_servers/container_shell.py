@@ -8,6 +8,12 @@ toolbox YAML's ``server_params.env`` block):
 
 - ``CONTAINER_IMAGE`` — image to run (required).
 - ``CONTAINER_WORKSPACE`` — host path bind-mounted at ``/workspace`` (optional).
+- ``CONTAINER_WORKSPACE_MODE`` — bind-mount mode for that path, ``ro`` (default)
+  or ``rw``. Defaults to read-only so a command run inside the container cannot
+  modify the host's copy of the source under audit. Set it to ``rw`` only if a
+  taskflow genuinely needs to write into the workspace. An empty, unset, or
+  unrecognized value falls back to ``ro``, so the default cannot be silently
+  weakened by a blank variable.
 - ``CONTAINER_TIMEOUT`` — default per-command timeout in seconds (default 30).
 - ``CONTAINER_PERSIST`` — reuse a deterministic container across runs when truthy.
 - ``CONTAINER_PERSIST_KEY`` — extra key to distinguish persistent containers.
@@ -66,6 +72,17 @@ _container_name: str | None = None
 
 CONTAINER_IMAGE = os.environ.get("CONTAINER_IMAGE", "")
 CONTAINER_WORKSPACE = os.environ.get("CONTAINER_WORKSPACE", "")
+# Bind-mount mode for CONTAINER_WORKSPACE. Defaults to "ro" so a command run
+# inside the container cannot modify the host's copy of the source under audit.
+# This matters because the workspace is typically the tree being analyzed, and
+# callers commonly collect it afterwards as an artifact: a writable mount makes
+# that artifact agent-influenced rather than a faithful copy of the input. Set
+# CONTAINER_WORKSPACE_MODE to "rw" to opt in to writes. An empty or
+# unrecognized value falls back to "ro" so the default cannot be silently
+# weakened by a blank variable.
+CONTAINER_WORKSPACE_MODE = (
+    "rw" if os.environ.get("CONTAINER_WORKSPACE_MODE", "").strip().lower() == "rw" else "ro"
+)
 CONTAINER_TIMEOUT = int(os.environ.get("CONTAINER_TIMEOUT", "30"))
 CONTAINER_PERSIST = os.environ.get("CONTAINER_PERSIST", "").lower() in ("1", "true", "yes")
 CONTAINER_PERSIST_KEY = os.environ.get("CONTAINER_PERSIST_KEY", "")
@@ -102,9 +119,14 @@ def _persistent_name() -> str:
     source trees. Including the network mode ensures a run configured for one
     network (e.g. the default "none") never reuses a persistent container that
     was created with a different, more permissive network (e.g. "bridge"),
-    which would otherwise silently re-enable egress.
+    which would otherwise silently re-enable egress. The workspace mount mode
+    is included for the same reason: a run configured for the default "ro" must
+    not reuse a container that was created with a writable workspace.
     """
-    key_material = f"{CONTAINER_IMAGE}:{CONTAINER_WORKSPACE}:net={CONTAINER_NETWORK}"
+    key_material = (
+        f"{CONTAINER_IMAGE}:{CONTAINER_WORKSPACE}"
+        f":net={CONTAINER_NETWORK}:ws={CONTAINER_WORKSPACE_MODE}"
+    )
     if CONTAINER_PERSIST_KEY:
         key_material += f":{CONTAINER_PERSIST_KEY}"
     digest = hashlib.sha256(key_material.encode()).hexdigest()[:12]
@@ -172,7 +194,7 @@ def _start_container() -> str:
     if not CONTAINER_PERSIST:
         cmd.append("--rm")
     if CONTAINER_WORKSPACE:
-        cmd += ["-v", f"{CONTAINER_WORKSPACE}:/workspace"]
+        cmd += ["-v", f"{CONTAINER_WORKSPACE}:/workspace:{CONTAINER_WORKSPACE_MODE}"]
     cmd += [CONTAINER_IMAGE, "tail", "-f", "/dev/null"]
     logging.debug(f"Starting container: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=_DOCKER_TIMEOUT)
