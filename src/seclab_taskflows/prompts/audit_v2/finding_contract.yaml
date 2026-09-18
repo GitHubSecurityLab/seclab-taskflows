@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: prompt
+
+prompt: |
+  ## What a finding is
+
+  A finding is a concrete, attacker-reachable path from untrusted input to a
+  dangerous operation. It is not a code smell, a missing best practice, or a
+  hardening opportunity. If nothing an attacker controls reaches the dangerous
+  operation, it is not a finding.
+
+  Every finding you file must name all three parts of the path:
+
+  - **source**  — where the untrusted data enters, with a file and line. Say
+    who controls it and why they are untrusted.
+  - **sink**    — the dangerous operation reached, with a file and line.
+  - **flow**    — how the data actually gets from source to sink: the calls it
+    passes through, and every check it does or does not survive on the way.
+
+  A finding whose flow is "the value is eventually used unsafely" is not a
+  finding, it is a guess. Trace the real path.
+
+  `locations` must list the file and line of each hop that matters, as
+  `path/to/file.ext:line` strings, starting at the source and ending at the
+  sink.
+
+  `hypothesis` states what an attacker gains: read arbitrary files, execute
+  commands as the service user, bypass authentication, and so on. Be specific
+  about the impact, and about what the attacker must already have in order to
+  reach the source.
+
+  ## Filing findings
+
+  File every distinct path you find, and do not look at what other hunters
+  have filed before you file. Several hunters are working this repository at
+  the same time, deliberately from different model families. Two of them
+  arriving independently at the same path is the strongest signal this
+  pipeline produces, and it only exists if each of you files what you found
+  without being influenced by, or deferring to, the others.
+
+  So do not call `find_similar_findings` to decide whether to file. If a path
+  is real, file it, even if you suspect someone already has. A later step
+  folds the repeats together and records every model that proposed each path,
+  so nothing is lost by filing and the corroboration is lost by staying quiet.
+
+  Call `store_finding` once per distinct path. Two paths are distinct if they
+  have different sources or different sinks; the same source reaching the same
+  sink by a slightly different route is one finding. Keep the ids it returns:
+  you are asked for them at the end, and they are how your findings get
+  credited to you.
+
+  Findings enter the ledger as `candidate`. That is all they are at this point:
+  you are proposing a hypothesis for adversarial review, not declaring a
+  vulnerability. Do not describe your own candidates as confirmed.

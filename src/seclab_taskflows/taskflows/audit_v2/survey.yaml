@@ -1,0 +1,228 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config_audit_v2
+
+globals:
+  repo:
+
+# Stage 1 of the audit v2 pipeline: build the map the rest of the audit hunts
+# over.
+#
+# Unlike the v1 audit this does not assume the target is a web application. The
+# attack surface question is asked in terms of trust boundaries, so it works for
+# parsers, libraries, daemons, command line tools and native code too.
+#
+# Data flow here is explicit rather than positional: the fan-out declares an
+# `outputs` contract and iterates with `over`, so the stage fails loudly if the
+# shape it depends on is wrong instead of quietly iterating whichever tool
+# happened to fire last.
+taskflow:
+  - task:
+      must_complete: true
+      headless: true
+      exclude_from_context: true
+      max_steps: 20
+      model: general_tasks
+      name: reset prior state
+      description: Clear any state left over from an earlier run of this repo.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Clear the memory cache. Clear the survey for the repo
+        {{ globals.repo }}. Clear the findings in the finding ledger for the
+        repo {{ globals.repo }}.
+      toolboxes:
+        - seclab_taskflow_agent.toolboxes.memcache
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  # Kept as its own task with a single toolbox on purpose. Folded in with the
+  # resets above, the model reliably did one of the jobs and stopped, leaving
+  # an empty /workspace for every stage that follows.
+  - task:
+      must_complete: true
+      headless: true
+      exclude_from_context: true
+      max_steps: 20
+      model: general_tasks
+      name: fetch source
+      description: Fetch and extract the source code for container analysis.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch and extract the source code of the repo {{ globals.repo }} for
+        container_shell analysis.
+      toolboxes:
+        - seclab_taskflows.toolboxes.local_gh_resources
+
+  - task:
+      must_complete: true
+      model: survey
+      max_steps: 100
+      name: map components
+      description: Identify what the repository is and decompose it into components.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
+        Map the repository {{ globals.repo }}, which is mounted at /workspace.
+
+        First work out what this software actually is. Read the README, the
+        packaging metadata, the documentation and the top-level layout. It may
+        be an application, a library, a framework, a parser, a command line
+        tool, a daemon, a build plugin, or several of these at once. Do not
+        assume it is a web application.
+
+        Then decompose it into components. A component is a coherent unit of
+        functionality that can be reasoned about on its own: one service, one
+        parser, one protocol implementation, one subsystem. Be granular. A
+        library is almost never a single component; group its directories by
+        what they do. If the repository contains several applications, each one
+        is its own component.
+
+        A component is identified by its `location`, and each location is one
+        component. If you would give two components the same directory or file,
+        they are one component: record it once and describe both roles in its
+        notes. If they are genuinely separate, give them separate locations.
+
+        For each component, store an entry with `store_component`. Set its
+        `kind` to the closest of: application, service, library, parser, cli,
+        daemon, plugin, other. Set `is_app` and `is_library` according to how
+        the component is consumed; a component is frequently both. Record
+        `language` and `runtime`, and use `notes` to record:
+
+        - what the component does
+        - who or what talks to it, and across which trust boundary
+        - anything that makes it interesting to attack: it parses untrusted
+          formats, it executes things, it makes authorisation decisions, it
+          handles credentials, it manages memory by hand
+
+        Record components only. The entry points are mapped in the next step,
+        so do not call `store_entry_point` here.
+
+        Identify example, demo, fixture and test code. Do not create components
+        for these, and say in your summary which directories you excluded.
+
+        {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
+      toolboxes:
+        - seclab_taskflows.toolboxes.container_shell_source_access
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
+
+  - task:
+      id: components
+      must_complete: true
+      exclude_from_context: true
+      max_steps: 5
+      model: general_tasks
+      name: fetch components
+      description: Publish the component list as a typed output.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Call `get_components` once for the repo {{ globals.repo }} and return
+        its result. Make no other tool calls.
+      outputs:
+        type: array
+        items:
+          type: object
+          properties:
+            component_id: {type: integer}
+            repo: {type: string}
+            location: {type: string}
+            kind: {type: string}
+          required: [component_id, repo, location]
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
+
+  - task:
+      if: "outputs.components | length > 0"
+      must_complete: false
+      repeat_prompt: true
+      over: "outputs.components"
+      async: true
+      async_limit: 4
+      model: survey
+      max_steps: 100
+      name: map attack surface
+      description: Identify where untrusted data crosses into each component.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
+        The component is in {{ result.repo }} in the directory
+        {{ result.location }}, and its id is {{ result.component_id }}.
+        Previous analysis recorded:
+
+        kind:          {{ result.kind | default('unknown') }}
+        is_application ? {{ result.is_app | default('unknown') }}
+        is_library     ? {{ result.is_library | default('unknown') }}
+
+        {{ result.notes | default('') }}
+
+        Map this component's attack surface: every place where data crosses
+        into it from somewhere less trusted. Think in terms of trust
+        boundaries, not in terms of any one kind of software.
+
+        Untrusted input includes, depending on what this component is:
+
+        - network input: requests, responses, protocol messages, peers
+        - file and stream input: anything parsed whose bytes came from
+          elsewhere, including archives, images, documents and serialised data
+        - input from other processes: IPC, pipes, sockets, environment and
+          arguments set by a less privileged caller
+        - stored data written by another user: database rows, cache entries,
+          queue messages, uploaded files
+        - repository and package content: filenames, paths, metadata, manifests
+        - for a library: the parameters its documented public API tells callers
+          they may pass, when a caller would reasonably pass attacker data
+
+        The following are *not* untrusted on their own: configuration the
+        operator wrote, arguments the operator typed, environment the operator
+        set. They become interesting when they point at untrusted resources; a
+        filename the operator supplies is trusted, but the file's contents may
+        not be.
+
+        For each entry point, call `store_entry_point` with `component_id`
+        {{ result.component_id }}, the precise file and integer line number,
+        the `trust_boundary` that is crossed (one of: network, file, ipc,
+        process, stored_data, package_content, library_api, other), the
+        variables that carry untrusted data, and notes explaining why the data
+        on the other side of that boundary is untrusted. If an entry point
+        spans several lines, use the first.
+
+        Record only the entry points of the component in
+        {{ result.location }}. Other components are being mapped alongside this
+        one, so an entry point that belongs to a different component is not
+        yours to record.
+
+        Do not assess vulnerabilities here. You are drawing the map, not
+        hunting on it.
+
+        {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
+      toolboxes:
+        - seclab_taskflows.toolboxes.container_shell_source_access
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
+
+  - task:
+      must_complete: true
+      model: survey
+      max_steps: 30
+      name: survey summary
+      description: Summarise the map produced by this stage.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Fetch the components and the entry points for the repo
+        {{ globals.repo }}.
+
+        Summarise what this repository is, which components exist, and where
+        untrusted data enters each one. Call out the components you would
+        prioritise for hunting and say why, in one or two sentences each.
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
