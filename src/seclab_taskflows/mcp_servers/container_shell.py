@@ -8,12 +8,13 @@ toolbox YAML's ``server_params.env`` block):
 
 - ``CONTAINER_IMAGE`` — image to run (required).
 - ``CONTAINER_WORKSPACE`` — host path bind-mounted at ``/workspace`` (optional).
-- ``CONTAINER_WORKSPACE_MODE`` — bind-mount mode for that path, ``ro`` (default)
-  or ``rw``. Defaults to read-only so a command run inside the container cannot
-  modify the host's copy of the source under audit. Set it to ``rw`` only if a
-  taskflow genuinely needs to write into the workspace. An empty, unset, or
-  unrecognized value falls back to ``ro``, so the default cannot be silently
-  weakened by a blank variable.
+- ``CONTAINER_WORKSPACE_MODE`` — bind-mount mode for that path, ``rw`` (default)
+  or ``ro``. The default preserves the historical writable mount, because the
+  shipped source-access and SAST prompts build symbol indexes in-tree
+  (``ctags -R .``, ``cscope -R -b``, ``gtags``). Set it to ``ro`` when the
+  workspace should be left pristine — for example when the caller collects the
+  tree afterwards as an artifact and wants a faithful copy of the input. Only a
+  literal ``ro`` selects read-only; any other value mounts read-write.
 - ``CONTAINER_TIMEOUT`` — default per-command timeout in seconds (default 30).
 - ``CONTAINER_PERSIST`` — reuse a deterministic container across runs when truthy.
 - ``CONTAINER_PERSIST_KEY`` — extra key to distinguish persistent containers.
@@ -72,16 +73,17 @@ _container_name: str | None = None
 
 CONTAINER_IMAGE = os.environ.get("CONTAINER_IMAGE", "")
 CONTAINER_WORKSPACE = os.environ.get("CONTAINER_WORKSPACE", "")
-# Bind-mount mode for CONTAINER_WORKSPACE. Defaults to "ro" so a command run
-# inside the container cannot modify the host's copy of the source under audit.
-# This matters because the workspace is typically the tree being analyzed, and
-# callers commonly collect it afterwards as an artifact: a writable mount makes
-# that artifact agent-influenced rather than a faithful copy of the input. Set
-# CONTAINER_WORKSPACE_MODE to "rw" to opt in to writes. An empty or
-# unrecognized value falls back to "ro" so the default cannot be silently
-# weakened by a blank variable.
+# Bind-mount mode for CONTAINER_WORKSPACE. Defaults to "rw", which preserves
+# the historical behaviour: the shipped source-access and SAST prompts tell the
+# model to build symbol indexes in-tree (`ctags -R .`, `cscope -R -b`, `gtags`),
+# which write into the workspace. Setting this to "ro" is worth doing whenever
+# the caller collects the workspace afterwards as an artifact, since a writable
+# mount makes that artifact agent-influenced rather than a faithful copy of the
+# input. Flipping the default would require redirecting those index outputs
+# first. Only a literal "ro" selects read-only, so a blank or unrecognized
+# value cannot accidentally break a workflow that needs to write.
 CONTAINER_WORKSPACE_MODE = (
-    "rw" if os.environ.get("CONTAINER_WORKSPACE_MODE", "").strip().lower() == "rw" else "ro"
+    "ro" if os.environ.get("CONTAINER_WORKSPACE_MODE", "").strip().lower() == "ro" else "rw"
 )
 CONTAINER_TIMEOUT = int(os.environ.get("CONTAINER_TIMEOUT", "30"))
 CONTAINER_PERSIST = os.environ.get("CONTAINER_PERSIST", "").lower() in ("1", "true", "yes")
@@ -108,6 +110,28 @@ _SUPPORTED_TRANSPORTS = ("stdio", "http", "streamable-http", "sse")
 
 _DEFAULT_WORKDIR = "/workspace"
 _DOCKER_TIMEOUT = 30
+
+
+def _legacy_persistent_names() -> list[str]:
+    """Names this config would have had before CONTAINER_WORKSPACE_MODE existed.
+
+    The mode was added to the key material so a run configured for the default
+    "ro" cannot reuse a container created with a writable workspace. That
+    changes the deterministic name for every pre-existing persistent container,
+    which would otherwise be orphaned: _start_container() only ever inspects or
+    removes the name it computes, so the old container would linger, never
+    reused and never cleaned up.
+
+    Returns the pre-mode name so callers can reap it once on upgrade. Note the
+    reap uses the same non-forcing ``docker rm`` as the same-name path, so a
+    legacy container that is still *running* is left alone rather than killed
+    out from under whoever is using it; only stopped leftovers are collected.
+    """
+    legacy = f"{CONTAINER_IMAGE}:{CONTAINER_WORKSPACE}:net={CONTAINER_NETWORK}"
+    if CONTAINER_PERSIST_KEY:
+        legacy += f":{CONTAINER_PERSIST_KEY}"
+    digest = hashlib.sha256(legacy.encode()).hexdigest()[:12]
+    return [f"seclab-persist-{digest}"]
 
 
 def _persistent_name() -> str:
@@ -187,6 +211,12 @@ def _start_container() -> str:
             return name
         # Remove stopped leftover with the same name
         _remove_container(name)
+        # Reap the pre-CONTAINER_WORKSPACE_MODE name for this same config, so
+        # upgrading does not strand a stopped container that can no longer be
+        # reused. Non-forcing, so a running one is left alone.
+        for legacy in _legacy_persistent_names():
+            if legacy != name:
+                _remove_container(legacy)
     else:
         name = f"seclab-shell-{uuid.uuid4().hex[:8]}"
 

@@ -12,6 +12,7 @@ server_params:
   env:
     CONTAINER_IMAGE: "ghcr.io/githubsecuritylab/seclab-shell-network-analysis:latest"
     CONTAINER_WORKSPACE: "{{ env('CONTAINER_WORKSPACE', required=False) }}"
+    CONTAINER_WORKSPACE_MODE: "{{ env('CONTAINER_WORKSPACE_MODE', 'rw') }}"
     CONTAINER_TIMEOUT: "{{ env('CONTAINER_TIMEOUT', '30') }}"
     CONTAINER_PERSIST: "{{ env('CONTAINER_PERSIST', required=False) }}"
     CONTAINER_PERSIST_KEY: "{{ env('CONTAINER_PERSIST_KEY', required=False) }}"
