@@ -116,36 +116,24 @@ class TestStartContainer:
             cmd = mock_run.call_args[0][0]
             assert "/host/workspace:/workspace:ro" in cmd
 
-    def test_start_container_reaps_legacy_persistent_name(self):
-        """Upgrading must not strand the pre-CONTAINER_WORKSPACE_MODE container."""
-        with (
-            patch.object(cs_mod, "CONTAINER_IMAGE", "test-image:latest"),
-            patch.object(cs_mod, "CONTAINER_WORKSPACE", "/host/workspace"),
-            patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "ro"),
-            patch.object(cs_mod, "CONTAINER_PERSIST", True),
-            patch.object(cs_mod, "CONTAINER_PERSIST_KEY", ""),
-            patch.object(cs_mod, "_is_running", return_value=False),
-            patch.object(cs_mod, "_remove_container") as mock_rm,
-            patch("subprocess.run", return_value=_make_proc(returncode=0)),
-        ):
-            cs_mod._start_container()
-            removed = [c[0][0] for c in mock_rm.call_args_list]
-            legacy = cs_mod._legacy_persistent_names()[0]
-            assert cs_mod._persistent_name() in removed
-            assert legacy in removed
+    def test_persistent_name_unchanged_at_default_mode(self):
+        """Upgrading must not rename existing persistent containers.
 
-    def test_legacy_persistent_name_matches_pre_mode_scheme(self):
-        """The legacy name is the current name computed without the ws= field."""
+        The pre-CONTAINER_WORKSPACE_MODE name is the one derived without a
+        ws= field, so the default must reproduce it exactly or every existing
+        persistent container is orphaned on upgrade.
+        """
         with (
             patch.object(cs_mod, "CONTAINER_IMAGE", "test-image:latest"),
             patch.object(cs_mod, "CONTAINER_WORKSPACE", "/host/workspace"),
             patch.object(cs_mod, "CONTAINER_NETWORK", "none"),
+            patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "rw"),
             patch.object(cs_mod, "CONTAINER_PERSIST_KEY", ""),
         ):
-            expected = hashlib.sha256(
+            pre_mode = hashlib.sha256(
                 b"test-image:latest:/host/workspace:net=none"
             ).hexdigest()[:12]
-            assert cs_mod._legacy_persistent_names() == [f"seclab-persist-{expected}"]
+            assert cs_mod._persistent_name() == f"seclab-persist-{pre_mode}"
 
     def test_start_container_failure(self):
         with (
@@ -439,7 +427,6 @@ class TestPersistentContainer:
             stdout="",
         )
         rm_proc = _make_proc(returncode=0)
-        legacy_rm_proc = _make_proc(returncode=0)
         run_proc = _make_proc(returncode=0)
         with (
             patch.object(cs_mod, "CONTAINER_IMAGE", "test-image:latest"),
@@ -448,7 +435,7 @@ class TestPersistentContainer:
             patch.object(cs_mod, "CONTAINER_PERSIST_KEY", ""),
             patch(
                 "subprocess.run",
-                side_effect=[inspect_proc, rm_proc, legacy_rm_proc, run_proc],
+                side_effect=[inspect_proc, rm_proc, run_proc],
             ) as mock_run,
         ):
             name = cs_mod._start_container()

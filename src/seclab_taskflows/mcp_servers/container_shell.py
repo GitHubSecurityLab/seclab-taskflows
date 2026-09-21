@@ -112,28 +112,6 @@ _DEFAULT_WORKDIR = "/workspace"
 _DOCKER_TIMEOUT = 30
 
 
-def _legacy_persistent_names() -> list[str]:
-    """Names this config would have had before CONTAINER_WORKSPACE_MODE existed.
-
-    The mode was added to the key material so a run configured for the default
-    "ro" cannot reuse a container created with a writable workspace. That
-    changes the deterministic name for every pre-existing persistent container,
-    which would otherwise be orphaned: _start_container() only ever inspects or
-    removes the name it computes, so the old container would linger, never
-    reused and never cleaned up.
-
-    Returns the pre-mode name so callers can reap it once on upgrade. Note the
-    reap uses the same non-forcing ``docker rm`` as the same-name path, so a
-    legacy container that is still *running* is left alone rather than killed
-    out from under whoever is using it; only stopped leftovers are collected.
-    """
-    legacy = f"{CONTAINER_IMAGE}:{CONTAINER_WORKSPACE}:net={CONTAINER_NETWORK}"
-    if CONTAINER_PERSIST_KEY:
-        legacy += f":{CONTAINER_PERSIST_KEY}"
-    digest = hashlib.sha256(legacy.encode()).hexdigest()[:12]
-    return [f"seclab-persist-{digest}"]
-
-
 def _persistent_name() -> str:
     """Derive a deterministic container name from the image for reuse across tasks.
 
@@ -143,14 +121,20 @@ def _persistent_name() -> str:
     source trees. Including the network mode ensures a run configured for one
     network (e.g. the default "none") never reuses a persistent container that
     was created with a different, more permissive network (e.g. "bridge"),
-    which would otherwise silently re-enable egress. The workspace mount mode
-    is included for the same reason: a run configured for the default "ro" must
-    not reuse a container that was created with a writable workspace.
+    which would otherwise silently re-enable egress.
+
+    The workspace mount mode is included for the same reason, but only when it
+    differs from the "rw" default. Appending it unconditionally would change the
+    derived name for every persistent container that already exists, orphaning
+    each one on upgrade: _start_container() only ever inspects or removes the
+    name it computes, and persistent containers are normally left running, so a
+    non-forcing ``docker rm`` would not collect them either. Omitting the field
+    at the default keeps those names byte-identical, while an explicit "ro" run
+    still gets a distinct name and so cannot reuse a writable container.
     """
-    key_material = (
-        f"{CONTAINER_IMAGE}:{CONTAINER_WORKSPACE}"
-        f":net={CONTAINER_NETWORK}:ws={CONTAINER_WORKSPACE_MODE}"
-    )
+    key_material = f"{CONTAINER_IMAGE}:{CONTAINER_WORKSPACE}:net={CONTAINER_NETWORK}"
+    if CONTAINER_WORKSPACE_MODE != "rw":
+        key_material += f":ws={CONTAINER_WORKSPACE_MODE}"
     if CONTAINER_PERSIST_KEY:
         key_material += f":{CONTAINER_PERSIST_KEY}"
     digest = hashlib.sha256(key_material.encode()).hexdigest()[:12]
@@ -211,12 +195,6 @@ def _start_container() -> str:
             return name
         # Remove stopped leftover with the same name
         _remove_container(name)
-        # Reap the pre-CONTAINER_WORKSPACE_MODE name for this same config, so
-        # upgrading does not strand a stopped container that can no longer be
-        # reused. Non-forcing, so a running one is left alone.
-        for legacy in _legacy_persistent_names():
-            if legacy != name:
-                _remove_container(legacy)
     else:
         name = f"seclab-shell-{uuid.uuid4().hex[:8]}"
 
