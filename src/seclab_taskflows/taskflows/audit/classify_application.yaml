@@ -29,6 +29,15 @@ taskflow:
         An authentication/authorization component may be susceptible to IDOR, bypasses etc.
         Components that grant user access to data may require access control or authentication.
 
+        For mobile applications, consider risks such as:
+        - Deep link / URL scheme hijacking or mishandling that triggers sensitive actions without validation
+        - Exported Android components (Activities, Services, BroadcastReceivers, ContentProviders) accessible
+        to malicious apps via crafted intents
+        - WebViews loading untrusted content with JavaScript bridges that expose native functionality
+        - Insecure data storage (tokens, credentials, PII in world-readable or unencrypted locations)
+        - Content Provider exposure allowing other apps to read or modify sensitive data
+        - Path traversal via file handling from untrusted sources (downloads, shared content, zip archives)
+
         We're looking for more concrete and serious security issues that affects system integrity or 
         lead to information leak, so please do not include issues like brute force, Dos, log injection etc.
 

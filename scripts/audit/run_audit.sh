@@ -33,6 +33,7 @@ fi
 python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.fetch_source_code -g repo="$1"
 python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.identify_applications -g repo="$1"
 python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.gather_web_entry_point_info -g repo="$1"
+python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.gather_mobile_entry_point_info -g repo="$1"
 python -m seclab_taskflow_agent $MODEL_CONFIG_FLAG -t seclab_taskflows.taskflows.audit.gather_security_entry_point_info -g repo="$1"
 
 if [ "$USE_ADVISORY" = true ]; then
