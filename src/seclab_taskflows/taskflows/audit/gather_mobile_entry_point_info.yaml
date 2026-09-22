@@ -12,7 +12,7 @@ globals:
 taskflow:
   - task:
       model: code_analysis
-      must_complete: true
+      must_complete: false
       headless: true
       max_steps: 100
       agents:

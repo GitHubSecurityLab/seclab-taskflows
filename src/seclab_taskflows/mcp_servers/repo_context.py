@@ -941,7 +941,7 @@ def store_new_mobile_entry_point(
     owner: str = Field(description="The owner of the GitHub repository"),
     repo: str = Field(description="The name of the GitHub repository"),
     entry_point_id: int = Field(description="The ID of the entry point this mobile entry point refers to"),
-    location: str = Field(description="The directory of the component where the mobile entry point belongs to"),
+    location: str = Field(description="The directory of the component; required when component is not supplied", default=""),
     entry_type: str = Field(description="Type of mobile entry point: deep_link, intent, url_scheme, content_provider, broadcast_receiver, js_bridge, app_extension, universal_link, etc.", default=""),
     scheme_or_action: str = Field(description="URL scheme (e.g. myapp://) or intent action (e.g. android.intent.action.VIEW)", default=""),
     exported: bool = Field(description="Whether the Android component is exported (accessible to other apps)", default=None),
@@ -956,6 +956,8 @@ def store_new_mobile_entry_point(
     """
     repo = process_repo(owner, repo)
     if component == 0:
+        if not location:
+            return "Error: Provide component or location for this mobile entry point."
         app = backend.get_app(repo, location)
         if not app:
             return f"Error: No component exists in repo: {repo} and location {location}"

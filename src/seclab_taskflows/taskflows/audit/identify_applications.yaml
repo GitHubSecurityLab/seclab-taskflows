@@ -104,8 +104,11 @@ taskflow:
         - Data read from external storage, clipboard, or other IPC mechanisms
         - User input from UI elements (text fields, file pickers, camera/gallery input)
 
-        Note that locally stored data (SharedPreferences, UserDefaults, local databases) is generally
-        considered trusted unless it can be modified by other apps. Focus on inputs that cross trust boundaries.
+        Determine trust in stored values (SharedPreferences, UserDefaults, local databases) from their
+        origin, who can influence them, and validation and integrity protections appropriate to their use.
+        Persisting externally controlled input in private storage does not by itself make it trusted.
+        Identify the original trust boundary and relevant persisted-input paths rather than treating
+        every storage read or UI action as a new attacker-controlled entry point.
         {% endif %}
 
         Only identify the untrusted inputs and entry points, do not analyze the security risks of the component or the 
