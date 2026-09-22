@@ -17,7 +17,7 @@ server_params:
     # cscope.out and GTAGS/GRTAGS into the workspace. Set this to "ro" and
     # redirect those outputs (e.g. `ctags -f /tmp/tags`) if you need the
     # workspace left pristine.
-    CONTAINER_WORKSPACE_MODE: "{{ env('CONTAINER_WORKSPACE_MODE', 'rw') }}"
+    CONTAINER_WORKSPACE_MOUNT_MODE: "{{ env('CONTAINER_WORKSPACE_MOUNT_MODE', 'rw') }}"
     CONTAINER_TIMEOUT: "{{ env('CONTAINER_TIMEOUT', '60') }}"
     CONTAINER_PERSIST: "{{ env('CONTAINER_PERSIST', required=False) }}"
     CONTAINER_PERSIST_KEY: "{{ env('CONTAINER_PERSIST_KEY', required=False) }}"

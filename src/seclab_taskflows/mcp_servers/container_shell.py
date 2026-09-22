@@ -8,7 +8,7 @@ toolbox YAML's ``server_params.env`` block):
 
 - ``CONTAINER_IMAGE`` — image to run (required).
 - ``CONTAINER_WORKSPACE`` — host path bind-mounted at ``/workspace`` (optional).
-- ``CONTAINER_WORKSPACE_MODE`` — bind-mount mode for that path, ``rw`` (default)
+- ``CONTAINER_WORKSPACE_MOUNT_MODE`` — bind-mount mode for that path, ``rw`` (default)
   or ``ro``. The default preserves the historical writable mount, because the
   shipped source-access and SAST prompts build symbol indexes in-tree
   (``ctags -R .``, ``cscope -R -b``, ``gtags``). Set it to ``ro`` when the
@@ -82,8 +82,8 @@ CONTAINER_WORKSPACE = os.environ.get("CONTAINER_WORKSPACE", "")
 # input. Flipping the default would require redirecting those index outputs
 # first. Only a literal "ro" selects read-only, so a blank or unrecognized
 # value cannot accidentally break a workflow that needs to write.
-CONTAINER_WORKSPACE_MODE = (
-    "ro" if os.environ.get("CONTAINER_WORKSPACE_MODE", "").strip().lower() == "ro" else "rw"
+CONTAINER_WORKSPACE_MOUNT_MODE = (
+    "ro" if os.environ.get("CONTAINER_WORKSPACE_MOUNT_MODE", "").strip().lower() == "ro" else "rw"
 )
 CONTAINER_TIMEOUT = int(os.environ.get("CONTAINER_TIMEOUT", "30"))
 CONTAINER_PERSIST = os.environ.get("CONTAINER_PERSIST", "").lower() in ("1", "true", "yes")
@@ -133,8 +133,8 @@ def _persistent_name() -> str:
     still gets a distinct name and so cannot reuse a writable container.
     """
     key_material = f"{CONTAINER_IMAGE}:{CONTAINER_WORKSPACE}:net={CONTAINER_NETWORK}"
-    if CONTAINER_WORKSPACE_MODE != "rw":
-        key_material += f":ws={CONTAINER_WORKSPACE_MODE}"
+    if CONTAINER_WORKSPACE_MOUNT_MODE != "rw":
+        key_material += f":ws={CONTAINER_WORKSPACE_MOUNT_MODE}"
     if CONTAINER_PERSIST_KEY:
         key_material += f":{CONTAINER_PERSIST_KEY}"
     digest = hashlib.sha256(key_material.encode()).hexdigest()[:12]
@@ -202,7 +202,7 @@ def _start_container() -> str:
     if not CONTAINER_PERSIST:
         cmd.append("--rm")
     if CONTAINER_WORKSPACE:
-        cmd += ["-v", f"{CONTAINER_WORKSPACE}:/workspace:{CONTAINER_WORKSPACE_MODE}"]
+        cmd += ["-v", f"{CONTAINER_WORKSPACE}:/workspace:{CONTAINER_WORKSPACE_MOUNT_MODE}"]
     cmd += [CONTAINER_IMAGE, "tail", "-f", "/dev/null"]
     logging.debug(f"Starting container: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=_DOCKER_TIMEOUT)

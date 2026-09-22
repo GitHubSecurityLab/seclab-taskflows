@@ -15,7 +15,7 @@ server_params:
     # The prompt for this toolbox builds symbol indexes in-tree (`ctags -R .`,
     # `gtags`), so the mount must stay writable by default. Set this to "ro"
     # if you redirect those outputs and want the workspace left pristine.
-    CONTAINER_WORKSPACE_MODE: "{{ env('CONTAINER_WORKSPACE_MODE', 'rw') }}"
+    CONTAINER_WORKSPACE_MOUNT_MODE: "{{ env('CONTAINER_WORKSPACE_MOUNT_MODE', 'rw') }}"
     CONTAINER_TIMEOUT: "{{ env('CONTAINER_TIMEOUT', '60') }}"
     CONTAINER_PERSIST: "{{ env('CONTAINER_PERSIST', 'true') }}"
     CONTAINER_PERSIST_KEY: "{{ env('CONTAINER_PERSIST_KEY', required=False) }}"

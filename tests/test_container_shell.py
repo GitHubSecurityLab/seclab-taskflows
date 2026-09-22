@@ -68,6 +68,7 @@ class TestStartContainer:
         with (
             patch.object(cs_mod, "CONTAINER_IMAGE", "test-image:latest"),
             patch.object(cs_mod, "CONTAINER_WORKSPACE", "/host/workspace"),
+            patch.object(cs_mod, "CONTAINER_WORKSPACE_MOUNT_MODE", "rw"),
             patch("subprocess.run", return_value=_make_proc(returncode=0)) as mock_run,
         ):
             name = cs_mod._start_container()
@@ -97,7 +98,7 @@ class TestStartContainer:
         with (
             patch.object(cs_mod, "CONTAINER_IMAGE", "test-image:latest"),
             patch.object(cs_mod, "CONTAINER_WORKSPACE", "/host/workspace"),
-            patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "rw"),
+            patch.object(cs_mod, "CONTAINER_WORKSPACE_MOUNT_MODE", "rw"),
             patch("subprocess.run", return_value=_make_proc(returncode=0)) as mock_run,
         ):
             cs_mod._start_container()
@@ -105,11 +106,11 @@ class TestStartContainer:
             assert "/host/workspace:/workspace:rw" in cmd
 
     def test_start_container_workspace_ro_opt_in(self):
-        """CONTAINER_WORKSPACE_MODE=ro mounts the workspace read-only."""
+        """CONTAINER_WORKSPACE_MOUNT_MODE=ro mounts the workspace read-only."""
         with (
             patch.object(cs_mod, "CONTAINER_IMAGE", "test-image:latest"),
             patch.object(cs_mod, "CONTAINER_WORKSPACE", "/host/workspace"),
-            patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "ro"),
+            patch.object(cs_mod, "CONTAINER_WORKSPACE_MOUNT_MODE", "ro"),
             patch("subprocess.run", return_value=_make_proc(returncode=0)) as mock_run,
         ):
             cs_mod._start_container()
@@ -119,7 +120,7 @@ class TestStartContainer:
     def test_persistent_name_unchanged_at_default_mode(self):
         """Upgrading must not rename existing persistent containers.
 
-        The pre-CONTAINER_WORKSPACE_MODE name is the one derived without a
+        The pre-CONTAINER_WORKSPACE_MOUNT_MODE name is the one derived without a
         ws= field, so the default must reproduce it exactly or every existing
         persistent container is orphaned on upgrade.
         """
@@ -127,7 +128,7 @@ class TestStartContainer:
             patch.object(cs_mod, "CONTAINER_IMAGE", "test-image:latest"),
             patch.object(cs_mod, "CONTAINER_WORKSPACE", "/host/workspace"),
             patch.object(cs_mod, "CONTAINER_NETWORK", "none"),
-            patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "rw"),
+            patch.object(cs_mod, "CONTAINER_WORKSPACE_MOUNT_MODE", "rw"),
             patch.object(cs_mod, "CONTAINER_PERSIST_KEY", ""),
         ):
             pre_mode = hashlib.sha256(
@@ -186,36 +187,36 @@ class TestStartContainer:
 
     def test_workspace_mode_defaults_to_rw_when_unset(self, monkeypatch):
         """Unset preserves the historical writable mount."""
-        original = os.environ.get("CONTAINER_WORKSPACE_MODE")
-        monkeypatch.delenv("CONTAINER_WORKSPACE_MODE", raising=False)
+        original = os.environ.get("CONTAINER_WORKSPACE_MOUNT_MODE")
+        monkeypatch.delenv("CONTAINER_WORKSPACE_MOUNT_MODE", raising=False)
         try:
             reloaded = _reload_cs()
-            assert reloaded.CONTAINER_WORKSPACE_MODE == "rw"
+            assert reloaded.CONTAINER_WORKSPACE_MOUNT_MODE == "rw"
         finally:
-            _restore_env_and_reload("CONTAINER_WORKSPACE_MODE", original)
+            _restore_env_and_reload("CONTAINER_WORKSPACE_MOUNT_MODE", original)
 
     @pytest.mark.parametrize(
         "value", ["", "   ", "\t", "bogus", "readonly", "rw", "ro; rm -rf /", "ro rw"]
     )
     def test_workspace_mode_falls_back_to_rw(self, monkeypatch, value):
         """Only a literal "ro" opts in; anything else stays writable."""
-        original = os.environ.get("CONTAINER_WORKSPACE_MODE")
-        monkeypatch.setenv("CONTAINER_WORKSPACE_MODE", value)
+        original = os.environ.get("CONTAINER_WORKSPACE_MOUNT_MODE")
+        monkeypatch.setenv("CONTAINER_WORKSPACE_MOUNT_MODE", value)
         try:
             reloaded = _reload_cs()
-            assert reloaded.CONTAINER_WORKSPACE_MODE == "rw"
+            assert reloaded.CONTAINER_WORKSPACE_MOUNT_MODE == "rw"
         finally:
-            _restore_env_and_reload("CONTAINER_WORKSPACE_MODE", original)
+            _restore_env_and_reload("CONTAINER_WORKSPACE_MOUNT_MODE", original)
 
     @pytest.mark.parametrize("value", ["ro", "RO", " ro "])
     def test_workspace_mode_ro_opt_in(self, monkeypatch, value):
-        original = os.environ.get("CONTAINER_WORKSPACE_MODE")
-        monkeypatch.setenv("CONTAINER_WORKSPACE_MODE", value)
+        original = os.environ.get("CONTAINER_WORKSPACE_MOUNT_MODE")
+        monkeypatch.setenv("CONTAINER_WORKSPACE_MOUNT_MODE", value)
         try:
             reloaded = _reload_cs()
-            assert reloaded.CONTAINER_WORKSPACE_MODE == "ro"
+            assert reloaded.CONTAINER_WORKSPACE_MOUNT_MODE == "ro"
         finally:
-            _restore_env_and_reload("CONTAINER_WORKSPACE_MODE", original)
+            _restore_env_and_reload("CONTAINER_WORKSPACE_MOUNT_MODE", original)
 
     def test_network_defaults_to_none_when_unset(self, monkeypatch):
         original = os.environ.get("CONTAINER_NETWORK")
@@ -385,9 +386,9 @@ class TestPersistentContainer:
             patch.object(cs_mod, "CONTAINER_WORKSPACE", "/source/tree"),
             patch.object(cs_mod, "CONTAINER_PERSIST_KEY", ""),
         ):
-            with patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "ro"):
+            with patch.object(cs_mod, "CONTAINER_WORKSPACE_MOUNT_MODE", "ro"):
                 name_ro = cs_mod._persistent_name()
-            with patch.object(cs_mod, "CONTAINER_WORKSPACE_MODE", "rw"):
+            with patch.object(cs_mod, "CONTAINER_WORKSPACE_MOUNT_MODE", "rw"):
                 name_rw = cs_mod._persistent_name()
             assert name_ro != name_rw
 
