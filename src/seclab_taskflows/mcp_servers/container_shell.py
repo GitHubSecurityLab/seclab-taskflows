@@ -8,6 +8,13 @@ toolbox YAML's ``server_params.env`` block):
 
 - ``CONTAINER_IMAGE`` — image to run (required).
 - ``CONTAINER_WORKSPACE`` — host path bind-mounted at ``/workspace`` (optional).
+- ``CONTAINER_WORKSPACE_MOUNT_MODE`` — bind-mount mode for that path, ``rw`` (default)
+  or ``ro``. The default preserves the historical writable mount, because the
+  shipped source-access and SAST prompts build symbol indexes in-tree
+  (``ctags -R .``, ``cscope -R -b``, ``gtags``). Set it to ``ro`` when the
+  workspace should be left pristine — for example when the caller collects the
+  tree afterwards as an artifact and wants a faithful copy of the input. Only a
+  literal ``ro`` selects read-only; any other value mounts read-write.
 - ``CONTAINER_TIMEOUT`` — default per-command timeout in seconds (default 30).
 - ``CONTAINER_PERSIST`` — reuse a deterministic container across runs when truthy.
 - ``CONTAINER_PERSIST_KEY`` — extra key to distinguish persistent containers.
@@ -66,6 +73,18 @@ _container_name: str | None = None
 
 CONTAINER_IMAGE = os.environ.get("CONTAINER_IMAGE", "")
 CONTAINER_WORKSPACE = os.environ.get("CONTAINER_WORKSPACE", "")
+# Bind-mount mode for CONTAINER_WORKSPACE. Defaults to "rw", which preserves
+# the historical behaviour: the shipped source-access and SAST prompts tell the
+# model to build symbol indexes in-tree (`ctags -R .`, `cscope -R -b`, `gtags`),
+# which write into the workspace. Setting this to "ro" is worth doing whenever
+# the caller collects the workspace afterwards as an artifact, since a writable
+# mount makes that artifact agent-influenced rather than a faithful copy of the
+# input. Flipping the default would require redirecting those index outputs
+# first. Only a literal "ro" selects read-only, so a blank or unrecognized
+# value cannot accidentally break a workflow that needs to write.
+CONTAINER_WORKSPACE_MOUNT_MODE = (
+    "ro" if os.environ.get("CONTAINER_WORKSPACE_MOUNT_MODE", "").strip().lower() == "ro" else "rw"
+)
 CONTAINER_TIMEOUT = int(os.environ.get("CONTAINER_TIMEOUT", "30"))
 CONTAINER_PERSIST = os.environ.get("CONTAINER_PERSIST", "").lower() in ("1", "true", "yes")
 CONTAINER_PERSIST_KEY = os.environ.get("CONTAINER_PERSIST_KEY", "")
@@ -103,8 +122,19 @@ def _persistent_name() -> str:
     network (e.g. the default "none") never reuses a persistent container that
     was created with a different, more permissive network (e.g. "bridge"),
     which would otherwise silently re-enable egress.
+
+    The workspace mount mode is included for the same reason, but only when it
+    differs from the "rw" default. Appending it unconditionally would change the
+    derived name for every persistent container that already exists, orphaning
+    each one on upgrade: _start_container() only ever inspects or removes the
+    name it computes, and persistent containers are normally left running, so a
+    non-forcing ``docker rm`` would not collect them either. Omitting the field
+    at the default keeps those names byte-identical, while an explicit "ro" run
+    still gets a distinct name and so cannot reuse a writable container.
     """
     key_material = f"{CONTAINER_IMAGE}:{CONTAINER_WORKSPACE}:net={CONTAINER_NETWORK}"
+    if CONTAINER_WORKSPACE_MOUNT_MODE != "rw":
+        key_material += f":ws={CONTAINER_WORKSPACE_MOUNT_MODE}"
     if CONTAINER_PERSIST_KEY:
         key_material += f":{CONTAINER_PERSIST_KEY}"
     digest = hashlib.sha256(key_material.encode()).hexdigest()[:12]
@@ -172,7 +202,7 @@ def _start_container() -> str:
     if not CONTAINER_PERSIST:
         cmd.append("--rm")
     if CONTAINER_WORKSPACE:
-        cmd += ["-v", f"{CONTAINER_WORKSPACE}:/workspace"]
+        cmd += ["-v", f"{CONTAINER_WORKSPACE}:/workspace:{CONTAINER_WORKSPACE_MOUNT_MODE}"]
     cmd += [CONTAINER_IMAGE, "tail", "-f", "/dev/null"]
     logging.debug(f"Starting container: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=_DOCKER_TIMEOUT)
