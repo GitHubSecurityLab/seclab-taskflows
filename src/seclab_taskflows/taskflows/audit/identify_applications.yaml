@@ -31,9 +31,13 @@ taskflow:
         - seclab_taskflows.personalities.web_application_security_expert
       user_prompt: |
         Inspect {{ globals.repo }} and determine its function. Determine whether the repo is a framework library,
-        or a web application etc. For repos that may contain multiple applications, determine the purpose of each
+        web application, mobile application etc. For repos that may contain multiple applications, determine the purpose of each
         application and the directories of each application. Repos can also be libraries but contain actual applications, for
         example, a web server and admin UI etc. that are not for testing or examples.
+
+        Mobile applications include Android apps (Java/Kotlin with Android SDK, Gradle-based), iOS apps
+        (Swift/Objective-C with Xcode), React Native, Flutter, Xamarin, or other cross-platform mobile frameworks.
+        Mark these as mobile applications when storing the component.
         
         Apart from source code, it is also useful to look at the README.md and documentations in 
         the repo.
@@ -81,11 +85,30 @@ taskflow:
         {{ result.notes }}
 
         Analyze the entry points of this application. First check whether this component is a library or 
-        an application. 
+        an application.
         {% if result.is_library %}
         {% include 'seclab_taskflows.prompts.audit.entry_point_library' %}
         {% else %}
         {% include 'seclab_taskflows.prompts.audit.entry_point_application' %}
+        {% endif %}
+
+        {% if result.is_mobile_app %}
+        ## Mobile Application
+
+        For mobile application components, consider the following sources of untrusted input:
+
+        - Deep links and custom URL schemes that can be invoked by other apps or web pages
+        - Intent data received from other applications (Android) or URL schemes / Universal Links (iOS)
+        - Data received from external services via network requests (API responses, push notifications)
+        - Content shared from other apps via share intents or extensions
+        - Data read from external storage, clipboard, or other IPC mechanisms
+        - User input from UI elements (text fields, file pickers, camera/gallery input)
+
+        Determine trust in stored values (SharedPreferences, UserDefaults, local databases) from their
+        origin, who can influence them, and validation and integrity protections appropriate to their use.
+        Persisting externally controlled input in private storage does not by itself make it trusted.
+        Identify the original trust boundary and relevant persisted-input paths rather than treating
+        every storage read or UI action as a new attacker-controlled entry point.
         {% endif %}
 
         Only identify the untrusted inputs and entry points, do not analyze the security risks of the component or the 
@@ -159,6 +182,22 @@ taskflow:
         {% include 'seclab_taskflows.prompts.audit.user_action_application' %}
         {% endif %}
         
+        {% if result.is_mobile_app %}
+        ## Mobile Application
+
+        For mobile application components, consider the following:
+
+        What actions can an external entity (another app, a web page, a remote server) trigger in this
+        mobile application? Consider:
+        - Actions triggered via deep links or custom URL schemes
+        - Actions triggered via intents from other apps (Android) or app extensions (iOS)
+        - Data that the app processes from untrusted network responses
+        - Actions triggered by push notifications or shared content
+
+        Focus on what the mobile app is designed to do with external input, not on security bypasses.
+        State clearly what an external entity is allowed to trigger and what restrictions exist.
+        {% endif %}
+
         Store an user_action entry stating precising the file and line number where the allowed action is performed, and
         provide notes about the action.
 

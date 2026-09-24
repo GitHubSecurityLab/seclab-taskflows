@@ -27,6 +27,19 @@ The results of the audit are written to an SQLite database, which is opened auto
 the end of the run. The results are in the table named "audit_result". The table has a column named "has_vulnerability",
 with checkmarks in the rows that are most likely to be genuine vulnerabilities.
 
+## Mobile application support
+
+The audit workflow recognizes Android, iOS, and cross-platform mobile applications alongside web applications and libraries.
+Mobile entry-point collection records exported Android components, deep links, URL schemes, Universal Links, app extensions,
+and WebView JavaScript bridges, including their permissions, export status, and input filters.
+
+The [audit runner](scripts/audit/run_audit.sh) collects this metadata before classification, which applies mobile-specific
+guidance to components marked as mobile applications. The existing `--advisory` and `-m` options also apply to mobile runs.
+Both mobile entry-point taskflows use the container-backed source-access toolbox and require Docker.
+
+Mobile metadata is stored in the `mobile_entry_point` table. Existing context databases automatically gain the nullable
+`application.is_mobile_app` column without deleting existing results.
+
 ## Running with docker script
 
 We recommend running taskflows in a sandboxed environment. [GitHub Codespaces](https://github.com/features/codespaces) are convenient, or if you prefer you can use the script [`run_seclab_agent.sh`](scripts/run_seclab_agent.sh) to run a docker container of the `seclab-taskflow-agent` as outlined [here](https://github.com/GitHubSecurityLab/seclab-taskflow-agent/tree/main?tab=readme-ov-file#deploying-from-docker). Note that this script needs to be run from the main directory of the repo, and the `.env` file with the environment variables for the custom MCP servers to store data needs to be in the same directory.

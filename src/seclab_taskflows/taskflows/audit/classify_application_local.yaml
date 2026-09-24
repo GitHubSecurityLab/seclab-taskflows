@@ -34,8 +34,8 @@ taskflow:
 
         {{ result.notes }}
 
-        Fetch the entry points and web entry points of the component, then the user actions of this component.
-        Based on the entry points, web entry points, components, user actions and README.md and if available, SECURITY.md in the {{ globals.repo }},
+        Fetch the entry points, web entry points and mobile entry points of the component, then the user actions of this component.
+        Based on the entry points, web entry points, mobile entry points, components, user actions and README.md and if available, SECURITY.md in the {{ globals.repo }},
         can you tell me what type of application this repo is and what kind of security boundary it has.
         Based on this, determine whether the component is likely to have security problems.
 
@@ -47,6 +47,155 @@ taskflow:
         {% include 'seclab_taskflows.prompts.audit.classify_library_component' %}
         {% else %}
         {% include 'seclab_taskflows.prompts.audit.classify_application_component' %}
+        {% endif %}
+
+        {% if result.is_mobile_app %}
+        Mobile review priorities
+
+        Use the recorded mobile entry points as a starting inventory, not an exhaustive boundary for
+        this review. Perform a focused source search for each category below, then read the relevant
+        code and configuration before proposing issues. Keep this pass at risk classification rather
+        than full exploit verification. Distinguish another app, a web page, a remote service, and the
+        device user; they need not have the same privileges.
+
+        Cover incoming data, outgoing sensitive data, and externally supplied code or resources
+        separately. A trusted UI action or background task can consume an untrusted resource or send
+        private data to an unintended recipient. Inspect those paths even when their trigger is not
+        an exported component or a previously stored entry point. Do not equate a trusted trigger
+        with trusted downstream data, code, or recipients.
+
+        Read source with file-local line numbers that restart for each file. Do not cite cumulative
+        line numbers from concatenated files. If source is inaccessible, report that the review is
+        blocked instead of inferring the implementation from project familiarity or documentation.
+
+        - Caller authorization: For Android activities, services, receivers, and providers, or iOS
+          extensions, describe who should be able to request each operation. Distinguish platform
+          permissions from account-level access rules. Relevant concerns include missing authorization
+          and confused-deputy behavior when the app acts on a caller's behalf.
+          Include Android permission declarations and protection levels, runtime receiver permissions,
+          and iOS extension or app-group entitlements in the expected access policy.
+
+        - Navigation and delegation: For deep links, App Links, Universal Links, login callbacks,
+          intents, and PendingIntents, record the intended destination and action. Describe which
+          decisions belong to the user or authenticated session rather than the incoming request.
+          Relevant concerns include intent redirection and incorrect binding of authentication callbacks.
+          Include URL scheme/host/path validation, callback session binding, PendingIntent mutability,
+          and restrictions on delegated actions. Link association does not replace authorization.
+          Locate getParcelableExtra, Intent.parseUri, startActivity, startService, and setResult calls.
+          For supplied intents, identify which component, action, data, ClipData, and permission flags
+          the sender can choose and which restrictions the app is expected to enforce. Treat navigation
+          to an activity and granting access to a content URI as different mechanisms.
+
+        - Message and resource sharing: For broadcasts, shared documents, content URIs, and app groups,
+          describe the intended senders, recipients, resources, and duration of access. Relevant concerns
+          include broadcast spoofing, unintended disclosure through implicit messaging, and overly broad
+          resource grants. Do not assume an exported interface is unintended merely because it is public.
+          Explicitly consider FileProvider directory scope, read/write URI grants, recipient selection,
+          and the expected authentication of message senders.
+          Search registerReceiver and sendBroadcast separately: receiving forged messages and exposing
+          outgoing secrets are different concerns. Inspect sensitive extras in outgoing broadcasts,
+          implicit activity/service intents, and activity results, including sends triggered by buttons
+          or successful login. Look for explicit destinations and receiver permissions, not just the
+          receiving component's export status.
+          Follow manifest FileProvider metadata into its paths XML. Review root-path and broad
+          external-path/files-path mappings alongside getUriForFile, grantUriPermission, ClipData,
+          and FLAG_GRANT_READ_URI_PERMISSION / FLAG_GRANT_WRITE_URI_PERMISSION use. Record which
+          resource and recipient a grant can cover; broad paths alone do not prove a usable access path.
+
+        - Web content in the app: For WebView or WKWebView components, distinguish the web document's
+          origin from the app's native privileges. Record which content may navigate, run scripts, or
+          invoke a native bridge. Relevant concerns include cross-site scripting and missing origin
+          restrictions on privileged bridge operations.
+          Include HTML injection, same-origin isolation, file-origin access, mixed content, navigation
+          restrictions, and WebView debugging. Also consider cookie and session isolation and whether
+          camera, microphone, and geolocation access decisions are scoped to the requesting origin.
+          Locate loadUrl, loadDataWithBaseURL, evaluateJavascript, addJavascriptInterface, and
+          WKScriptMessageHandler uses. For each relevant call, distinguish control of the loaded URL,
+          document content, base origin, and native bridge methods. Inspect allowFileAccess,
+          allowFileAccessFromFileURLs, and allowUniversalAccessFromFileURLs with the document's actual
+          origin. File-origin settings do not by themselves let a remote HTTPS page read local files.
+
+        - Imported data and parsing: For shared files, downloaded documents, archives, and media,
+          describe the accepted formats, intended output locations, and downstream consumers. Relevant
+          concerns include path traversal, unsafe parsing, and treating external data as executable
+          instructions. Include native-code handling only where the component actually uses it.
+          Name applicable review concerns explicitly: SQL injection, predicate injection, XPath injection,
+          XML external entities, unsafe XSLT processing, unsafe deserialization, and OS command injection.
+          Record whether input should remain data rather than becoming a query, command, or template.
+          Include file read/write/delete boundaries, archive extraction, and symbolic-link handling.
+          Locate rawQuery/execSQL, NSPredicate format construction, XML parser configuration, process
+          execution, and archive/file-copy operations where present. Follow URI-to-path conversions and
+          canonicalization rather than assuming that a file URI and an absolute filesystem path are
+          interchangeable. Record platform/storage prerequisites for proposed disclosure or overwrite.
+
+        - Native runtime and code loading: For JNI and other native dependencies, note whether native
+          memory safety warrants review, including bounds checking, integer overflow, and object lifetime.
+          For dynamic code loading, plugins, and embedded interpreters, record the expected source and
+          integrity protection of executable content. Keep code provenance distinct from ordinary data
+          validation; the presence of a native library or interpreter alone is not a vulnerability.
+          Search createPackageContext with CONTEXT_INCLUDE_CODE or CONTEXT_IGNORE_SECURITY, installed
+          package enumeration, classLoader/loadClass, DexClassLoader, System.load, and dlopen where
+          applicable. Determine whether package identity, signing certificates, and code integrity are
+          checked before execution. A package-name prefix or matching class name is not a signer check.
+          Include these paths in UI callbacks and error/fallback branches, not only IPC handlers.
+
+        - Service connections: For backend requests and authentication handoffs, describe the expected
+          service identity and which credentials or account data belong with that service. Relevant
+          concerns include incorrect TLS peer verification and sending session information to an
+          unintended destination. Distinguish app-side responsibilities from server-side authorization.
+          Include cleartext traffic, hostname validation, network-security or ATS exceptions, credential
+          handling across redirects, HTTP request construction, and HTTP cache integrity. For embedded
+          HTTP or socket listeners, note local-server authentication and network binding scope; do not
+          assume that a service is private simply because it runs on the device.
+          Inspect custom TrustManager/checkServerTrusted, HostnameVerifier, onReceivedSslError handlers,
+          and ATS configuration where present. Distinguish accepting a supplied URL from failing to
+          authenticate a service that the app is supposed to trust; record the relevant trust boundary.
+
+        - Data lifetime and device access: For stored sessions, keys, logs, backups, and shared storage,
+          record who should retain access and for how long, including account changes and logout.
+          Relevant concerns include sensitive-data exposure and inappropriate key management. For
+          camera, microphone, or location features, distinguish OS permission from user consent to a
+          particular operation; a granted permission alone does not establish the intended behavior.
+          Include plaintext credential storage, sensitive logging, clipboard exposure, backup policy,
+          cross-account cache separation, Android file permissions, iOS file-protection classes, and
+          Keychain accessibility and access groups. Relate each concern to the data's sensitivity and
+          the documented threat model, rather than assuming physical access or a compromised device.
+          Trace credentials from acquisition to persistence and any logs, notifications, clipboard,
+          provider responses, or messages that expose them. Do not treat private plaintext storage or
+          debug logging alone as cross-app access without identifying the required access conditions.
+
+        - Cryptographic assets: Where the component uses cryptography, consider hardcoded keys,
+          weak randomness, inappropriate key derivation, nonce or IV misuse, and missing integrity
+          protection. Record intended key storage, exportability, rotation, and deletion requirements.
+          Include bundled private signing-key material; distinguish private secrets from public
+          certificates, identifiers, and values intentionally designed to be public.
+          Distinguish Random from SecureRandom in security-sensitive generation, and inspect key/nonce
+          construction at Cipher or platform cryptographic API calls rather than flagging API names alone.
+
+        - Release and platform policy: Separate release-build debugging, diagnostic interfaces, test
+          credentials, and developer-only settings from production behavior. Record platform-version
+          behavior using the actual Android minimum/target SDK or iOS deployment version, including
+          relevant differences between manifest declarations, entitlements, and runtime controls.
+          Do not apply historical platform weaknesses to unsupported versions or treat a deprecated API
+          as proof of a vulnerability. Build settings are relevant only in the configuration being reviewed.
+
+        These are review priorities, not verified vulnerabilities or a guarantee of complete coverage.
+        For each applicable area, record the entry point, affected resource, expected restriction, and
+        supporting repository file references. State which protections are documented and which remain
+        unknown; lack of evidence is not evidence of a missing check. Skip irrelevant categories and
+        note platform or SDK assumptions instead of applying Android-specific rules to iOS code.
+        Other review priorities may be noted when supported by the component's documented purpose.
+        Store relevant risk hypotheses as component issues with the affected operation, external
+        influence or disclosure destination, expected restriction, and prerequisites in the notes.
+        Merge candidates with the same root cause and source location instead of duplicating an issue
+        under several category names. Do not mark a hypothesis as verified at this stage.
+        Keep this stage to defensive source review; do not produce exploit payloads, reproduction
+        instructions, or interact with a running target.
+
+        Background references for the review categories:
+        - Android security guidance: https://developer.android.com/privacy-and-security/security-tips
+        - Apple Platform Security: https://support.apple.com/guide/security/welcome/web
+        - OWASP MASVS: https://mas.owasp.org/MASVS/
         {% endif %}
 
         It is not your task to audit the security measures, but rather just to identify the risks and suggest some issues
