@@ -105,6 +105,7 @@ ignore = [
   "RUF015",    # Prefer `next(iter())` over single element slice
   "S607",      # Starting a process with a partial executable path
   "SIM101",    # Use a ternary expression instead of if-else-block
+  "SIM105",    # Use contextlib.suppress (false positive: try block contains assignment)
   "SIM114",    # Combine `if` branches using logical `or` operator
   "SIM117",    # Use a single `with` statement with multiple contexts
   "SIM118",    # Use `key in dict` instead of `key in dict.keys()`
@@ -120,6 +121,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = [
+  "PLC0415",   # Import not at top of file (deliberate in setUp/test methods for patching)
+  "PT009",     # Use assert instead of unittest-style assertEqual (TestCase subclass)
+  "PT027",     # Use pytest.raises instead of assertRaises (TestCase subclass)
   "S101",      # Use of assert (standard in pytest)
   "SLF001",    # Private member accessed (tests legitimately access module internals)
 ]
