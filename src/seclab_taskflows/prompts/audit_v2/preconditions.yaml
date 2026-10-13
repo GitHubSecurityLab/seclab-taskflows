@@ -1,0 +1,73 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: prompt
+
+prompt: |
+  ## Preconditions
+
+  A confirmed finding is recorded with the conditions under which it is
+  reachable, not with a severity rating. Rate nothing. What the next reader
+  needs is not how bad you judged this to be, it is *when* it happens, so that
+  they can decide for themselves whether it matters to them.
+
+  This is the difference between "authorization is broken in this library" and
+  "authorization fails open when the opt-in execution mode is enabled, the
+  permission check raises rather than returns, and the unauthorized handler is
+  left at its default". The second is the same bug, scoped so a maintainer can
+  confirm it and a reader can tell whether they are affected. The first gets
+  the report dismissed.
+
+  Record three things, and derive each from the code rather than from what the
+  vulnerability class usually implies. You cannot confirm a finding without
+  `required_access` and `default_reachable`: the ledger refuses the promotion
+  rather than recording a finding nobody can scope. `unknown` is a legitimate
+  answer for either, so answer honestly rather than guessing to get past it.
+
+  ### `required_access`
+
+  What the attacker must already have to reach the source. Pick the *lowest*
+  level that genuinely works:
+
+  - `unauthenticated` — no credentials. Anyone who can reach the interface.
+  - `authenticated`   — any valid account, including self-registered ones.
+  - `privileged`      — an account with elevated rights: admin, operator, or a
+                        role most users do not have.
+  - `local`           — local access to the host, or the ability to place files
+                        or set environment variables the target reads.
+  - `unknown`         — the code does not settle it. Say so in your rationale.
+
+  For a library, judge this by what the documented API lets a caller reach. If
+  the calling application decides who can reach it, that is a fact about the
+  application, and `unknown` with an explanation is the honest answer.
+
+  ### `required_config`
+
+  Non-default configuration, build flags, feature toggles or API usage the path
+  depends on. Leave it empty when the path needs nothing special. When it is
+  not empty, name the specific setting and the value that enables the path, so
+  a reader can check their own deployment against it.
+
+  Vary one axis at a time when you work this out. A path that needs three
+  separate non-default settings is a much narrower claim than one that needs
+  one, and the difference is the whole report.
+
+  ### `default_reachable`
+
+  Whether the path is reachable in the target's default, documented
+  configuration: `yes`, `no`, or `unknown`. This is the single most useful bit
+  in the record, so do not guess it. If `required_config` is non-empty, this is
+  almost always `no`. If you could not determine the defaults, say `unknown`
+  rather than assuming `yes`.
+
+  ## CWE
+
+  Give one to three CWE ids, most specific first, as `CWE-78` style strings.
+
+  Pick the identifier that names the *mechanism* you actually traced, not the
+  broadest category it belongs to: `CWE-78` for OS command injection rather
+  than `CWE-77`, `CWE-22` for path traversal rather than `CWE-20`. Do not list
+  every tangentially related id. If only a general class genuinely fits, one
+  general id is better than three speculative ones.

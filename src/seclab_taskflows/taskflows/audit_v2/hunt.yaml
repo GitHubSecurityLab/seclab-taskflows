@@ -1,0 +1,265 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  filetype: taskflow
+  version: "1.0"
+model_config: seclab_taskflows.configs.model_config_audit_v2
+
+globals:
+  repo:
+
+# Stage 2 of the audit v2 pipeline: hunt every component with three model
+# families at once.
+#
+# Models within a family tend to miss the same things, so the breadth here comes
+# from disagreement between families rather than from running one model harder.
+# The task is a `models` x `repeat_prompt` cross product: every component is
+# hunted independently by every hunter. For a multi-model task the runner bounds
+# all branches (items x models) with `model_concurrency`; `async_limit` only
+# applies to single-model repeat_prompt fan-outs, so it is not set here.
+#
+# Each branch writes its candidates straight into the finding ledger. That is
+# deliberate: a multi-model task does not feed the implicit last-tool-result
+# channel that `repeat_prompt` reads, so downstream stages re-read the ledger
+# rather than having findings threaded through the taskflow. It also means the
+# stage is resumable and that partial results survive a failed branch.
+taskflow:
+  - task:
+      id: components
+      must_complete: true
+      exclude_from_context: true
+      max_steps: 5
+      model: general_tasks
+      name: fetch components
+      description: Publish the component list as a typed output.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Call `get_components` once for the repo {{ globals.repo }} and return
+        its result. Make no other tool calls.
+      outputs:
+        type: array
+        items:
+          type: object
+          properties:
+            component_id: {type: integer}
+            repo: {type: string}
+            location: {type: string}
+            kind: {type: string}
+          required: [component_id, repo, location]
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
+
+  - task:
+      id: filings
+      if: "outputs.components | length > 0"
+      must_complete: false
+      repeat_prompt: true
+      over: "outputs.components"
+      completion: any
+      model_concurrency: 6
+      max_steps: 200
+      models: [hunt_gpt, hunt_claude, hunt_gemini]
+      name: hunt component
+      description: Independently hunt each component with three model families.
+      agents:
+        - seclab_taskflows.personalities.vulnerability_hunter
+      user_prompt: |
+        {% include 'seclab_taskflows.prompts.audit_v2.engagement' %}
+
+        Hunt for vulnerabilities in the component at {{ result.location }} in
+        the repo {{ result.repo }}. The repository is mounted at /workspace.
+
+        What previous analysis recorded about this component:
+
+        kind:          {{ result.kind | default('unknown') }}
+        is_application ? {{ result.is_app | default('unknown') }}
+        is_library     ? {{ result.is_library | default('unknown') }}
+
+        {{ result.notes | default('') }}
+
+        Start from the entry points already mapped for this component; fetch
+        them with `get_entry_points` for component_id {{ result.component_id }}.
+        Each one records the trust boundary it crosses. If that comes back
+        empty, or looks thinner than the code warrants, fetch the entry points
+        for the whole repository and work out which of them reach this
+        component. They are a starting point, not a limit. If you find an entry
+        point that was missed, hunt it too.
+
+        Work outward from each entry point:
+
+        1. Take the untrusted value and follow it. Read every function it
+           passes through, including the ones whose names suggest they make it
+           safe.
+        2. Note every check, escape, cast, allow-list and normalisation on the
+           way, and decide whether it actually holds for a hostile value on
+           every branch.
+        3. When the value reaches something dangerous, work out what an
+           attacker gets.
+
+        Judge this component on what it actually is. A parser's danger is in
+        how it handles malformed input; a library's is in what its documented
+        API lets a caller pass through to something dangerous; a daemon's is in
+        what an unauthenticated peer can reach; native code's is in bounds,
+        lifetimes and integer arithmetic.
+
+        Do not limit yourself to a checklist of well-known vulnerability
+        classes, and do not report generic hardening advice. Report paths.
+
+        {% include 'seclab_taskflows.prompts.audit_v2.finding_contract' %}
+
+        {% include 'seclab_taskflows.prompts.audit_v2.evidence_rules' %}
+
+        Finish by returning the component you hunted and the ids
+        `store_finding` gave back, as `{"component": "...", "filed": [...]}`.
+        Return an empty `filed` list if you filed nothing. The ids are how this
+        run is credited to the model you are: do not omit any, and do not
+        include ids you did not file yourself.
+
+        That JSON object must be your entire final message. Put your reasoning
+        and your writeup in the findings you file, not in the last message; any
+        prose around the object makes the branch unreadable to the runner and
+        the credit for this run is lost.
+      capture: response
+      outputs:
+        type: object
+        properties:
+          component: {type: string}
+          filed:
+            type: array
+            items: {type: integer}
+        required: [component, filed]
+      toolboxes:
+        - seclab_taskflows.toolboxes.container_shell_source_access
+        - seclab_taskflows.toolboxes.audit_v2_repo_survey
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      if: "outputs.filings | default([], true) | length > 0"
+      must_complete: false
+      exclude_from_context: true
+      model: general_tasks
+      max_steps: 120
+      name: attribute filings
+      description: Record which model proposed each finding, from the branch records.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Record which model proposed each candidate finding for the repo
+        {{ globals.repo }}.
+
+        Each line below is one hunt branch: the model slot the runner ran it
+        as, and the findings that branch filed. This is the authoritative
+        attribution, taken from the runner rather than self-reported by the
+        hunters.
+
+        {% for rec in outputs.filings %}
+        {% set filed = rec.result.filed | default([], true) if rec.result else [] %}
+        - model {{ rec.model }} filed: {{ filed | join(', ') | default('nothing', true) }}
+        {% endfor %}
+
+        Call `attribute_findings` exactly once, passing every branch above as
+        one entry: `{"proposed_by": "<model>", "finding_ids": [...]}`, with the
+        model written exactly as it appears above. Skip branches that filed
+        nothing. Make no other tool calls and change nothing else. Report the
+        result the tool gives back.
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      id: raw_candidates
+      must_complete: true
+      exclude_from_context: true
+      max_steps: 5
+      model: general_tasks
+      name: fetch raw candidates
+      description: Publish the pre-deduplication candidate list.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Call `get_findings` once for the repo {{ globals.repo }} with state
+        `candidate` and return its result. Make no other tool calls.
+      outputs:
+        type: array
+        items:
+          type: object
+          properties:
+            finding_id: {type: integer}
+            component: {type: string}
+            title: {type: string}
+            vuln_class: {type: string}
+            proposed_by: {type: string}
+          required: [finding_id, component, title, vuln_class]
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      if: "outputs.raw_candidates | length > 1"
+      must_complete: false
+      model: survey
+      max_steps: 120
+      name: deduplicate candidates
+      description: Fold candidates that describe the same path into one another.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Three independent hunters have just filed candidate findings for the
+        repo {{ globals.repo }}. Where they found the same bug, the ledger now
+        holds several candidates describing one path.
+
+        These are the candidates:
+
+        {% for c in outputs.raw_candidates %}
+        - id {{ c.finding_id }} [{{ c.component }}] ({{ c.vuln_class }})
+          proposed by {{ c.proposed_by | default('unknown') }}: {{ c.title }}
+        {% endfor %}
+
+        Use `get_finding` to read the source, sink and flow of any candidate
+        you are unsure about; the titles alone are not enough to judge this.
+
+        Group them by the path they describe: the same untrusted source
+        reaching the same dangerous operation. Two candidates are the same
+        finding when they describe the same flow, even if they use different
+        wording, a different vulnerability class label, or cite slightly
+        different lines along the way.
+
+        Two candidates are *not* the same finding when they reach the same sink
+        from different sources, or the same source reaches different sinks.
+        Those are separate paths and each deserves its own review. When you are
+        unsure, leave them separate: splitting a duplicate costs one extra
+        contest, but merging two distinct bugs loses one of them entirely.
+
+        For each group of two or more:
+
+        1. Pick the canonical finding: the one whose source, sink and flow are
+           described most precisely, with the most useful locations.
+        2. Call `merge_duplicate_finding` for every other member of the group,
+           with the canonical finding as `canonical_id`.
+
+        Merging carries each duplicate's `proposed_by` label onto the canonical
+        finding, so a path that several families found independently ends up
+        recording all of them. Do not delete anything and do not adjudicate
+        anything; merging is the only action you take here.
+
+        Finish by reporting how many candidates you started with, how many
+        groups you merged, and which findings more than one model family found
+        independently.
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
+
+  - task:
+      must_complete: true
+      model: general_tasks
+      max_steps: 20
+      name: hunt summary
+      description: Report the state of the ledger after hunting.
+      agents:
+        - seclab_taskflow_agent.personalities.assistant
+      user_prompt: |
+        Get the ledger summary for the repo {{ globals.repo }}, then list the
+        surviving candidate findings with their component, vulnerability class,
+        title and `proposed_by`. Report them grouped by component, and call out
+        any that were proposed by more than one model.
+      toolboxes:
+        - seclab_taskflows.toolboxes.audit_v2_finding_ledger
