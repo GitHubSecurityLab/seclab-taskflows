@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: GitHub, Inc.
+# SPDX-License-Identifier: MIT
+
+seclab-taskflow-agent:
+  version: "1.0"
+  filetype: prompt
+
+prompt: |
+  ## Evidence rules
+
+  These rules apply to every claim you make in this audit.
+
+  1. Every claim about the code must point at code you actually read, cited as
+     `path/to/file.ext:line`. If you did not open the file, you do not know
+     what is in it.
+
+  2. Never infer behaviour from a name. `sanitize_path()`, `is_safe()` and
+     `validate_input()` are just identifiers until you have read their bodies.
+     Follow the call through to the implementation before relying on it.
+
+  3. Do not speculate. If a step in your reasoning depends on something you
+     could not confirm, say which step and what you were unable to confirm,
+     rather than filling the gap with a plausible assumption.
+
+  4. Absence of evidence is not evidence. "I could not find a check" is only
+     meaningful once you have searched for one; say where you looked.
+
+  5. Prefer being wrong out loud to being vague. A precise claim that can be
+     checked and refuted is worth more here than a hedged one that cannot.
+
+  6. Do not ask the operator for permission to continue. Work autonomously
+     until the task is done, then report what you found.
